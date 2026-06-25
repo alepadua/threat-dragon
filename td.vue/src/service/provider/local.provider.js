@@ -23,6 +23,11 @@ const getDashboardActions = () => ([
         to: `/${providerType}/templates`,
         key: 'createFromTemplate',
         icon: 'file-alt'
+    },
+    {
+        to: `/${providerType}/threatmodel/ai`,
+        key: 'aiThreatModeler',
+        icon: 'robot'
     }
 ]);
 

@@ -35,6 +35,8 @@ import {
     faClone,
     faCog,
     faEllipsisV,
+    faRobot,
+    faInfoCircle
 } from '@fortawesome/free-solid-svg-icons';
 
 import {faBitbucket, faGithub, faGitlab, faVuejs, faGoogle, faGoogleDrive} from '@fortawesome/free-brands-svg-icons';
@@ -77,7 +79,9 @@ library.add(
     faLock,
     faClone,
     faCog,
-    faEllipsisV
+    faEllipsisV,
+    faRobot,
+    faInfoCircle
 );
 
 export { FontAwesomeIcon };

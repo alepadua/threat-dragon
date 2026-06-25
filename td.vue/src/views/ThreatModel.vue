@@ -47,6 +47,8 @@
                 <b-btn-group>
                     <td-form-button id="td-edit-btn" :isPrimary="true" :onBtnClick="onEditClick" icon="edit"
                         :text="$t('forms.edit')" />
+                    <td-form-button id="td-refine-btn" :onBtnClick="onRefineAIClick" icon="robot"
+                        text="Refine with AI" />
                     <td-form-button id="td-report-btn" :onBtnClick="onReportClick" icon="file-alt"
                         :text="$t('forms.report')" />
                     <!-- REPLACE the export template button with dropdown -->
@@ -108,6 +110,10 @@ export default {
         onEditClick(evt) {
             evt.preventDefault();
             this.$router.push({ name: `${this.providerType}ThreatModelEdit`, params: this.$route.params });
+        },
+        onRefineAIClick(evt) {
+            evt.preventDefault();
+            this.$router.push({ name: `${this.providerType}ThreatModelAI`, params: this.$route.params });
         },
         onReportClick(evt) {
             evt.preventDefault();

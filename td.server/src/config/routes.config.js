@@ -1,8 +1,8 @@
-import express from 'express';
-
+import aiController from '../controllers/aiController.js';
 import auth from '../controllers/auth.js';
 import bearer from './bearer.config.js';
 import configController from "../controllers/configcontroller";
+import express from 'express';
 import googleProviderThreatmodelController from '../controllers/googleProviderThreatmodelController.js';
 import healthcheck from '../controllers/healthz.js';
 import homeController from '../controllers/homecontroller.js';
@@ -22,6 +22,8 @@ const unauthRoutes = (router) => {
     router.get('/healthz', healthcheck.healthz);
     router.get('/api/config', configController.config);
     router.get('/api/threatmodel/organisation', threatmodelController.organisation);
+    router.post('/api/ai/threatmodel', aiController.generate);
+    router.get('/api/ai/session/:sessionId', aiController.getSessionState);
     
 
     router.get('/api/login/:provider', auth.login);

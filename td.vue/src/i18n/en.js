@@ -48,8 +48,31 @@ const messages = {
             createNew: 'Create a new, empty threat model',
             readDemo: 'Explore a sample threat model',
             importExisting: 'Import a threat model via JSON',
-            createFromTemplate: 'Create model from a Template'
+            createFromTemplate: 'Create model from a Template',
+            aiThreatModeler: 'Generate Threat Model using AI Agent'
         }
+    },
+    aiThreatModeler: {
+        title: 'AI Agent Threat Modeler',
+        description: 'Upload system architecture documentation and network diagram images. The AI agent will analyze them, map the architecture, perform STRIDE threat modeling, and generate a Threat Dragon diagram for you.',
+        formTitle: 'Threat Model Title',
+        formDescription: 'System Description',
+        formDocs: 'Documentation Files (TXT, MD, DOCX, PDF)',
+        formImages: 'Architecture Diagrams / Images (PNG, JPG, WEBP)',
+        apiKeyOverride: 'Optional: Custom Gemini API Key',
+        apiKeyPlaceholder: 'Enter custom API key if not configured on server...',
+        generateBtn: 'Generate Threat Model with AI',
+        generating: 'Generating Threat Model...',
+        dropFiles: 'Drag & drop files here or click to select',
+        successTitle: 'Threat Model Generated!',
+        successSubtitle: 'The AI agent successfully mapped your architecture and identified threats.',
+        statsElements: 'Components Created',
+        statsThreats: 'STRIDE Threats Identified',
+        statsFlows: 'Data Flows Mapped',
+        openEditor: 'Open in Threat Dragon Editor',
+        downloadJson: 'Download Model JSON',
+        errorTitle: 'Generation Failed',
+        tryAgain: 'Try Again'
     },
     demo: {
         select: 'Select a demo threat model from the list below'
