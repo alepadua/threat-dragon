@@ -36,7 +36,15 @@ import {
     faCog,
     faEllipsisV,
     faRobot,
-    faInfoCircle
+    faInfoCircle,
+    faCheckCircle,
+    faCheckDouble,
+    faShieldAlt,
+    faBug,
+    faCompressArrowsAlt,
+    faArrowLeft,
+    faArrowRight,
+    faCommentDots
 } from '@fortawesome/free-solid-svg-icons';
 
 import {faBitbucket, faGithub, faGitlab, faVuejs, faGoogle, faGoogleDrive} from '@fortawesome/free-brands-svg-icons';
@@ -48,6 +56,8 @@ library.add(
     faGithub,
     faGitlab,
     faBitbucket,
+    faCheckCircle,
+    faCheckDouble,
     faVuejs,
     faPlus,
     faCloudDownloadAlt,
@@ -81,7 +91,13 @@ library.add(
     faCog,
     faEllipsisV,
     faRobot,
-    faInfoCircle
+    faInfoCircle,
+    faShieldAlt,
+    faBug,
+    faCompressArrowsAlt,
+    faArrowLeft,
+    faArrowRight,
+    faCommentDots
 );
 
 export { FontAwesomeIcon };

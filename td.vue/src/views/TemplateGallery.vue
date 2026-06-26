@@ -214,7 +214,58 @@ export default {
                     console.warn('File picker cancelled or error:', e);
                 }
             } else {
-                this.$toast.error('File picker not supported on this browser');
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.json,application/json';
+                input.onchange = async (event) => {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    try {
+                        const text = await file.text();
+                        let templateData;
+                        try {
+                            templateData = JSON.parse(text);
+                        } catch (e) {
+                            this.$toast.error(this.$t('template.errors.invalidJson'));
+                            console.error('JSON parse error:', e);
+                            return;
+                        }
+
+                        const validation = schema.validateTemplateFormat(templateData);
+                        if (!validation.valid) {
+                            console.warn('Template validation failed:', validation.errors);
+                            this.$toast.error(this.$t('template.errors.invalidTemplate'));
+                            return;
+                        }
+
+                        await this.$store.dispatch(tmActions.templateLoad, {
+                            templateData: templateData.model
+                        });
+
+                        const model = this.$store.state.threatmodel.data;
+                        const params = Object.assign({}, this.$route.params, {
+                            threatmodel: model.summary.title
+                        });
+
+                        if (this.isLocalProvider) {
+                            this.$router.push({ name: `${this.providerType}ThreatModel`, params });
+                        } else {
+                            const routeName = this.providerType === providerTypes.google
+                                ? `${this.providerType}Folder`
+                                : `${this.providerType}Repository`;
+
+                            this.$router.push({
+                                name: routeName,
+                                params: { provider: this.selectedProvider },
+                                query: { action: 'create' }
+                            });
+                        }
+                    } catch (e) {
+                        console.error('File import error:', e);
+                        this.$toast.error('Failed to read template file');
+                    }
+                };
+                input.click();
             }
         },
         async onTemplateClick(template) {

@@ -131,7 +131,21 @@ export default {
                     console.warn(e);
                 }
             } else {
-                this.$toast.error('File picker is not yet supported on this browser: use Paste or Drag and Drop');
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.json,application/json';
+                input.onchange = async (event) => {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    if (file.name.endsWith('.json')) {
+                        this.tmJson = await file.text();
+                        this.$store.dispatch(tmActions.update, { fileName: file.name });
+                        this.onImportClick(file.name);
+                    } else {
+                        this.$toast.error(this.$t('threatmodel.errors.onlyJsonAllowed'));
+                    }
+                };
+                input.click();
             }
         },
         onImportClick(fileName) {

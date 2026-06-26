@@ -435,7 +435,7 @@ export default {
                     );
                     if (tmpfreq !== null) objRef.threatFrequency = tmpfreq;
                 }
-                if (objRef.threatFrequency) {
+                if (objRef.threatFrequency && this.threat.modelType) {
                     Object.keys(objRef.threatFrequency).forEach((k) => {
                         if (
                             this.$t(
@@ -469,7 +469,7 @@ export default {
             this.hideModal();
         },
         deleteThreat() {
-            if (!this.threat.new && this.cellRef.data.threatFrequency) {
+            if (!this.threat.new && this.cellRef.data.threatFrequency && this.threat.modelType) {
                 const threatMap = this.cellRef.data.threatFrequency;
                 Object.keys(threatMap).forEach((k) => {
                     if (

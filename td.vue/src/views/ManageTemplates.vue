@@ -214,7 +214,15 @@ export default {
                     console.warn('File picker cancelled');
                 }
             } else {
-                this.$toast.error('File picker not supported on this browser');
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.json,application/json';
+                input.onchange = async (event) => {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    await this.importTemplate(file);
+                };
+                input.click();
             }
         },
 

@@ -257,6 +257,164 @@
                 </div>
             </b-card>
 
+            <!-- DFD Validation / Human-in-the-Loop View -->
+            <b-row v-else-if="step === 'validate-dfd'" class="mb-4">
+                <!-- Left: Model Preview Stats & DFD Critique -->
+                <b-col md="5" class="mb-3">
+                    <b-card class="shadow-sm border-0 h-100" header-class="bg-dark text-white py-2">
+                        <template #header>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0 font-weight-bold">Diagram Draft Preview</h5>
+                                <b-badge variant="info" class="px-2 py-1">Evolução Rodada {{ refinementRound }}</b-badge>
+                            </div>
+                        </template>
+
+                        <!-- Stats summary -->
+                        <b-row class="text-center mb-3">
+                            <b-col cols="6" class="px-1">
+                                <div class="py-2 bg-light border rounded">
+                                    <h4 class="font-weight-bold text-primary mb-0">{{ stats.elements }}</h4>
+                                    <small class="text-muted font-size-xs">Components</small>
+                                </div>
+                            </b-col>
+                            <b-col cols="6" class="px-1">
+                                <div class="py-2 bg-light border rounded">
+                                    <h4 class="font-weight-bold text-success mb-0">{{ stats.flows }}</h4>
+                                    <small class="text-muted font-size-xs">Data Flows</small>
+                                </div>
+                            </b-col>
+                        </b-row>
+
+                        <!-- Completeness Score Card -->
+                        <div class="completeness-score-box bg-light border rounded p-3 mb-3 text-center">
+                            <h6 class="font-weight-bold text-muted mb-1">DFD Completeness Score</h6>
+                            <div class="d-flex align-items-center justify-content-center mb-2">
+                                <h2 class="font-weight-bold mb-0 text-warning" style="font-size: 2.2rem;">
+                                    <span v-if="previousScore !== null && previousScore !== (evaluation ? evaluation.completenessScore : 0)" class="text-muted mr-2" style="font-size: 1.2rem; text-decoration: line-through;">
+                                        {{ previousScore }}%
+                                    </span>
+                                    {{ evaluation ? evaluation.completenessScore : 0 }}%
+                                    <span v-if="previousScore !== null && (evaluation ? evaluation.completenessScore : 0) > previousScore" class="text-success ml-2" style="font-size: 1.2rem;">
+                                        &nbsp;📈 +{{ (evaluation ? evaluation.completenessScore : 0) - previousScore }}%
+                                    </span>
+                                </h2>
+                            </div>
+                            <div v-if="evaluation" class="font-size-xs text-left text-muted mt-2 border-top pt-2">
+                                <div class="d-flex justify-content-between mb-1">
+                                    <span>Component Coverage:</span>
+                                    <span class="font-weight-bold">{{ evaluation.criteria.elementCoverage }}%</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>Unresolved Elements:</span>
+                                    <span class="font-weight-bold text-danger">{{ evaluation.criteria.unresolvedQuestionsCount }}</span>
+                                </div>
+                            </div>
+                            <!-- Status badge -->
+                            <div class="mt-2">
+                                <span class="badge py-1 px-3 font-weight-bold badge-warning text-dark">
+                                    Status: Awaiting Human Validation
+                                </span>
+                            </div>
+                            <!-- Critique feedback text -->
+                            <div v-if="evaluation && evaluation.feedback" class="mt-3 text-left border-top pt-2 font-size-xs">
+                                <div class="font-weight-bold text-dark mb-1">
+                                    <font-awesome-icon icon="info-circle" class="mr-1 text-info" />
+                                    Crítica do DFD (DFDCriticAgent):
+                                </div>
+                                <div class="text-muted" style="line-height: 1.35; white-space: pre-wrap;">{{ evaluation.feedback }}</div>
+                            </div>
+                        </div>
+
+                        <!-- Action buttons directly below stats -->
+                        <div class="mt-3 pt-2 border-top">
+                            <b-button variant="warning" class="w-100 font-weight-bold text-dark mb-2 py-2" @click="openInEditor">
+                                <font-awesome-icon icon="edit" class="mr-2" />
+                                Open in Threat Dragon
+                            </b-button>
+                            <b-button v-if="refinementRound > 1" variant="outline-secondary" class="w-100 mb-2 py-2 font-weight-medium" @click="undoLastRefinement">
+                                <font-awesome-icon icon="undo" class="mr-2" />
+                                Desfazer Última Evolução
+                            </b-button>
+                            <b-button variant="outline-danger" class="w-100" size="sm" @click="resetForm">
+                                Start Over
+                            </b-button>
+                        </div>
+                    </b-card>
+                </b-col>
+
+                <!-- Right: Visual DFD Components & Validation Form -->
+                <b-col md="7" class="mb-3">
+                    <b-card class="shadow-sm border-0 h-100 d-flex flex-column" header-class="bg-warning text-dark py-2">
+                        <template #header>
+                            <h5 class="mb-0 font-weight-bold">
+                                <font-awesome-icon icon="project-diagram" class="mr-2" />
+                                DFD Visual Element Validation
+                            </h5>
+                        </template>
+
+                        <!-- Tabs to switch between Visual Diagram and Element List -->
+                        <b-tabs content-class="mt-3" class="mb-3">
+                            <b-tab title="Visual DFD Diagram" active>
+                                <div class="border rounded p-2 bg-white overflow-auto d-flex justify-content-center" style="max-height: 500px; min-height: 350px;">
+                                    <td-read-only-diagram 
+                                        v-if="generatedModel && generatedModel.detail && generatedModel.detail.diagrams && generatedModel.detail.diagrams[0]" 
+                                        :diagram="generatedModel.detail.diagrams[0]" 
+                                    />
+                                    <div v-else class="text-center text-muted py-4 w-100">No diagram preview available.</div>
+                                </div>
+                            </b-tab>
+                            <b-tab title="DFD Elements List">
+                                <div class="element-list overflow-auto p-2 bg-light border rounded" style="max-height: 500px; min-height: 350px;">
+                                    <div v-for="(elem, idx) in previewElements" :key="idx" class="font-size-sm py-2 border-bottom d-flex justify-content-between align-items-center">
+                                        <span>
+                                            <b-badge :variant="elem.type === 'Actor' ? 'primary' : elem.type === 'Process' ? 'warning text-dark' : 'success'">
+                                                {{ elem.type }}
+                                            </b-badge>
+                                            <strong class="ml-2">{{ elem.name }}</strong>
+                                        </span>
+                                    </div>
+                                </div>
+                            </b-tab>
+                        </b-tabs>
+
+                        <!-- Option 1: Confirm and Proceed -->
+                        <div class="approve-box bg-light border border-success rounded p-3 mb-3 text-center">
+                            <h6 class="font-weight-bold text-success mb-2">
+                                <font-awesome-icon icon="check" class="mr-1 text-success" />
+                                Is the DFD structure complete?
+                            </h6>
+                            <p class="font-size-xs text-muted mb-3">
+                                If the diagram accurately represents your network/application topology, click below to validate it and proceed to generate STRIDE/MITRE threats and security controls.
+                            </p>
+                            <b-button variant="success" class="font-weight-bold w-100 py-2 shadow-sm" @click="approveDfd">
+                                <font-awesome-icon icon="check" class="mr-2" />
+                                Yes, DFD is Complete (Proceed to Threats)
+                            </b-button>
+                        </div>
+
+                        <!-- Option 2: Request modifications -->
+                        <b-form @submit.prevent="submitDfdRefinement">
+                            <b-form-group label="No, the DFD is too simple or missing elements (Request adjustments):" label-class="font-weight-bold font-size-sm text-danger">
+                                <b-form-textarea
+                                    v-model="userResponse"
+                                    rows="2"
+                                    required
+                                    placeholder="e.g. 'Add Azure Key Vault component connected to Account Management Service', or 'Falta o banco de dados CosmosDB conectado ao microsserviço de cartões'..."
+                                    class="custom-input font-size-sm"
+                                ></b-form-textarea>
+                            </b-form-group>
+
+                            <div class="text-right">
+                                <b-button type="submit" variant="warning" class="font-weight-bold text-dark px-4 py-2">
+                                    <font-awesome-icon icon="redo" class="mr-2" />
+                                    Refine & Re-generate DFD
+                                </b-button>
+                            </div>
+                        </b-form>
+                    </b-card>
+                </b-col>
+            </b-row>
+
             <!-- Refinement / Interactive Loop View -->
             <b-row v-else-if="step === 'interactive'" class="mb-4">
                 <!-- Left: Model Preview Stats & Threat List -->
@@ -290,10 +448,19 @@
 
                         <!-- Completeness Score Card -->
                         <div class="completeness-score-box bg-light border rounded p-3 mb-3 text-center">
-                            <h6 class="font-weight-bold text-muted mb-1">Model Completeness Score</h6>
+                            <h6 class="font-weight-bold text-muted mb-1">
+                                <span v-if="!dfdApproved">DFD Completeness Score</span>
+                                <span v-else>Threat Model Completeness Score</span>
+                            </h6>
                             <div class="d-flex align-items-center justify-content-center mb-2">
                                 <h2 class="font-weight-bold mb-0 text-success" style="font-size: 2.2rem;">
+                                    <span v-if="previousScore !== null && previousScore !== (evaluation ? evaluation.completenessScore : 0)" class="text-muted mr-2" style="font-size: 1.2rem; text-decoration: line-through;">
+                                        {{ previousScore }}%
+                                    </span>
                                     {{ evaluation ? evaluation.completenessScore : 0 }}%
+                                    <span v-if="previousScore !== null && (evaluation ? evaluation.completenessScore : 0) > previousScore" class="text-success ml-2" style="font-size: 1.2rem;">
+                                        &nbsp;📈 +{{ (evaluation ? evaluation.completenessScore : 0) - previousScore }}%
+                                    </span>
                                 </h2>
                             </div>
                             <div v-if="evaluation" class="font-size-xs text-left text-muted mt-2 border-top pt-2">
@@ -302,7 +469,7 @@
                                     <span class="font-weight-bold">{{ evaluation.criteria.elementCoverage }}%</span>
                                 </div>
                                 <div class="d-flex justify-content-between mb-1">
-                                    <span>Mitigation Completeness:</span>
+                                    <span>Threat Mapping Completeness:</span>
                                     <span class="font-weight-bold">{{ evaluation.criteria.mitigationCompleteness }}%</span>
                                 </div>
                                 <div class="d-flex justify-content-between">
@@ -312,7 +479,11 @@
                             </div>
                             <!-- Status badge -->
                             <div class="mt-2">
-                                <span class="badge py-1 px-3 font-weight-bold" :class="evaluation && evaluation.status === 'Ready' ? 'badge-success' : 'badge-warning text-dark'">
+                                <span v-if="threatModelApproved" class="badge badge-success py-1 px-3 font-weight-bold">
+                                    <font-awesome-icon icon="check-double" class="mr-1" />
+                                    Status: Concluído e Aprovado
+                                </span>
+                                <span v-else class="badge py-1 px-3 font-weight-bold" :class="evaluation && evaluation.status === 'Ready' ? 'badge-success' : 'badge-warning text-dark'">
                                     Status: {{ evaluation ? evaluation.status : 'Refining' }}
                                 </span>
                             </div>
@@ -320,9 +491,41 @@
                             <div v-if="evaluation && evaluation.feedback" class="mt-3 text-left border-top pt-2 font-size-xs">
                                 <div class="font-weight-bold text-dark mb-1">
                                     <font-awesome-icon icon="info-circle" class="mr-1 text-info" />
-                                    AI Security Critique:
+                                    <span v-if="!dfdApproved">Crítica do DFD (DFDCriticAgent):</span>
+                                    <span v-else>Crítica de Ameaças & Controles (ThreatCriticAgent):</span>
                                 </div>
                                 <div class="text-muted" style="line-height: 1.35; white-space: pre-wrap;">{{ evaluation.feedback }}</div>
+                            </div>
+
+                            <!-- Missing elements / boundaries / metadata lists from Critic -->
+                            <div v-if="!dfdApproved && evaluation && evaluation.criteria" class="mt-3 text-left border-top pt-2 font-size-xs">
+                                <div v-if="evaluation.criteria.missingElements && evaluation.criteria.missingElements.length > 0" class="mb-2">
+                                    <div class="font-weight-bold text-danger mb-1">
+                                        <font-awesome-icon icon="exclamation-triangle" class="mr-1" />
+                                        Componentes / Fluxos Faltantes:
+                                    </div>
+                                    <ul class="pl-3 mb-0 text-muted" style="list-style-type: square;">
+                                        <li v-for="(item, idx) in evaluation.criteria.missingElements" :key="idx" class="mb-1">{{ item }}</li>
+                                    </ul>
+                                </div>
+                                <div v-if="evaluation.criteria.missingBoundaries && evaluation.criteria.missingBoundaries.length > 0" class="mb-2">
+                                    <div class="font-weight-bold text-danger mb-1">
+                                        <font-awesome-icon icon="exclamation-triangle" class="mr-1" />
+                                        Boundaries Faltantes:
+                                    </div>
+                                    <ul class="pl-3 mb-0 text-muted" style="list-style-type: square;">
+                                        <li v-for="(item, idx) in evaluation.criteria.missingBoundaries" :key="idx" class="mb-1">{{ item }}</li>
+                                    </ul>
+                                </div>
+                                <div v-if="evaluation.criteria.missingMetadata && evaluation.criteria.missingMetadata.length > 0" class="mb-2">
+                                    <div class="font-weight-bold text-danger mb-1">
+                                        <font-awesome-icon icon="exclamation-triangle" class="mr-1" />
+                                        Metadados / Descrições Faltantes:
+                                    </div>
+                                    <ul class="pl-3 mb-0 text-muted" style="list-style-type: square;">
+                                        <li v-for="(item, idx) in evaluation.criteria.missingMetadata" :key="idx" class="mb-1">{{ item }}</li>
+                                    </ul>
+                                </div>
                             </div>
                         </div>
 
@@ -389,59 +592,230 @@
                             </h5>
                         </template>
 
-                        <!-- Agent Questions Box -->
-                        <div v-if="questions.length > 0" class="agent-questions-box bg-light border border-warning rounded p-3 mb-3">
-                            <h6 class="font-weight-bold text-warning-dark mb-2">
-                                <font-awesome-icon icon="question-circle" class="mr-1" />
-                                Agent's Clarifying Questions:
-                            </h6>
-                            <ul class="pl-3 mb-0 font-size-sm">
-                                <li v-for="(q, idx) in questions" :key="idx" class="mb-2">{{ q }}</li>
-                            </ul>
-                        </div>
-                        <div v-else class="alert alert-success py-2 font-size-sm mb-3">
-                            <font-awesome-icon icon="check" class="mr-1" />
-                            No further clarifying questions! The agent has all required info, but you can still request manual changes.
+                        <!-- Congratulations Panel if Approved -->
+                        <div v-if="threatModelApproved" class="text-center py-5 d-flex flex-column justify-content-center align-items-center flex-grow-1">
+                            <div class="mb-4 text-success">
+                                <font-awesome-icon icon="check-double" size="4x" />
+                            </div>
+                            <h4 class="font-weight-bold text-success">Modelo de Ameaças Aprovado!</h4>
+                            <p class="text-muted px-4 mt-3">
+                                O processo de modelagem de ameaças para o sistema <strong>{{ form.title }}</strong> foi finalizado e aprovado por você.
+                            </p>
+                            <p class="text-muted px-4 font-size-xs">
+                                Agora você pode baixar o relatório completo da avaliação ou o JSON final do modelo para importar no Threat Dragon.
+                            </p>
+                            <div class="mt-4 w-75">
+                                <b-button variant="outline-primary" class="w-100 py-2 font-weight-bold" @click="undoLastRefinement">
+                                    <font-awesome-icon icon="undo" class="mr-2" />
+                                    Reverter Aprovação (Voltar a Refinar)
+                                </b-button>
+                            </div>
                         </div>
 
-                        <!-- Chat refinement thread -->
-                        <h6 class="font-weight-bold border-bottom pb-1">Refinement History</h6>
-                        <div class="chat-thread flex-grow-1 overflow-auto p-2 bg-light border rounded mb-3" style="max-height: 200px; min-height: 120px;">
-                            <div v-for="(msg, idx) in refinementHistory" :key="idx" class="mb-2 font-size-sm">
-                                <div :class="msg.role === 'user' ? 'text-right' : 'text-left'">
-                                    <span class="badge py-1 px-2" :class="msg.role === 'user' ? 'badge-primary' : 'badge-dark'">
-                                        {{ msg.role === 'user' ? 'You' : 'AI Agent' }}
-                                    </span>
-                                    <div class="d-inline-block rounded p-2 mt-1 max-w-75 text-left border"
-                                         :class="msg.role === 'user' ? 'bg-primary-light border-primary-light text-dark' : 'bg-white text-dark'">
-                                        <div style="white-space: pre-wrap;">{{ msg.text }}</div>
+                        <!-- Q&A Refinement Loop if NOT Approved -->
+                        <div v-else class="d-flex flex-column flex-grow-1">
+                            <!-- Agent Questions Box -->
+                            <div v-if="questions.length > 0" class="agent-questions-box bg-light border border-warning rounded p-3 mb-3">
+                                <h6 class="font-weight-bold text-warning-dark mb-2">
+                                    <font-awesome-icon icon="question-circle" class="mr-1" />
+                                    Agent's Clarifying Questions:
+                                </h6>
+                                <ul class="pl-3 mb-0 font-size-sm">
+                                    <li v-for="(q, idx) in questions" :key="idx" class="mb-2">{{ q }}</li>
+                                </ul>
+                            </div>
+                            <div v-else class="alert alert-success py-2 font-size-sm mb-3">
+                                <font-awesome-icon icon="check" class="mr-1" />
+                                No further clarifying questions! The agent has all required info, but you can still request manual changes.
+                            </div>
+
+                            <!-- Chat refinement thread -->
+                            <h6 class="font-weight-bold border-bottom pb-1">Refinement History</h6>
+                            <div class="chat-thread flex-grow-1 overflow-auto p-2 bg-light border rounded mb-3" style="max-height: 200px; min-height: 120px;">
+                                <div v-for="(msg, idx) in refinementHistory" :key="idx" class="mb-2 font-size-sm">
+                                    <div :class="msg.role === 'user' ? 'text-right' : 'text-left'">
+                                        <span class="badge py-1 px-2" :class="msg.role === 'user' ? 'badge-primary' : 'badge-dark'">
+                                            {{ msg.role === 'user' ? 'You' : 'AI Agent' }}
+                                        </span>
+                                        <div class="d-inline-block rounded p-2 mt-1 max-w-75 text-left border"
+                                             :class="msg.role === 'user' ? 'bg-primary-light border-primary-light text-dark' : 'bg-white text-dark'">
+                                            <div style="white-space: pre-wrap;">{{ msg.text }}</div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
+
+                            <!-- Answering field -->
+                            <b-form @submit.prevent="submitRefinement">
+                                <b-form-group label="Your Answers / Feedback:" label-class="font-weight-bold font-size-sm">
+                                    <b-form-textarea
+                                        v-model="userResponse"
+                                        rows="3"
+                                        required
+                                        placeholder="Answer the questions above or request modifications (e.g. 'Add a Redis cache storage connected to the Backend worker')..."
+                                        class="custom-input font-size-sm"
+                                    ></b-form-textarea>
+                                </b-form-group>
+
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <b-button type="submit" variant="warning" class="font-weight-bold text-dark px-4 py-2">
+                                        <font-awesome-icon icon="robot" class="mr-2" />
+                                        Submit Answers & Refine
+                                    </b-button>
+                                    
+                                    <b-button v-if="evaluation && evaluation.completenessScore >= 80" variant="success" class="font-weight-bold text-white px-4 py-2" @click="approveThreatModel">
+                                        <font-awesome-icon icon="check-double" class="mr-2" />
+                                        Approve & Conclude
+                                    </b-button>
+                                </div>
+                            </b-form>
                         </div>
-
-                        <!-- Answering field -->
-                        <b-form @submit.prevent="submitRefinement">
-                            <b-form-group label="Your Answers / Feedback:" label-class="font-weight-bold font-size-sm">
-                                <b-form-textarea
-                                    v-model="userResponse"
-                                    rows="3"
-                                    required
-                                    placeholder="Answer the questions above or request modifications (e.g. 'Add a Redis cache storage connected to the Backend worker')..."
-                                    class="custom-input font-size-sm"
-                                ></b-form-textarea>
-                            </b-form-group>
-
-                            <div class="text-right">
-                                <b-button type="submit" variant="warning" class="font-weight-bold text-dark px-4 py-2">
-                                    <font-awesome-icon icon="robot" class="mr-2" />
-                                    Submit Answers & Refine
-                                </b-button>
-                            </div>
-                        </b-form>
                     </b-card>
                 </b-col>
             </b-row>
+
+            <!-- Loading Proposals View -->
+            <b-card v-else-if="step === 'generating-proposals'" class="shadow-lg border-0 mb-4 py-5 text-center">
+                <div class="loading-container py-5 text-center">
+                    <b-spinner variant="success" label="Spinning" class="mb-3" style="width: 4rem; height: 4rem;"></b-spinner>
+                    <h3 class="font-weight-bold text-success mt-3">Analisando duplicatas e redundâncias...</h3>
+                    <p class="text-muted">Aguarde enquanto identificamos oportunidades de deduplicação sem perda de contexto.</p>
+                </div>
+            </b-card>
+
+            <!-- Deduplication Review View -->
+            <b-card v-else-if="step === 'deduplicate-review'" class="shadow-lg border-0 mb-4">
+                <template #header>
+                    <div class="d-flex justify-content-between align-items-center py-2">
+                        <div class="text-left">
+                            <h4 class="mb-0 font-weight-bold text-success">
+                                <font-awesome-icon icon="compress-arrows-alt" class="mr-2" />
+                                Revisão e Deduplicação Manual
+                            </h4>
+                            <small class="text-muted">Selecione quais unificações deseja aprovar antes de concluir o modelo de ameaças.</small>
+                        </div>
+                        <b-badge variant="success" class="px-3 py-2 font-size-sm">Human-in-the-Loop</b-badge>
+                    </div>
+                </template>
+
+                <b-row class="text-left">
+                    <!-- Controls Deduplication Card -->
+                    <b-col md="6" class="mb-3">
+                        <b-card class="border-0 shadow-sm h-100 bg-light" header-class="bg-info text-white py-2">
+                            <template #header>
+                                <h5 class="mb-0 font-weight-bold font-size-md">
+                                    <font-awesome-icon icon="shield-alt" class="mr-2" />
+                                    Relatório de Eficácia de Controles ({{ deduplicateProposals && deduplicateProposals.controlDeduplications ? deduplicateProposals.controlDeduplications.length : 0 }})
+                                </h5>
+                            </template>
+
+                            <div v-if="!deduplicateProposals || !deduplicateProposals.controlDeduplications || deduplicateProposals.controlDeduplications.length === 0" class="text-center py-5">
+                                <font-awesome-icon icon="check-circle" size="3x" class="text-success mb-3" />
+                                <p class="text-muted font-weight-bold">Nenhuma redundância encontrada nos controles.</p>
+                            </div>
+
+                            <div v-else>
+                                <div
+                                    v-for="proposal in deduplicateProposals.controlDeduplications"
+                                    :key="proposal.id"
+                                    class="bg-white border rounded p-3 mb-3 shadow-sm"
+                                >
+                                    <div class="d-flex justify-content-between align-items-start border-bottom pb-2 mb-2">
+                                        <b-form-checkbox
+                                            v-model="selectedControlDups"
+                                            :value="proposal.id"
+                                            class="font-weight-bold text-info"
+                                        >
+                                            Unificar Controles em: <b-badge variant="info">{{ proposal.controlCategory }}</b-badge>
+                                        </b-form-checkbox>
+                                    </div>
+
+                                    <div class="font-size-xs text-muted mb-2">
+                                        <strong>Itens a serem mesclados:</strong>
+                                        <ul class="pl-3 mt-1 mb-2">
+                                            <li v-for="(item, iIdx) in proposal.itemsToMerge" :key="iIdx">
+                                                <em>Resposta:</em> "{{ item.userAnswer }}"
+                                            </li>
+                                        </ul>
+                                    </div>
+
+                                    <div class="border rounded p-2 bg-light font-size-xs">
+                                        <strong class="text-success"><font-awesome-icon icon="arrow-right" class="mr-1"/> Resposta Unificada Proposta:</strong>
+                                        <p class="mb-1 mt-1 font-weight-medium text-dark">"{{ proposal.proposedMergedItem.userAnswer }}"</p>
+                                        <strong class="text-success"><font-awesome-icon icon="comment-dots" class="mr-1"/> Recomendações Unificadas:</strong>
+                                        <p class="mb-0 text-muted">"{{ proposal.proposedMergedItem.details }}"</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </b-card>
+                    </b-col>
+
+                    <!-- Threats Deduplication Card -->
+                    <b-col md="6" class="mb-3">
+                        <b-card class="border-0 shadow-sm h-100 bg-light" header-class="bg-danger text-white py-2">
+                            <template #header>
+                                <h5 class="mb-0 font-weight-bold font-size-md">
+                                    <font-awesome-icon icon="bug" class="mr-2" />
+                                    Ameaças no Modelo ({{ deduplicateProposals && deduplicateProposals.threatDeduplications ? deduplicateProposals.threatDeduplications.length : 0 }})
+                                </h5>
+                            </template>
+
+                            <div v-if="!deduplicateProposals || !deduplicateProposals.threatDeduplications || deduplicateProposals.threatDeduplications.length === 0" class="text-center py-5">
+                                <font-awesome-icon icon="check-circle" size="3x" class="text-success mb-3" />
+                                <p class="text-muted font-weight-bold">Nenhuma redundância encontrada nas ameaças.</p>
+                            </div>
+
+                            <div v-else>
+                                <div
+                                    v-for="proposal in deduplicateProposals.threatDeduplications"
+                                    :key="proposal.id"
+                                    class="bg-white border rounded p-3 mb-3 shadow-sm"
+                                >
+                                    <div class="d-flex justify-content-between align-items-start border-bottom pb-2 mb-2">
+                                        <b-form-checkbox
+                                            v-model="selectedThreatDups"
+                                            :value="proposal.id"
+                                            class="font-weight-bold text-danger"
+                                        >
+                                            Unificar Ameaças em: <b-badge variant="danger">{{ proposal.cellName }}</b-badge>
+                                        </b-form-checkbox>
+                                    </div>
+
+                                    <div class="font-size-xs text-muted mb-2">
+                                        <strong>Ameaças a serem mescladas:</strong>
+                                        <ul class="pl-3 mt-1 mb-2">
+                                            <li v-for="(item, tIdx) in proposal.itemsToMerge" :key="tIdx">
+                                                <strong>{{ item.title }}</strong>: "{{ item.description.substring(0, 80) }}..."
+                                            </li>
+                                        </ul>
+                                    </div>
+
+                                    <div class="border rounded p-2 bg-light font-size-xs">
+                                        <strong class="text-danger"><font-awesome-icon icon="arrow-right" class="mr-1"/> Ameaça Unificada Proposta:</strong>
+                                        <p class="mb-1 mt-1 font-weight-bold text-dark">{{ proposal.proposedMergedThreat.title }}</p>
+                                        <strong class="text-danger"><font-awesome-icon icon="info-circle" class="mr-1"/> Descrição Unificada:</strong>
+                                        <p class="mb-1 text-muted">"{{ proposal.proposedMergedThreat.description }}"</p>
+                                        <strong class="text-danger"><font-awesome-icon icon="shield-alt" class="mr-1"/> Mitigação Unificada:</strong>
+                                        <p class="mb-0 text-muted">"{{ proposal.proposedMergedThreat.mitigation }}"</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </b-card>
+                    </b-col>
+                </b-row>
+
+                <div class="d-flex justify-content-between align-items-center border-top pt-3 mt-3">
+                    <b-button variant="outline-secondary" class="font-weight-bold" @click="cancelDeduplication">
+                        <font-awesome-icon icon="arrow-left" class="mr-2" />
+                        Voltar ao Refinamento
+                    </b-button>
+                    
+                    <b-button variant="success" class="font-weight-bold text-white px-5 py-2 shadow-sm" @click="confirmDeduplicationAndApprove">
+                        <font-awesome-icon icon="check-double" class="mr-2" />
+                        Confirmar e Concluir Modelo
+                    </b-button>
+                </div>
+            </b-card>
 
             <!-- Error Card -->
             <b-card
@@ -476,11 +850,13 @@ import { getProviderType } from '@/service/provider/providers.js';
 import { PROVIDER_SELECTED } from '@/store/actions/provider.js';
 import tmActions from '@/store/actions/threatmodel.js';
 import TdFormSelect from '@/components/FormSelect.vue';
+import TdReadOnlyDiagram from '@/components/ReadOnlyDiagram.vue';
 
 export default {
     name: 'AIThreatModeler',
     components: {
-        TdFormSelect
+        TdFormSelect,
+        TdReadOnlyDiagram
     },
     data() {
         return {
@@ -510,6 +886,12 @@ export default {
             refinementHistory: [], // Array of { role: 'user'|'model', text: string }
             userResponse: '',
             refinementRound: 1,
+            previousScore: null,
+            dfdApproved: false,
+            threatModelApproved: false,
+            deduplicateProposals: null,
+            selectedControlDups: [],
+            selectedThreatDups: [],
             stats: {
                 elements: 0,
                 flows: 0,
@@ -571,6 +953,10 @@ export default {
             }
         } catch (e) {
             this.recentSessions = [];
+        }
+
+        if (this.savedSessionId && this.$route.query.resume === 'true') {
+            this.resumeSession(this.savedSessionId);
         }
     },
     methods: {
@@ -704,7 +1090,8 @@ export default {
                     });
                 }
 
-                this.step = 'interactive';
+                this.dfdApproved = false;
+                this.step = 'validate-dfd';
 
             } catch (err) {
                 console.error(err);
@@ -739,7 +1126,9 @@ export default {
                     currentModel: this.generatedModel,
                     refinementHistory: this.refinementHistory,
                     sessionId: this.sessionId,
-                    methodology: this.form.methodology
+                    methodology: this.form.methodology,
+                    dfdApproved: this.dfdApproved,
+                    threatModelApproved: this.threatModelApproved
                 };
 
                 const response = await axios.post('/api/ai/threatmodel', payload);
@@ -767,7 +1156,11 @@ export default {
                     });
                 }
 
-                this.step = 'interactive';
+                if (this.dfdApproved) {
+                    this.step = 'interactive';
+                } else {
+                    this.step = 'validate-dfd';
+                }
 
             } catch (err) {
                 console.error(err);
@@ -781,6 +1174,18 @@ export default {
             this.generatedModel = model;
             this.questions = result.questions || [];
             this.sessionId = result.sessionId || null;
+            if (result.dfdApproved !== undefined) {
+                this.dfdApproved = result.dfdApproved;
+            }
+            if (result.threatModelApproved !== undefined) {
+                this.threatModelApproved = result.threatModelApproved;
+            }
+
+            if (this.evaluation && this.evaluation.completenessScore !== undefined) {
+                this.previousScore = this.evaluation.completenessScore;
+            } else {
+                this.previousScore = null;
+            }
             this.evaluation = result.evaluation || null;
 
             if (this.sessionId) {
@@ -847,7 +1252,6 @@ export default {
         },
         openInEditor() {
             if (!this.generatedModel) return;
-            this.clearSavedSession();
             this.$store.dispatch(tmActions.selected, this.generatedModel);
             const params = Object.assign({}, this.$route.params, {
                 threatmodel: this.generatedModel.summary.title
@@ -873,6 +1277,33 @@ export default {
             this.generatedModel = null;
             this.clearSavedSession();
         },
+        async undoLastRefinement() {
+            if (!this.sessionId) return;
+            this.step = 'generating';
+            this.progressIndex = 4;
+            this.errorMessage = '';
+
+            try {
+                const response = await axios.post('/api/ai/threatmodel/undo', {
+                    sessionId: this.sessionId
+                });
+                const result = response.data.data;
+                this.updateLocalState(result);
+                this.refinementHistory = result.refinementHistory || [];
+                const userMsgCount = this.refinementHistory.filter(m => m.role === 'user').length;
+                this.refinementRound = userMsgCount + 1;
+
+                if (this.dfdApproved) {
+                    this.step = 'interactive';
+                } else {
+                    this.step = 'validate-dfd';
+                }
+            } catch (err) {
+                console.error('Failed to undo last refinement round:', err);
+                this.errorMessage = err.response?.data?.message || err.message || 'Error occurred while reverting to the previous round.';
+                this.step = 'error';
+            }
+        },
         clearSavedSession() {
             localStorage.removeItem('active_ai_session_id');
             this.savedSessionId = null;
@@ -893,10 +1324,6 @@ export default {
             }
         },
         async resumeSession(sessionId) {
-            this.step = 'generating';
-            this.progressIndex = 0;
-            this.progressSteps.forEach(step => step.state = 'pending');
-            this.progressIndex = 1;
             try {
                 const response = await axios.get(`/api/ai/session/${sessionId}`);
                 const result = response.data.data;
@@ -907,22 +1334,84 @@ export default {
                 this.refinementHistory = result.refinementHistory || [];
                 
                 this.updateLocalState({
-                    threatModel: result.threatModel,
+                    threatModel: this.generatedModel || result.threatModel,
                     questions: result.questions,
                     evaluation: result.evaluation,
-                    sessionId: result.sessionId
+                    sessionId: result.sessionId,
+                    dfdApproved: result.dfdApproved || false,
+                    threatModelApproved: result.threatModelApproved || false
                 });
                 
                 const userMsgCount = this.refinementHistory.filter(m => m.role === 'user').length;
                 this.refinementRound = userMsgCount + 1;
 
-                this.step = 'interactive';
+                if (this.dfdApproved) {
+                    this.step = 'interactive';
+                } else {
+                    this.step = 'validate-dfd';
+                }
             } catch (err) {
                 console.error('Failed to resume session:', err);
                 this.$toast.error('Failed to resume the session. It may have expired or been deleted.');
                 this.clearSavedSession();
                 this.step = 'input';
             }
+        },
+        async approveDfd() {
+            this.dfdApproved = true;
+            this.userResponse = 'Aprovado. O DFD está completo.';
+            await this.submitRefinement();
+        },
+        async approveThreatModel() {
+            this.step = 'generating-proposals';
+            try {
+                const response = await axios.get(`/api/ai/session/${this.sessionId}/deduplicate-proposals`);
+                const proposals = response.data.data;
+                
+                const hasControls = proposals.controlDeduplications && proposals.controlDeduplications.length > 0;
+                const hasThreats = proposals.threatDeduplications && proposals.threatDeduplications.length > 0;
+                
+                if (!hasControls && !hasThreats) {
+                    await this.confirmDeduplicationAndApprove([], []);
+                    return;
+                }
+                
+                this.deduplicateProposals = proposals;
+                this.selectedControlDups = (proposals.controlDeduplications || []).map(p => p.id);
+                this.selectedThreatDups = (proposals.threatDeduplications || []).map(p => p.id);
+                
+                this.step = 'deduplicate-review';
+            } catch (err) {
+                await this.confirmDeduplicationAndApprove([], []);
+            }
+        },
+        cancelDeduplication() {
+            this.step = 'interactive';
+        },
+        async confirmDeduplicationAndApprove(controlDups = null, threatDups = null) {
+            this.step = 'generating-proposals';
+            
+            const approvedControlIds = Array.isArray(controlDups) ? controlDups : this.selectedControlDups;
+            const approvedThreatIds = Array.isArray(threatDups) ? threatDups : this.selectedThreatDups;
+
+            try {
+                const response = await axios.post(`/api/ai/session/${this.sessionId}/apply-deduplication`, {
+                    approvedControlDeduplicationIds: approvedControlIds,
+                    approvedThreatDeduplicationIds: approvedThreatIds
+                });
+                
+                const data = response.data.data;
+                this.generatedModel = data.threatModel;
+                this.evaluation = data.evaluation;
+                this.threatModelApproved = true;
+                this.step = 'interactive';
+            } catch (err) {
+                this.errorMessage = err.message || 'Error occurred while applying deduplication';
+                this.step = 'error';
+            }
+        },
+        async submitDfdRefinement() {
+            await this.submitRefinement();
         },
         downloadAssessmentReport() {
             if (!this.generatedModel || !this.evaluation) return;

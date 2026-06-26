@@ -20,6 +20,11 @@ const getSessionPath = (sessionId) => {
     return path.join(SESSIONS_DIR, `${safeId}.json`);
 };
 
+const getVectorsPath = (sessionId) => {
+    const safeId = sessionId.replace(/[^a-zA-Z0-9-]/gu, '');
+    return path.join(SESSIONS_DIR, `${safeId}.vectors.json`);
+};
+
 export const createSession = (data) => {
     ensureSessionsDir();
     const sessionId = crypto.randomUUID();
@@ -32,6 +37,7 @@ export const createSession = (data) => {
         images: data.images || [],
         refinementHistory: data.refinementHistory || [],
         currentModel: data.currentModel || null,
+        history: [],
         methodology: data.methodology || 'STRIDE'
     };
 
@@ -52,6 +58,30 @@ export const getSession = (sessionId) => {
         return JSON.parse(content);
     } catch (err) {
         logger.error(`Error reading session ${sessionId}: ${err.message}`);
+        return null;
+    }
+};
+
+export const saveVectors = (sessionId, chunksWithEmbeddings) => {
+    ensureSessionsDir();
+    const filePath = getVectorsPath(sessionId);
+    fs.writeFileSync(filePath, JSON.stringify(chunksWithEmbeddings, null, 2), 'utf-8');
+    logger.info(`Saved session vectors: ${sessionId}`);
+    return true;
+};
+
+export const getVectors = (sessionId) => {
+    ensureSessionsDir();
+    const filePath = getVectorsPath(sessionId);
+    if (!fs.existsSync(filePath)) {
+        logger.warn(`Vectors not found for session: ${sessionId}`);
+        return null;
+    }
+    try {
+        const content = fs.readFileSync(filePath, 'utf-8');
+        return JSON.parse(content);
+    } catch (err) {
+        logger.error(`Error reading vectors for session ${sessionId}: ${err.message}`);
         return null;
     }
 };
@@ -77,9 +107,17 @@ export const updateSession = (sessionId, updates) => {
 export const deleteSession = (sessionId) => {
     ensureSessionsDir();
     const filePath = getSessionPath(sessionId);
+    const vectorsPath = getVectorsPath(sessionId);
+    let deleted = false;
     if (fs.existsSync(filePath)) {
         fs.unlinkSync(filePath);
-        logger.info(`Deleted session: ${sessionId}`);
+        deleted = true;
+    }
+    if (fs.existsSync(vectorsPath)) {
+        fs.unlinkSync(vectorsPath);
+    }
+    if (deleted) {
+        logger.info(`Deleted session and associated vectors: ${sessionId}`);
         return true;
     }
     return false;
@@ -89,5 +127,7 @@ export default {
     createSession,
     getSession,
     updateSession,
-    deleteSession
+    deleteSession,
+    saveVectors,
+    getVectors
 };

@@ -113,7 +113,7 @@ export default {
         },
         onRefineAIClick(evt) {
             evt.preventDefault();
-            this.$router.push({ name: `${this.providerType}ThreatModelAI`, params: this.$route.params });
+            this.$router.push({ name: `${this.providerType}ThreatModelAI`, params: this.$route.params, query: { resume: 'true' } });
         },
         onReportClick(evt) {
             evt.preventDefault();
