@@ -38,7 +38,9 @@ export const createSession = (data) => {
         refinementHistory: data.refinementHistory || [],
         currentModel: data.currentModel || null,
         history: [],
-        methodology: data.methodology || 'STRIDE'
+        methodology: data.methodology || 'STRIDE',
+        questionPlan: data.questionPlan || null,
+        answeredQuestionIds: data.answeredQuestionIds || []
     };
 
     fs.writeFileSync(getSessionPath(sessionId), JSON.stringify(sessionData, null, 2), 'utf-8');

@@ -83,7 +83,11 @@
                                     v-model="form.methodology"
                                     :options="[
                                         { value: 'STRIDE', text: 'STRIDE (Standard Cyber Security)' },
-                                        { value: 'MITRE_F3', text: 'MITRE F3 (Fraud Prevention Framework)' }
+                                        { value: 'LINDDUN', text: 'LINDDUN (Privacy Threats)' },
+                                        { value: 'CIA', text: 'CIA (Confidentiality, Integrity, Availability)' },
+                                        { value: 'DIE', text: 'DIE (Distributed, Immutable, Ephemeral)' },
+                                        { value: 'MITRE_F3', text: 'MITRE F3 (Fraud Prevention Framework)' },
+                                        { value: 'PLOT4ai', text: 'PLOT4ai (AI/ML Responsible Threats)' }
                                     ]"
                                 />
                             </b-form-group>
@@ -544,9 +548,13 @@
                                 <font-awesome-icon icon="edit" class="mr-2" />
                                 Open in Threat Dragon
                             </b-button>
+                            <b-button variant="primary" class="w-100 mb-2 py-2 font-weight-bold text-white" @click="downloadPdfReport">
+                                <font-awesome-icon icon="file-pdf" class="mr-2" />
+                                Download PDF Report
+                            </b-button>
                             <b-button variant="info" class="w-100 mb-2 py-2 font-weight-bold" @click="downloadAssessmentReport">
                                 <font-awesome-icon icon="file-alt" class="mr-2" />
-                                Download Assessment Report
+                                Download Markdown Report
                             </b-button>
                             <b-button variant="secondary" class="w-100 mb-2 py-2" @click="downloadJson">
                                 <font-awesome-icon icon="cloud-download-alt" class="mr-2" />
@@ -586,11 +594,58 @@
                 <b-col md="7" class="mb-3">
                     <b-card class="shadow-sm border-0 h-100 d-flex flex-column" header-class="bg-warning text-dark py-2">
                         <template #header>
-                            <h5 class="mb-0 font-weight-bold">
-                                <font-awesome-icon icon="robot" class="mr-2" />
-                                Model Refinement Round {{ refinementRound }}
-                            </h5>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h5 class="mb-0 font-weight-bold">
+                                    <font-awesome-icon icon="robot" class="mr-2" />
+                                    Model Refinement Round {{ refinementRound }}
+                                </h5>
+                                <b-badge v-if="questionPlan" variant="dark" class="px-2 py-1 font-size-xs">
+                                    {{ questionPlan.methodology }}
+                                </b-badge>
+                            </div>
                         </template>
+
+                        <!-- Question Progress Bar (only shown when plan exists) -->
+                        <div v-if="questionPlan && !threatModelApproved" class="question-progress-box bg-light border rounded p-3 mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="font-weight-bold text-dark mb-0">
+                                    <font-awesome-icon icon="tasks" class="mr-1 text-warning" />
+                                    {{ $t('aiThreatModeler.frameworkCoverage') }}
+                                </h6>
+                                <span class="font-weight-bold font-size-sm">
+                                    {{ questionProgress.answered }}/{{ questionProgress.total }}
+                                    <span class="text-muted font-size-xs ml-1">{{ $t('aiThreatModeler.questionsAnswered') }}</span>
+                                </span>
+                            </div>
+                            <!-- Overall progress bar -->
+                            <b-progress :max="100" height="20px" class="mb-2 shadow-sm">
+                                <b-progress-bar
+                                    :value="questionProgress.percentage"
+                                    :variant="questionProgress.percentage >= 80 ? 'success' : questionProgress.percentage >= 50 ? 'warning' : 'info'"
+                                    :label="questionProgress.percentage + '%'"
+                                    animated
+                                    striped
+                                />
+                            </b-progress>
+                            <div class="font-size-xs text-muted mb-2">
+                                {{ $t('aiThreatModeler.estimatedRounds') }}: ~{{ questionPlan.estimatedRounds }} | 
+                                {{ questionProgress.total - questionProgress.answered }} {{ $t('aiThreatModeler.questionsRemaining') }}
+                            </div>
+                            <!-- Per-category mini progress -->
+                            <div v-if="questionPlan.byCategory" class="category-progress mt-2 border-top pt-2">
+                                <div class="font-weight-bold font-size-xs text-muted mb-1">{{ $t('aiThreatModeler.categoryProgress') }}</div>
+                                <div v-for="(catData, catName) in questionPlan.byCategory" :key="catName" class="d-flex align-items-center mb-1">
+                                    <span class="font-size-xs text-dark" style="min-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ catName }}</span>
+                                    <b-progress :max="catData.total || 1" height="10px" class="flex-grow-1 mx-2">
+                                        <b-progress-bar
+                                            :value="catData.answered"
+                                            :variant="catData.answered >= catData.total ? 'success' : 'info'"
+                                        />
+                                    </b-progress>
+                                    <span class="font-size-xs text-muted" style="min-width: 40px; text-align: right;">{{ catData.answered }}/{{ catData.total }}</span>
+                                </div>
+                            </div>
+                        </div>
 
                         <!-- Congratulations Panel if Approved -->
                         <div v-if="threatModelApproved" class="text-center py-5 d-flex flex-column justify-content-center align-items-center flex-grow-1">
@@ -621,7 +676,7 @@
                                     Agent's Clarifying Questions:
                                 </h6>
                                 <ul class="pl-3 mb-0 font-size-sm">
-                                    <li v-for="(q, idx) in questions" :key="idx" class="mb-2">{{ q }}</li>
+                                    <li v-for="(q, idx) in questions" :key="idx" class="mb-2">{{ q.text || q }}</li>
                                 </ul>
                             </div>
                             <div v-else class="alert alert-success py-2 font-size-sm mb-3">
@@ -839,6 +894,229 @@
                     </b-button>
                 </div>
             </b-card>
+            <!-- Off-screen Premium PDF print template -->
+            <div id="pdf-report-template" style="position: absolute; left: 0; top: 0; width: 680px; height: 1px; overflow: hidden; opacity: 0.01; pointer-events: none; z-index: -9999; font-family: 'Outfit', 'Inter', 'Helvetica Neue', Arial, sans-serif; color: #1e293b; background-color: #ffffff; line-height: 1.6;">
+                <!-- Capa / Cover Page -->
+                <div class="pdf-cover-page" style="width: 100%; height: 880px; display: flex; flex-direction: column; justify-content: space-between; padding: 0 30px 30px 30px; box-sizing: border-box;">
+                    <div>
+                        <!-- Logo / Header -->
+                        <div style="display: flex; align-items: center; margin-bottom: 60px;">
+                            <img src="@/assets/threatdragon_logo_image.svg" alt="Threat Dragon Logo" style="height: 50px; margin-right: 15px;" onerror="this.style.display='none'" />
+                            <div style="font-size: 26px; font-weight: 800; color: #0f172a; letter-spacing: -0.5px;">OWASP Threat Dragon</div>
+                        </div>
+
+                        <!-- Title -->
+                        <h1 style="font-size: 36px; font-weight: 900; color: #0f172a; line-height: 1.1; margin-bottom: 20px; letter-spacing: -1px;">
+                            Threat Modeling Assessment Report
+                        </h1>
+                        <h2 style="font-size: 24px; font-weight: 600; color: #0ea5e9; margin-bottom: 40px;">
+                            {{ form.title }}
+                        </h2>
+
+                        <!-- Description -->
+                        <p style="font-size: 16px; color: #64748b; max-width: 600px; margin-bottom: 60px;">
+                            {{ form.description || 'N/A' }}
+                        </p>
+                    </div>
+
+                    <!-- Metadata Grid -->
+                    <div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 60px; background-color: #f8fafc; padding: 25px; border-radius: 12px; border: 1px solid #e2e8f0;">
+                            <div>
+                                <span style="font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; font-weight: 700; display: block; margin-bottom: 5px;">Methodology</span>
+                                <span style="font-size: 16px; font-weight: 700; color: #334155;">{{ form.methodology }}</span>
+                            </div>
+                            <div>
+                                <span style="font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; font-weight: 700; display: block; margin-bottom: 5px;">Date Generated</span>
+                                <span style="font-size: 16px; font-weight: 700; color: #334155;">{{ new Date().toLocaleDateString('pt-BR') }}</span>
+                            </div>
+                            <div>
+                                <span style="font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; font-weight: 700; display: block; margin-bottom: 5px;">Completeness Score</span>
+                                <span style="font-size: 16px; font-weight: 700; color: #10b981;">{{ evaluation ? evaluation.completenessScore : 0 }}%</span>
+                            </div>
+                            <div>
+                                <span style="font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #94a3b8; font-weight: 700; display: block; margin-bottom: 5px;">Assessment Status</span>
+                                <span style="font-size: 16px; font-weight: 700; color: #0ea5e9;">{{ evaluation ? evaluation.status : 'Awaiting Approval' }}</span>
+                            </div>
+                        </div>
+
+                        <!-- Footer Cover -->
+                        <div style="font-size: 12px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 20px; display: flex; justify-content: space-between;">
+                            <span>CONFIDENTIAL - INTERNAL SECURITY REPORT</span>
+                            <span>Powered by AI Threat Modeler</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Executive Summary Page -->
+                <div class="pdf-page" style="width: 100%; page-break-before: always; padding: 40px 30px 0 30px; box-sizing: border-box;">
+                    <h2 style="font-size: 24px; font-weight: 800; color: #0f172a; margin-bottom: 25px; border-bottom: 2px solid #0ea5e9; padding-bottom: 10px;">
+                        1. Executive Summary
+                    </h2>
+                    
+                    <div style="background-color: #f0f9ff; border-left: 5px solid #0ea5e9; border-radius: 6px; padding: 20px; margin-bottom: 30px;">
+                        <h4 style="font-size: 16px; font-weight: 700; color: #0369a1; margin-bottom: 10px;">Threat Critic & Controls Audit:</h4>
+                        <p style="font-size: 14px; color: #334155; margin-bottom: 0; white-space: pre-line;">
+                            {{ evaluation ? evaluation.feedback : 'No feedback available.' }}
+                        </p>
+                    </div>
+
+                    <!-- Statistics / Quick Stats -->
+                    <div style="display: flex; gap: 20px; margin-bottom: 40px;">
+                        <div style="flex: 1; text-align: center; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px;">
+                            <span style="font-size: 32px; font-weight: 800; color: #0f172a; display: block; line-height: 1;">{{ generatedModel ? generatedModel.detail.diagrams[0].cells.filter(c => c.type !== 'tm.Boundary').length : 0 }}</span>
+                            <span style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase;">DFD Components</span>
+                        </div>
+                        <div style="flex: 1; text-align: center; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px;">
+                            <span style="font-size: 32px; font-weight: 800; color: #0f172a; display: block; line-height: 1;">{{ totalThreats }}</span>
+                            <span style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase;">Identified Threats</span>
+                        </div>
+                        <div style="flex: 1; text-align: center; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px;">
+                            <span style="font-size: 32px; font-weight: 800; color: #10b981; display: block; line-height: 1;">{{ evaluation ? evaluation.completenessScore : 0 }}%</span>
+                            <span style="font-size: 12px; color: #64748b; font-weight: 600; text-transform: uppercase;">Model Progress</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Framework Coverage Page -->
+                <div class="pdf-page" style="width: 100%; page-break-before: always; padding: 40px 30px 0 30px; box-sizing: border-box;" v-if="questionPlan">
+                    <h2 style="font-size: 24px; font-weight: 800; color: #0f172a; margin-bottom: 25px; border-bottom: 2px solid #0ea5e9; padding-bottom: 10px;">
+                        2. Framework Coverage Analysis
+                    </h2>
+                    <p style="font-size: 14px; color: #64748b; margin-bottom: 30px;">
+                        Below is the completion status of threat modeling categories mapped from the DFD components and boundaries for the <strong>{{ form.methodology }}</strong> framework:
+                    </p>
+
+                    <!-- Category Coverage bars -->
+                    <div style="margin-bottom: 40px;">
+                        <div v-for="(progress, cat) in questionPlan.byCategory" :key="cat" style="margin-bottom: 15px;">
+                            <div style="display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; color: #334155; margin-bottom: 4px;">
+                                <span>{{ cat }}</span>
+                                <span>{{ progress.answered }}/{{ progress.total }} answered ({{ Math.round((progress.answered / progress.total) * 100) }}%)</span>
+                            </div>
+                            <div style="height: 10px; background-color: #f1f5f9; border-radius: 5px; overflow: hidden; width: 100%;">
+                                <div :style="{ width: (progress.total > 0 ? ((progress.answered / progress.total) * 100) : 0) + '%', backgroundColor: '#0ea5e9', height: '100%', borderRadius: '5px' }"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Visual DFD Diagram Page -->
+                <div class="pdf-page pdf-landscape-page" style="width: 1000px; height: 670px; page-break-before: always; padding: 40px 30px 30px 30px; box-sizing: border-box; background-color: #ffffff;" v-if="generatedModel && generatedModel.detail && generatedModel.detail.diagrams && generatedModel.detail.diagrams[0]">
+                    <h2 style="font-size: 24px; font-weight: 800; color: #0f172a; margin-bottom: 25px; border-bottom: 2px solid #0ea5e9; padding-bottom: 10px;">
+                        3. Visual Data Flow Diagram (DFD)
+                    </h2>
+                    <p style="font-size: 14px; color: #64748b; margin-bottom: 20px;">
+                        The graphical system topology representing components, data flows, and trust boundaries:
+                    </p>
+                    <div style="width: 100%; height: 500px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; background-color: #ffffff;">
+                        <td-read-only-diagram 
+                            :diagram="generatedModel.detail.diagrams[0]" 
+                            :width="940"
+                            :height="500"
+                        />
+                    </div>
+                </div>
+
+                <!-- Security Control Efficacy Report Page -->
+                <div class="pdf-page" style="width: 100%; page-break-before: always; padding: 40px 30px 0 30px; box-sizing: border-box;" v-if="evaluation && evaluation.controlsAssessment && evaluation.controlsAssessment.length > 0">
+                    <h2 style="font-size: 24px; font-weight: 800; color: #0f172a; margin-bottom: 25px; border-bottom: 2px solid #0ea5e9; padding-bottom: 10px;">
+                        4. Security Control Efficacy Assessment
+                    </h2>
+                    <p style="font-size: 14px; color: #64748b; margin-bottom: 20px;">
+                        Audited mitigations and security controls evaluated during the interactive sessions:
+                    </p>
+
+                    <!-- Efficacy Table -->
+                    <table style="width: 100%; border-collapse: collapse; font-size: 13px; text-align: left;">
+                        <thead>
+                            <tr style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                                <th style="padding: 12px 10px; font-weight: 700; color: #475569; width: 25%;">Security Control</th>
+                                <th style="padding: 12px 10px; font-weight: 700; color: #475569; width: 15%;">Efficacy</th>
+                                <th style="padding: 12px 10px; font-weight: 700; color: #475569; width: 60%;">Critique / Recommendations</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="(item, idx) in evaluation.controlsAssessment" :key="idx" style="border-bottom: 1px solid #f1f5f9;">
+                                <td style="padding: 12px 10px; font-weight: 600; color: #334155;">{{ item.securityControl }}</td>
+                                <td style="padding: 12px 10px;">
+                                    <span v-if="item.assessment === 'Eficaz'" style="background-color: #dcfce7; color: #15803d; padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 11px; display: inline-block;">
+                                        ✅ Eficaz
+                                    </span>
+                                    <span v-else style="background-color: #ffedd5; color: #c2410c; padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 11px; display: inline-block;">
+                                        ⚠️ Melhorar
+                                    </span>
+                                </td>
+                                <td style="padding: 12px 10px; color: #475569; font-size: 12px;">{{ item.details }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- DFD Components and Threats Inventory Page -->
+                <div class="pdf-page" style="width: 100%; page-break-before: always; padding: 40px 30px 0 30px; box-sizing: border-box;" v-if="generatedModel">
+                    <h2 style="font-size: 24px; font-weight: 800; color: #0f172a; margin-bottom: 25px; border-bottom: 2px solid #0ea5e9; padding-bottom: 10px;">
+                        5. Component Security Inventory
+                    </h2>
+                    <p style="font-size: 14px; color: #64748b; margin-bottom: 20px;">
+                        Catalog of elements identified in the DFD topology and their associated security threats:
+                    </p>
+
+                    <div v-for="elem in sortedElementsWithThreats" :key="elem.id" style="margin-bottom: 25px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; page-break-inside: avoid;">
+                        <div style="background-color: #f8fafc; padding: 12px 15px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                            <span style="font-weight: 700; color: #334155;">{{ elem.type }}: {{ elem.name }}</span>
+                            <span style="background-color: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 700;">
+                                {{ elem.threatsCount }} threats
+                            </span>
+                        </div>
+                        <div style="padding: 15px; background-color: #ffffff;">
+                            <div v-if="elem.threats && elem.threats.length > 0">
+                                <div v-for="(threat, tIdx) in elem.threats" :key="tIdx" style="margin-bottom: 12px; border-bottom: 1px dashed #f1f5f9; padding-bottom: 10px; font-size: 12px;">
+                                    <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+                                        <span style="font-weight: 700; color: #0f172a;">{{ threat.title }}</span>
+                                        <span :style="{ color: threat.severity === 'High' || threat.severity === 'Critical' ? '#dc2626' : '#d97706', fontWeight: '700' }">
+                                            {{ threat.severity }} (Risk: {{ threat.score }})
+                                        </span>
+                                    </div>
+                                    <div style="color: #475569; margin-bottom: 4px;"><strong>Scenario:</strong> {{ threat.description }}</div>
+                                    <div style="color: #10b981; font-weight: 600;"><strong>Mitigation:</strong> {{ threat.mitigation }}</div>
+                                </div>
+                            </div>
+                            <p v-else style="font-size: 12px; color: #94a3b8; font-style: italic; margin-bottom: 0;">
+                                No threats found or mapped for this component.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Refinement History Page -->
+                <div class="pdf-page" style="width: 100%; page-break-before: always; padding: 40px 30px 0 30px; box-sizing: border-box;" v-if="refinementHistory && refinementHistory.length > 0">
+                    <h2 style="font-size: 24px; font-weight: 800; color: #0f172a; margin-bottom: 25px; border-bottom: 2px solid #0ea5e9; padding-bottom: 10px;">
+                        6. Audit Trail & Refinement History
+                    </h2>
+                    <p style="font-size: 14px; color: #64748b; margin-bottom: 20px;">
+                        Complete Q&A audit log history representing design refinement sessions:
+                    </p>
+
+                    <div v-for="(msg, idx) in refinementHistory" :key="idx" style="margin-bottom: 20px; page-break-inside: avoid;">
+                        <div style="display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; color: #475569; margin-bottom: 5px;">
+                            <span>{{ msg.role === 'user' ? '👤 User Response' : '🤖 AI Agent Prompt' }}</span>
+                            <span>Round {{ Math.floor(idx / 2) + 1 }}</span>
+                        </div>
+                        <div :style="{
+                            backgroundColor: msg.role === 'user' ? '#f8fafc' : '#f0f9ff',
+                            borderLeft: msg.role === 'user' ? '4px solid #94a3b8' : '4px solid #0ea5e9',
+                            borderRadius: '4px',
+                            padding: '12px 15px',
+                            fontSize: '13px',
+                            color: '#334155',
+                            whiteSpace: 'pre-line'
+                        }">
+                            {{ msg.text }}
+                        </div>
+                    </div>
+                </div>
+            </div>
         </b-col>
     </b-row>
 </template>
@@ -898,14 +1176,59 @@ export default {
                 threats: 0
             },
             previewElements: [], // list of elements parsed for stats
-            errorMessage: ''
+            errorMessage: '',
+            questionPlan: null,
+            questionProgress: { answered: 0, total: 0, percentage: 0 }
         };
     },
-    computed: mapState({
-        providerType: (state) => getProviderType(state.provider.selected || 'local'),
-        version: (state) => state.packageBuildVersion,
-        existingModel: (state) => state.threatmodel.data
-    }),
+    computed: {
+        ...mapState({
+            providerType: (state) => getProviderType(state.provider.selected || 'local'),
+            version: (state) => state.packageBuildVersion,
+            existingModel: (state) => state.threatmodel.data
+        }),
+        sortedElementsWithThreats() {
+            if (!this.generatedModel) return [];
+            const result = [];
+            const diagrams = this.generatedModel.detail?.diagrams || [];
+            diagrams.forEach((diagram) => {
+                if (diagram.cells) {
+                    diagram.cells.forEach((cell) => {
+                        if (cell.shape !== 'trust-boundary-curve') {
+                            const name = cell.data?.name || cell.id;
+                            let cellType = 'Component';
+                            if (cell.shape === 'flow') {
+                                cellType = 'Data Flow';
+                            } else {
+                                if (cell.shape === 'actor') cellType = 'Actor';
+                                if (cell.shape === 'store') cellType = 'Data Store';
+                                if (cell.shape === 'process') cellType = 'Process';
+                            }
+                            
+                            const threats = cell.data?.threats || [];
+                            result.push({
+                                id: cell.id,
+                                name,
+                                type: cellType,
+                                threatsCount: threats.length,
+                                threats: threats.map((t) => ({
+                                    title: t.title || 'Untitled Threat',
+                                    severity: t.severity || 'Medium',
+                                    score: t.score || '5',
+                                    description: t.description || 'No description provided.',
+                                    mitigation: t.mitigation || 'No mitigation documented.'
+                                }))
+                            });
+                        }
+                    });
+                }
+            });
+            return result.sort((a, b) => b.threatsCount - a.threatsCount || a.name.localeCompare(b.name));
+        },
+        totalThreats() {
+            return this.stats?.threats || 0;
+        }
+    },
     watch: {
         existingModel: {
             immediate: true,
@@ -1081,15 +1404,6 @@ export default {
                 const result = response.data.data;
                 this.updateLocalState(result);
 
-                // Add initial questions to chat thread
-                if (this.questions.length > 0) {
-                    this.refinementHistory.push({
-                        role: 'model',
-                        text: 'Welcome! I have mapped your initial architecture. Please answer these questions to help me refine the threat model:\n\n' + 
-                              this.questions.map((q, i) => `${i + 1}. ${q}`).join('\n')
-                    });
-                }
-
                 this.dfdApproved = false;
                 this.step = 'validate-dfd';
 
@@ -1138,23 +1452,10 @@ export default {
                 this.progressIndex = 5;
 
                 const result = response.data.data;
+                
                 this.updateLocalState(result);
 
                 this.refinementRound++;
-
-                // Append follow-up questions
-                if (this.questions.length > 0) {
-                    this.refinementHistory.push({
-                        role: 'model',
-                        text: 'Thanks! Based on your feedback, I have updated the model. Here is my next round of questions:\n\n' + 
-                              this.questions.map((q, i) => `${i + 1}. ${q}`).join('\n')
-                    });
-                } else {
-                    this.refinementHistory.push({
-                        role: 'model',
-                        text: 'Model refined successfully! I have no further questions. You can refine it again if you have more changes, or open the model in Threat Dragon.'
-                    });
-                }
 
                 if (this.dfdApproved) {
                     this.step = 'interactive';
@@ -1170,10 +1471,15 @@ export default {
         },
         updateLocalState(result) {
             const model = result.threatModel;
-            model.version = this.version;
-            this.generatedModel = model;
+            if (model) {
+                model.version = this.version;
+                this.generatedModel = model;
+            }
             this.questions = result.questions || [];
             this.sessionId = result.sessionId || null;
+            if (result.refinementHistory !== undefined) {
+                this.refinementHistory = result.refinementHistory || [];
+            }
             if (result.dfdApproved !== undefined) {
                 this.dfdApproved = result.dfdApproved;
             }
@@ -1187,6 +1493,12 @@ export default {
                 this.previousScore = null;
             }
             this.evaluation = result.evaluation || null;
+
+            // Question plan progress tracking
+            if (result.questionPlan) {
+                this.questionPlan = result.questionPlan;
+                this.questionProgress = result.questionPlan.progress || { answered: 0, total: result.questionPlan.totalQuestions || 0, percentage: 0 };
+            }
 
             if (this.sessionId) {
                 localStorage.setItem('active_ai_session_id', this.sessionId);
@@ -1325,22 +1637,19 @@ export default {
         },
         async resumeSession(sessionId) {
             try {
+                // Sync the local model (with any potential manual edits) to the server session first
+                if (this.existingModel && this.existingModel.summary) {
+                    await axios.put(`/api/ai/session/${sessionId}`, { currentModel: this.existingModel });
+                }
+
                 const response = await axios.get(`/api/ai/session/${sessionId}`);
                 const result = response.data.data;
                 
                 this.form.title = result.title || '';
                 this.form.description = result.description || '';
                 this.form.methodology = result.methodology || 'STRIDE';
-                this.refinementHistory = result.refinementHistory || [];
                 
-                this.updateLocalState({
-                    threatModel: this.generatedModel || result.threatModel,
-                    questions: result.questions,
-                    evaluation: result.evaluation,
-                    sessionId: result.sessionId,
-                    dfdApproved: result.dfdApproved || false,
-                    threatModelApproved: result.threatModelApproved || false
-                });
+                this.updateLocalState(result);
                 
                 const userMsgCount = this.refinementHistory.filter(m => m.role === 'user').length;
                 this.refinementRound = userMsgCount + 1;
@@ -1453,6 +1762,102 @@ export default {
             document.body.appendChild(downloadAnchor);
             downloadAnchor.click();
             downloadAnchor.remove();
+        },
+        async downloadPdfReport() {
+            if (!this.generatedModel || !this.evaluation) return;
+            
+            let clone = null;
+            try {
+                const { jsPDF } = await import('jspdf');
+                const html2canvas = (await import('html2canvas')).default;
+                
+                const element = document.getElementById('pdf-report-template');
+                if (!element) return;
+                
+                // Clone the hidden element and override styles to make it visible off-screen
+                clone = element.cloneNode(true);
+                clone.style.position = 'absolute';
+                clone.style.left = '-9999px';
+                clone.style.top = '-9999px';
+                clone.style.height = 'auto';
+                clone.style.overflow = 'visible';
+                clone.style.opacity = '1';
+                clone.style.zIndex = '-9999';
+                
+                document.body.appendChild(clone);
+                
+                const doc = new jsPDF({
+                    orientation: 'portrait',
+                    unit: 'mm',
+                    format: 'a4'
+                });
+                
+                const pages = clone.querySelectorAll('.pdf-cover-page, .pdf-page');
+                let isFirstPage = true;
+                
+                for (let i = 0; i < pages.length; i++) {
+                    const page = pages[i];
+                    const isLandscape = page.classList.contains('pdf-landscape-page');
+                    
+                    // Render page using html2canvas
+                    const canvas = await html2canvas(page, {
+                        scale: 2,
+                        useCORS: true,
+                        logging: false
+                    });
+                    
+                    const pageWidth = isLandscape ? 297 : 210;
+                    const pageHeight = isLandscape ? 210 : 297;
+                    const margin = 15;
+                    const printableWidth = pageWidth - margin * 2;
+                    const printableHeight = pageHeight - margin * 2;
+                    
+                    // Equivalent height of a page in canvas pixels
+                    const pagePixelHeight = canvas.width * (printableHeight / printableWidth);
+                    
+                    let y = 0;
+                    while (y < canvas.height) {
+                        // If it's not the very first page/slice of the document, add a new page
+                        if (!isFirstPage) {
+                            doc.addPage('a4', isLandscape ? 'landscape' : 'portrait');
+                        }
+                        isFirstPage = false;
+                        
+                        const sliceHeight = Math.min(pagePixelHeight, canvas.height - y);
+                        
+                        // Create slice canvas
+                        const slice = document.createElement('canvas');
+                        slice.width = canvas.width;
+                        slice.height = sliceHeight;
+                        const ctx = slice.getContext('2d');
+                        ctx.drawImage(canvas, 0, y, canvas.width, sliceHeight, 0, 0, canvas.width, sliceHeight);
+                        
+                        const imgData = slice.toDataURL('image/jpeg', 0.98);
+                        
+                        // Calculate image size in PDF units
+                        const imgWidth = printableWidth;
+                        const imgHeight = printableWidth * (sliceHeight / canvas.width);
+                        
+                        // Center vertically in printable area
+                        const x = margin;
+                        const yPos = margin + (printableHeight - imgHeight) / 2;
+                        
+                        doc.addImage(imgData, 'JPEG', x, yPos, imgWidth, imgHeight);
+                        
+                        y += pagePixelHeight;
+                    }
+                }
+                
+                const filename = `${this.form.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-assessment-report.pdf`;
+                doc.save(filename);
+            } catch (err) {
+                console.error('Failed to generate PDF report:', err);
+                this.$toast.error('Failed to generate PDF report');
+            } finally {
+                if (clone && clone.parentNode) {
+                    clone.parentNode.removeChild(clone);
+                }
+            }
         }
     }
 };

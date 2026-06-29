@@ -6,6 +6,7 @@ import env from '../env/Env.js';
 import loggerHelper from '../helpers/logger.helper.js';
 import mammoth from 'mammoth';
 import { PDFParse } from 'pdf-parse';
+import questionPlanningEngine from '../helpers/questionPlanningEngine.js';
 
 const logger = loggerHelper.get('controllers/aiController.js');
 
@@ -47,6 +48,36 @@ const extractJson = (str) => {
         throw e;
     }
 };
+
+const ensureModelMessageInHistory = (refinementHistory, questions, dfdApproved) => {
+    const history = [...(refinementHistory || [])];
+    const lastMsg = history[history.length - 1];
+    
+    if (!lastMsg || lastMsg.role !== 'model') {
+        if (questions && questions.length > 0) {
+            const isTransition = dfdApproved && history.length === 0;
+            let welcomeText = '';
+            if (isTransition) {
+                welcomeText = 'Welcome! I have analyzed your approved DFD topology and prepared a Question Plan. Please answer these questions to help me identify and mitigate threats:\n\n';
+            } else if (history.length > 0) {
+                welcomeText = 'Thanks! Based on your feedback, I have updated the model. Here is my next round of questions:\n\n';
+            } else {
+                welcomeText = 'Welcome! I have mapped your initial architecture. Please answer these questions to help me refine the threat model:\n\n';
+            }
+            history.push({
+                role: 'model',
+                text: welcomeText + questions.map((q, i) => `${i + 1}. ${q.text || q}`).join('\n')
+            });
+        } else {
+            history.push({
+                role: 'model',
+                text: 'Model refined successfully! I have no further questions. You can refine it again if you have more changes, or open the model in Threat Dragon.'
+            });
+        }
+    }
+    return history;
+};
+
 
 const getCellName = (cell) => {
     if (!cell) { return ''; }
@@ -729,7 +760,7 @@ const generate = async (req, res) => {
 
     const apiKey = clientApiKey || env.get().config.GEMINI_API_KEY;
     const dfdApprovedBool = (dfdApproved === true || dfdApproved === 'true');
-    const threatModelApprovedBool = (threatModelApproved === true || threatModelApproved === 'true');
+    let threatModelApprovedBool = (threatModelApproved === true || threatModelApproved === 'true');
 
     if (!apiKey) {
         return badRequest('Gemini API key is missing. Please configure GEMINI_API_KEY in the server environment or provide it in the API Key input.', res, logger);
@@ -763,6 +794,20 @@ const generate = async (req, res) => {
             }
         }
 
+        // Compute or update question plan on DFD approval transition (pre-LLM)
+        if (dfdApprovedBool && activeSession && !activeSession.questionPlan) {
+            const modelToUse = currentModel || activeSession.currentModel;
+            if (modelToUse && modelToUse.detail && modelToUse.detail.diagrams && modelToUse.detail.diagrams[0]) {
+                const diagramCells = modelToUse.detail.diagrams[0].cells || [];
+                const computedPlan = questionPlanningEngine.computeQuestionPlan(diagramCells, finalMethodology);
+                logger.info(`Question plan computed pre-LLM: ${computedPlan.totalQuestions} questions for ${finalMethodology}`);
+                activeSession.questionPlan = computedPlan;
+                aiContextStore.updateSession(activeSession.sessionId, {
+                    questionPlan: computedPlan
+                });
+            }
+        }
+
         // Bypassing LLM generation on explicit human approval of the final threat model
         if (threatModelApprovedBool && activeSession) {
             const previousHistory = activeSession.history || [];
@@ -792,7 +837,8 @@ const generate = async (req, res) => {
                     evaluation: activeSession.evaluation,
                     sessionId: activeSession.sessionId,
                     dfdApproved: activeSession.dfdApproved || false,
-                    threatModelApproved: true
+                    threatModelApproved: true,
+                    refinementHistory: activeSession.refinementHistory || []
                 }
             });
         }
@@ -865,6 +911,50 @@ Strictly map threats to elements using these MITRE F3 tactics:
 
 For each threat, the threat's "type" property MUST be set to one of the F3 tactics above, and its "modelType" property MUST be exactly "MITRE_F3".
 `;
+        } else if (finalMethodology === 'LINDDUN') {
+            methodologyPrompt = `
+You must perform Threat Modeling focusing on the LINDDUN privacy methodology.
+Strictly map threats to elements using these LINDDUN categories:
+- "actor" (Data Subject): Applicable categories are "Linkability", "Identifiability", "Unawareness", and "Non-compliance".
+- "process": Applicable categories are "Linkability", "Identifiability", "Non-repudiation", "Detectability", "Disclosure of information", "Unawareness", and "Non-compliance".
+- "store" (Data Store): Applicable categories are "Linkability", "Identifiability", "Detectability", "Disclosure of information", and "Non-compliance".
+- "flow" (Data Flow): Applicable categories are "Linkability", "Identifiability", "Detectability", and "Disclosure of information".
+
+For each threat, the threat's "type" property MUST be set to one of the LINDDUN categories above, and its "modelType" property MUST be exactly "LINDDUN".
+`;
+        } else if (finalMethodology === 'CIA') {
+            methodologyPrompt = `
+You must perform Threat Modeling focusing on the CIA triad (Confidentiality, Integrity, Availability).
+Strictly map threats to elements using these CIA categories:
+- "actor" (External Entity): Applicable categories are "Confidentiality" only.
+- "process": Applicable categories are "Confidentiality", "Integrity", and "Availability".
+- "store" (Data Store): Applicable categories are "Confidentiality", "Integrity", and "Availability".
+- "flow" (Data Flow): Applicable categories are "Confidentiality", "Integrity", and "Availability".
+
+For each threat, the threat's "type" property MUST be set to one of the CIA categories above, and its "modelType" property MUST be exactly "CIA".
+`;
+        } else if (finalMethodology === 'DIE') {
+            methodologyPrompt = `
+You must perform Threat Modeling focusing on the DIE model (Distributed, Immutable, Ephemeral) for cloud-native infrastructure resilience.
+Strictly map threats to elements using these DIE categories:
+- "actor" (External Entity): No DIE categories apply to external actors.
+- "process": Applicable categories are "Distributed", "Immutable", and "Ephemeral".
+- "store" (Data Store): Applicable categories are "Distributed", "Immutable", and "Ephemeral".
+- "flow" (Data Flow): Applicable categories are "Distributed" and "Ephemeral".
+
+For each threat, the threat's "type" property MUST be set to one of the DIE categories above, and its "modelType" property MUST be exactly "DIE".
+`;
+        } else if (finalMethodology === 'PLOT4ai') {
+            methodologyPrompt = `
+You must perform Threat Modeling focusing on the PLOT4ai framework (Practical Library Of Threats for AI).
+Strictly map threats to elements using these PLOT4ai categories:
+- "actor": Applicable categories are "Privacy & Data Protection" and "Ethics & Human Rights".
+- "process": Applicable categories are "Data & Data Governance", "Privacy & Data Protection", "Cybersecurity", "Safety & Environmental Impact", "Bias, Fairness & Discrimination", "Transparency & Accessibility", "Ethics & Human Rights", and "Accountability & Human Oversight".
+- "store" (Data Store): Applicable categories are "Data & Data Governance", "Privacy & Data Protection", and "Bias, Fairness & Discrimination".
+- "flow" (Data Flow): Applicable categories are "Privacy & Data Protection" and "Cybersecurity".
+
+For each threat, the threat's "type" property MUST be set to one of the PLOT4ai categories above, and its "modelType" property MUST be exactly "PLOT4ai".
+`;
         } else {
             methodologyPrompt = `
 You must perform Threat Modeling focusing on the STRIDE methodology.
@@ -880,36 +970,62 @@ For each threat, the threat's "type" property MUST be set to one of the STRIDE c
 
         // 2. Build the detailed instruction prompt for generator (separated into DFDAgent and ThreatAgent)
         let promptText = '';
+        let jsonKeysInstruction = '';
         const agentName = !dfdApprovedBool ? 'DFDAgent' : 'ThreatAgent';
         let questionsInstruction = '';
 
         if (!dfdApprovedBool) {
-            questionsInstruction = `An array of 3-5 clarifying questions in Portuguese.
-CRITICAL RULES FOR PHASE 1 QUESTIONS:
-- You MUST focus ONLY on diagram structure, missing components, connectivity, data flow pathways, and trust boundaries (e.g. "Do we have a data flow between X and Y?", "Are there any other microservices connecting to the Database?").
-- You are strictly FORBIDDEN from asking about security controls, authentication (mTLS, OAuth, Managed Identities), encryption (Always Encrypted, HTTPS, transit/rest), auditing/logging configurations, WAF/firewall inspection, or any threat-specific or control-specific details in this phase.
-- All structural/topology questions must help clarify how to draw or structure the DFD correctly.
-- You MUST always include, as the very last item in this array, a question in Portuguese instructing the user to review the DFD, and ask if they wish to add manual inputs/corrections or if they approve it (e.g., "Por favor, valide o DFD proposto acima. Caso falte algum elemento ou esteja muito simples, responda com as instruções de ajuste. Se estiver de acordo, digite 'Aprovado' para gerarmos as ameaças finais.").`;
+            questionsInstruction = `An array containing EXACTLY ONE string in Portuguese.
+You are strictly FORBIDDEN from generating custom clarifying questions or asking about security controls, authentication, protocols, encryption, logging, or threats in this phase.
+Instead, you MUST return exactly this single validation string:
+"Por favor, valide o diagrama de fluxo de dados (DFD) proposto acima. Se houver algum componente, fluxo ou fronteira de confiança faltando ou incorreto, descreva os ajustes necessários. Se estiver de acordo, clique em \\"Yes, DFD is Complete\\" para prosseguir para a análise de ameaças."`;
             promptText = `You are the DFDAgent, a specialized system architect and Data Flow Diagram (DFD) layout expert.
-Your sole responsibility is to analyze the provided architecture documentation and system diagrams, perform system decomposition, and return a complete Threat Dragon V2 JSON object representing the DFD topology, along with clarifying questions.
+Your sole responsibility is to analyze the provided architecture documentation and system diagrams, perform system decomposition, and return a complete Threat Dragon V2 JSON object representing the DFD topology.
 
 CURRENT REFINEMENT PHASE: DFD TOPOLOGY REFINEMENT (Phase 1)
 - Your main goal is to map the elements and flows correctly.
 - Do NOT generate detailed threats in the 'threats' array of the cells. Keep the 'threats' array empty ([]) for all cells for now.
-- EXCLUSIVELY STRUCTURAL QUESTIONS: Your clarifying questions in the "questions" array MUST focus ONLY on diagram structure, components, data flow connections, and trust boundaries (e.g., who communicates with whom, what protocols are used for routes, and which components exist). You are strictly FORBIDDEN from asking about security controls, authentication mechanisms, encryption, firewalls, service mesh configurations, secret management, or any other threat-specific or control-specific details in Phase 1. Those questions must be deferred entirely to Phase 2.
-- Always include, as the very last question, the DFD validation prompt (e.g. "Por favor, valide o DFD proposto acima. Caso falte algum elemento ou esteja muito simples, responda com as instruções de ajuste. Se estiver de acordo, digite 'Aprovado' para gerarmos as ameaças finais.").
+- Do NOT ask any custom questions about security, protocols, databases, or access rules. Return exactly the single validation question in the "questions" array.
 `;
+            jsonKeysInstruction = `You MUST return ONLY a JSON object containing two keys:
+1. "threatModel": The valid Threat Dragon V2 JSON object containing the summary and detail (diagrams, cells, and threats).
+2. "questions": ${questionsInstruction}`;
         } else {
-            questionsInstruction = `An array of 3-5 clarifying questions in Portuguese. You MUST strictly follow the STRATEGIC QUESTIONING PROTOCOL:
-1. ARCHITECTURAL COVERAGE (TIER ROTATION): Distribute questions across different levels of the architecture. In each round:
-   - Ask at most ONE question related to any single component or database.
-   - Ensure the questions cover different parts of the system (e.g., Ingress/Perimeter, Processing/Microservices, Storage/Databases, External Integrations).
-2. THREAT CATEGORY ROTATION: Distribute questions across different threat categories from the framework (STRIDE/MITRE).
-   - Do NOT ask multiple questions about the same security control or risk theme in the same round (e.g., do not ask multiple questions about credentials rotation, or multiple questions about logging).
-   - Cover different angles: e.g., one question on Authentication/Spoofing, one on Confidentiality/Encryption (transit/rest), one on Authorization/Privilege escalation, one on Auditability/Logging/Resilience.
-3. ADDRESSING GAPS (NEGLECTED COMPONENTS): Analyze which elements or connections in the current DFD have the fewest mapped threats or lack detailed mitigations. Target at least one question to discover risks and controls for these less-explored components.
-4. NO REDUNDANT TOPICS: Do NOT ask about topics that the user has already answered or controls that are already fully mapped and marked as "Mitigated".
-5. Keep questions technically specific, direct, and actionable, prompting the user for architecture realities. Do NOT include DFD validation or approval questions in Phase 2.`;
+            // Get the next batch of planned questions from the plan
+            let activeQuestionsPrompt = '';
+            if (activeSession && activeSession.questionPlan) {
+                const answeredIds = activeSession.answeredQuestionIds || [];
+                const currentQuestionIds = (activeSession.questions || []).map((q) => q.id || q);
+                const combinedIds = Array.from(new Set([...answeredIds, ...currentQuestionIds]));
+                const batchSize = 3;
+                const { questions: roundQuestions } = questionPlanningEngine.getQuestionsByRound(
+                    activeSession.questionPlan,
+                    1,
+                    combinedIds,
+                    batchSize
+                );
+                
+                if (roundQuestions && roundQuestions.length > 0) {
+                    activeQuestionsPrompt = '\n--- ASSIGNED QUESTIONS FOR THIS ROUND ---\n';
+                    activeQuestionsPrompt += 'You MUST generate exactly the following questions for the elements and categories below. Do NOT generate questions for other categories or elements. Write a specific, technical, direct question in Portuguese for each assigned category:\n';
+                    roundQuestions.forEach((q) => {
+                        activeQuestionsPrompt += `- Question ID: "${q.id}" | Element ID: "${q.elementId}" | Element Name: "${q.elementName}" | Category: "${q.category}" | Type: "${q.type}"\n`;
+                    });
+                    activeQuestionsPrompt += '\n';
+                }
+            }
+
+            questionsInstruction = `An array of objects matching the ASSIGNED QUESTIONS FOR THIS ROUND list. Each object MUST have:
+- "id": The exact "Question ID" string from the assigned list.
+- "elementId": The exact "Element ID" string.
+- "category": The exact "Category" string.
+- "text": A technical, specific question in Portuguese related to the assigned element and category.
+
+If no questions are assigned, return an empty array [].`;
+
+            if (activeQuestionsPrompt) {
+                questionsInstruction += '\n' + activeQuestionsPrompt;
+            }
             promptText = `You are the ThreatAgent, a specialized security auditor and Threat Modeling expert.
 Your sole responsibility is to analyze the approved Data Flow Diagram (DFD) topology, identify security threats (e.g. STRIDE/MITRE) for each cell, evaluate their severities, risk scores, scenario descriptions, and mitigations, and keep updating the threat model.
 
@@ -930,6 +1046,25 @@ CURRENT REFINEMENT PHASE: THREAT ANALYSIS & SECURITY CONTROLS REFINEMENT (Phase 
   4. A risk 'score' value.
 - Your clarifying questions in the "questions" array MUST target discovering new threats or gathering necessary context to refine and evaluate existing threats (assessing severity, score, description, and mitigations).
 `;
+            let previousQuestionsPrompt = '';
+            if (activeSession && activeSession.questions && activeSession.questions.length > 0) {
+                previousQuestionsPrompt = '\n--- QUESTIONS ASKED IN PREVIOUS ROUND ---\n';
+                previousQuestionsPrompt += 'The user has provided answers/feedback in the conversation history to these specific questions from the previous round:\n';
+                activeSession.questions.forEach((q) => {
+                    const qId = q.id || '';
+                    const qText = q.text || q;
+                    previousQuestionsPrompt += `- Question ID: "${qId}" | Text: "${qText}"\n`;
+                });
+                previousQuestionsPrompt += '\nCompare the user answers in REFINEMENT CONVERSATION HISTORY against this list. If the user successfully answered/resolved/mitigated a question, include its Question ID in the "resolvedQuestionIds" array.\n';
+            }
+
+            jsonKeysInstruction = `You MUST return ONLY a JSON object containing three keys:
+1. "threatModel": The valid Threat Dragon V2 JSON object containing the summary and detail.
+   - IMPORTANT SCHEMA OPTIMIZATION FOR PHASE 2 (dfdApproved is true): To maximize your output token limit for rich, detailed, and comprehensive threat descriptions and mitigations, you MUST NOT return all cells in the "cells" array. Instead, ONLY include the cell objects under "threatModel.detail.diagrams[0].cells" that have new, updated, or modified threats. Completely omit any cell that has no changes.
+2. "questions": ${questionsInstruction}
+3. "resolvedQuestionIds": An array of strings containing the Question IDs (from the previous round) that have been successfully answered/mitigated by the user.
+
+${previousQuestionsPrompt}`;
         }
 
         if (!dfdApprovedBool) {
@@ -1035,10 +1170,7 @@ You MUST position elements horizontally based on their logical tiers to avoid ov
 
 Ensure elements are positioned on this clean grid layout and flows connect them correctly using IDs.
 
-You MUST return ONLY a JSON object containing two keys:
-1. "threatModel": The valid Threat Dragon V2 JSON object containing the summary and detail (diagrams, cells, and threats).
-   - IMPORTANT SCHEMA OPTIMIZATION FOR PHASE 2 (dfdApproved is true): To maximize your output token limit for rich, detailed, and comprehensive threat descriptions and mitigations, you MUST NOT return all cells in the "cells" array. Instead, ONLY include the cell objects under "threatModel.detail.diagrams[0].cells" that have new, updated, or modified threats. Completely omit any cell that has no changes.
-2. "questions": ${questionsInstruction}
+${jsonKeysInstruction}
 
 CRITICAL SCHEMA REQUIREMENT FOR DIAGRAM CELLS:
 Every item in the "cells" array of the diagram must represent a valid Threat Dragon V2 node or edge, conforming to the Antv/X6 model schema. Specifically:
@@ -1282,7 +1414,9 @@ ${JSON.stringify(threatModel, null, 2)}
 Here is the user refinement conversation history:
 ${refinementHistory && refinementHistory.length > 0 ? refinementHistory.map((m) => `${m.role.toUpperCase()}: ${m.text}`).join('\n') : 'No history yet.'}
 
-Please perform a critical review of the generated model using the ${finalMethodology === 'MITRE_F3' ? 'MITRE Fight Fraud (F3) Framework' : 'STRIDE methodology'}.
+Please perform a critical review of the generated model using the ${
+    { MITRE_F3: 'MITRE Fight Fraud (F3) Framework', LINDDUN: 'LINDDUN privacy methodology', CIA: 'CIA triad', DIE: 'DIE model', PLOT4ai: 'PLOT4ai framework' }[finalMethodology] || 'STRIDE methodology'
+}.
 ${reviewCriteriaPrompt}
 `;
             }
@@ -1458,13 +1592,66 @@ Return ONLY a JSON object containing the keys "threatModel" and "questions" (as 
             });
         }
 
+        // Compute or update question plan on DFD approval transition
+        let questionPlan = activeSession.questionPlan || null;
+        const answeredQuestionIds = activeSession.answeredQuestionIds || [];
+
+        if (dfdApprovedBool && parsedOutput.threatModel) {
+            const diagramCells = parsedOutput.threatModel.detail?.diagrams?.[0]?.cells || [];
+            if (!questionPlan) {
+                // First time DFD is approved: compute the full question plan
+                questionPlan = questionPlanningEngine.computeQuestionPlan(diagramCells, finalMethodology);
+                logger.info(`Question plan computed: ${questionPlan.totalQuestions} questions for ${finalMethodology} across ${diagramCells.length} cells`);
+            }
+
+            // Extract resolved question IDs from LLM response
+            if (parsedOutput.resolvedQuestionIds && Array.isArray(parsedOutput.resolvedQuestionIds)) {
+                parsedOutput.resolvedQuestionIds.forEach((id) => {
+                    if (id && typeof id === 'string' && !answeredQuestionIds.includes(id)) {
+                        answeredQuestionIds.push(id);
+                    }
+                });
+            }
+
+            // Mark matched plan questions as answered
+            if (questionPlan.elementQuestions) {
+                questionPlan.elementQuestions.forEach((elem) => {
+                    elem.categories.forEach((catGroup) => {
+                        catGroup.questions.forEach((q) => {
+                            if (answeredQuestionIds.includes(q.id)) {
+                                q.answered = true;
+                            }
+                        });
+                    });
+                });
+            }
+
+            // Recompute progress
+            questionPlan.progress = questionPlanningEngine.computeProgress(questionPlan, answeredQuestionIds);
+            if (questionPlan.progress && questionPlan.progress.byCategory) {
+                questionPlan.byCategory = questionPlan.progress.byCategory;
+            }
+
+            if (questionPlan.progress && questionPlan.progress.answered >= questionPlan.progress.total && questionPlan.progress.total > 0) {
+                threatModelApprovedBool = true;
+                parsedOutput.questions = [];
+            }
+        }
+
+        const isTransition = dfdApprovedBool && (!activeSession || !activeSession.dfdApproved);
+        const historyToUse = isTransition ? [] : (refinementHistory || []);
+        const updatedHistory = ensureModelMessageInHistory(historyToUse, parsedOutput.questions, dfdApprovedBool);
+
         aiContextStore.updateSession(activeSession.sessionId, {
             currentModel: parsedOutput.threatModel,
             questions: parsedOutput.questions || [],
             evaluation: evaluation,
             history: previousHistory,
             dfdApproved: dfdApprovedBool,
-            threatModelApproved: threatModelApprovedBool
+            threatModelApproved: threatModelApprovedBool,
+            questionPlan: questionPlan,
+            answeredQuestionIds: answeredQuestionIds,
+            refinementHistory: updatedHistory
         });
 
         logger.info(`Threat model session round processed. Session ID: ${activeSession.sessionId}`);
@@ -1477,7 +1664,16 @@ Return ONLY a JSON object containing the keys "threatModel" and "questions" (as 
                 evaluation: evaluation,
                 sessionId: activeSession.sessionId,
                 dfdApproved: dfdApprovedBool,
-                threatModelApproved: threatModelApprovedBool
+                threatModelApproved: threatModelApprovedBool,
+                refinementHistory: updatedHistory,
+                questionPlan: questionPlan ? {
+                    methodology: questionPlan.methodology,
+                    totalQuestions: questionPlan.totalQuestions,
+                    breakdown: questionPlan.breakdown,
+                    byCategory: questionPlan.progress?.byCategory || questionPlan.byCategory,
+                    estimatedRounds: questionPlan.estimatedRounds,
+                    progress: questionPlan.progress
+                } : null
             }
         });
 
@@ -1515,9 +1711,17 @@ const getSessionState = (req, res) => {
             title: session.title,
             description: session.description,
             methodology: session.methodology || 'STRIDE',
-            refinementHistory: session.refinementHistory || [],
+            refinementHistory: ensureModelMessageInHistory(session.refinementHistory || [], session.questions || [], session.dfdApproved || false),
             dfdApproved: session.dfdApproved || false,
-            threatModelApproved: session.threatModelApproved || false
+            threatModelApproved: session.threatModelApproved || false,
+            questionPlan: session.questionPlan ? {
+                methodology: session.questionPlan.methodology,
+                totalQuestions: session.questionPlan.totalQuestions,
+                breakdown: session.questionPlan.breakdown,
+                byCategory: session.questionPlan.progress?.byCategory || session.questionPlan.byCategory,
+                estimatedRounds: session.questionPlan.estimatedRounds,
+                progress: session.questionPlan.progress
+            } : null
         }
     });
 };
@@ -1546,11 +1750,16 @@ const undoRefinement = (req, res) => {
             });
         }
         const lastState = history.pop();
+        const restoredHistory = ensureModelMessageInHistory(
+            lastState.refinementHistory || [],
+            lastState.questions || [],
+            lastState.dfdApproved || false
+        );
         const updated = aiContextStore.updateSession(sessionId, {
             currentModel: lastState.currentModel,
             questions: lastState.questions,
             evaluation: lastState.evaluation,
-            refinementHistory: lastState.refinementHistory,
+            refinementHistory: restoredHistory,
             history: history,
             dfdApproved: lastState.dfdApproved || false,
             threatModelApproved: lastState.threatModelApproved || false
@@ -1777,12 +1986,123 @@ const applyDeduplication = (req, res) => {
     }
 };
 
+/**
+ * GET /api/ai/session/:sessionId/question-count
+ * Returns the question count for an existing session's DFD and methodology.
+ */
+const getQuestionCount = (req, res) => {
+    const { sessionId } = req.params;
+    const session = aiContextStore.getSession(sessionId);
+    if (!session) {
+        return res.status(404).json({ status: 404, message: 'Session not found' });
+    }
+
+    if (session.questionPlan) {
+        return res.status(200).json({
+            status: 200,
+            message: 'Question plan retrieved from session',
+            data: {
+                methodology: session.questionPlan.methodology,
+                totalQuestions: session.questionPlan.totalQuestions,
+                breakdown: session.questionPlan.breakdown,
+                byCategory: session.questionPlan.byCategory,
+                estimatedRounds: session.questionPlan.estimatedRounds,
+                progress: session.questionPlan.progress
+            }
+        });
+    }
+
+    // Compute on the fly from current model
+    const cells = session.currentModel?.detail?.diagrams?.[0]?.cells || [];
+    const methodology = session.methodology || 'STRIDE';
+    const plan = questionPlanningEngine.computeQuestionPlan(cells, methodology);
+
+    return res.status(200).json({
+        status: 200,
+        message: 'Question count computed from current model',
+        data: {
+            methodology: plan.methodology,
+            totalQuestions: plan.totalQuestions,
+            breakdown: plan.breakdown,
+            byCategory: plan.byCategory,
+            estimatedRounds: plan.estimatedRounds,
+            progress: plan.progress
+        }
+    });
+};
+
+/**
+ * POST /api/ai/question-count
+ * Stateless endpoint: receives cells + methodology and returns question count without creating a session.
+ */
+const computeQuestionCountStateless = (req, res) => {
+    const { cells = [], methodology = 'STRIDE' } = req.body;
+    const plan = questionPlanningEngine.computeQuestionPlan(cells, methodology);
+
+    return res.status(200).json({
+        status: 200,
+        message: 'Question count computed successfully',
+        data: {
+            methodology: plan.methodology,
+            totalQuestions: plan.totalQuestions,
+            breakdown: plan.breakdown,
+            byCategory: plan.byCategory,
+            estimatedRounds: plan.estimatedRounds,
+            progress: plan.progress
+        }
+    });
+};
+
+/**
+ * GET /api/ai/frameworks
+ * Returns list of available threat modeling frameworks.
+ */
+const getAvailableFrameworks = (req, res) => {
+    const frameworks = questionPlanningEngine.getAvailableFrameworks().map((key) => {
+        const def = questionPlanningEngine.getFrameworkDefinition(key);
+        return {
+            key,
+            name: def.name,
+            description: def.description,
+            categories: def.categories
+        };
+    });
+    return res.status(200).json({
+        status: 200,
+        data: frameworks
+    });
+};
+
+const updateSessionState = (req, res) => {
+    const { sessionId } = req.params;
+    const { currentModel } = req.body;
+    const session = aiContextStore.getSession(sessionId);
+    if (!session) {
+        return res.status(404).json({
+            status: 404,
+            message: 'Session not found'
+        });
+    }
+    aiContextStore.updateSession(sessionId, {
+        currentModel: currentModel || session.currentModel
+    });
+    logger.info(`Updated current model in session ${sessionId} with user manual edits.`);
+    return res.status(200).json({
+        status: 200,
+        message: 'Session model updated successfully'
+    });
+};
+
 export default {
     generate,
     getSessionState,
+    updateSessionState,
     undoRefinement,
     getDeduplicateProposals,
     applyDeduplication,
+    getQuestionCount,
+    computeQuestionCountStateless,
+    getAvailableFrameworks,
     _areTitlesSimilar: areTitlesSimilar,
     _mergeDiagramCells: mergeDiagramCells,
     _mergeControlsAssessment: mergeControlsAssessment,

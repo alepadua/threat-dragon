@@ -87,6 +87,7 @@
     "dotenv": "^17.4.1",
     "electron-log": "^4.4.8",
     "electron-updater": "^6.3.0",
+    "html2pdf.js": "^0.14.0",
     "is-electron": "^2.2.1",
     "jquery": "^3.7.1",
     "passive-events-support": "^1.1.0",

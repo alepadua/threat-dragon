@@ -72,7 +72,14 @@ const messages = {
         openEditor: 'Open in Threat Dragon Editor',
         downloadJson: 'Download Model JSON',
         errorTitle: 'Generation Failed',
-        tryAgain: 'Try Again'
+        tryAgain: 'Try Again',
+        questionCount: 'Questions Required',
+        questionProgress: 'Question Progress',
+        questionsRemaining: 'questions remaining to complete the framework',
+        frameworkCoverage: 'Framework Coverage',
+        estimatedRounds: 'Estimated Refinement Rounds',
+        questionsAnswered: 'answered',
+        categoryProgress: 'Category Coverage'
     },
     demo: {
         select: 'Select a demo threat model from the list below'
