@@ -25,7 +25,8 @@ class ThreatDragonEnv extends Env {
             { key: 'BEDROCK_MANTLE_API_KEY', required: false },
             { key: 'BEDROCK_MANTLE_BASE_URL', required: false },
             { key: 'BEDROCK_MANTLE_MODEL', required: false },
-            { key: 'BEDROCK_MANTLE_EMBEDDING_MODEL', required: false }
+            { key: 'BEDROCK_MANTLE_EMBEDDING_MODEL', required: false },
+            { key: 'AI_REQUEST_TIMEOUT', required: false, defaultValue: 180000 }
         ];
     }
 }

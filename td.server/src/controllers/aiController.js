@@ -13,6 +13,7 @@ import questionPlanningEngine from '../helpers/questionPlanningEngine.js';
 global.DOMMatrix = DOMMatrix;
 
 const logger = loggerHelper.get('controllers/aiController.js');
+const REQUEST_TIMEOUT = parseInt(process.env.AI_REQUEST_TIMEOUT, 10) || 180000;
 
 const parseBase64Image = (dataUri) => {
     const matches = dataUri.match(/^data:(?<mime>[a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(?<data>.+)$/u);
@@ -619,7 +620,7 @@ const callAIModel = async (promptText, images, aiConfig) => {
                 },
                 {
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${aiConfig.apiKey}` },
-                    timeout: 90000
+                    timeout: REQUEST_TIMEOUT
                 }
             );
 
@@ -656,7 +657,7 @@ const callAIModel = async (promptText, images, aiConfig) => {
             payload,
             {
                 headers: { 'Content-Type': 'application/json' },
-                timeout: 90000
+                timeout: REQUEST_TIMEOUT
             }
         );
 
