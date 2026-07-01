@@ -6,7 +6,11 @@ import env from '../env/Env.js';
 import loggerHelper from '../helpers/logger.helper.js';
 import mammoth from 'mammoth';
 import { PDFParse } from 'pdf-parse';
+import { DOMMatrix } from '@napi-rs/canvas';
 import questionPlanningEngine from '../helpers/questionPlanningEngine.js';
+
+// Polyfill DOMMatrix for pdfjs-dist used by pdf-parse
+global.DOMMatrix = DOMMatrix;
 
 const logger = loggerHelper.get('controllers/aiController.js');
 
