@@ -1,0 +1,3206 @@
+{
+  "meta": {
+    "edition": "OWASP Cornucopia Website App Edition",
+    "component": "cards",
+    "language": "ru",
+    "version": "3.0"
+  },
+  "standards": [
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/VE2/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "ПРОВЕРКА И КОДИРОВАНИЕ ДАННЫХ",
+      "description": "Брайан может собрать информацию о базовых конфигурациях, схемах, логике, коде, программном обеспечении, услугах и инфраструктуре из-за содержания сообщений об ошибках, плохой конфигурации или наличия файлов установки по умолчанию или старых, тестовых, резервных копий ресурсов или раскрытия исходного кода",
+      "sectionID": "VE2",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/VE2/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "232-325"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "774-888"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "615-744"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "067-050"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "838-636"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "253-452"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "462-245"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "743-110"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/VE3/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "ПРОВЕРКА И КОДИРОВАНИЕ ДАННЫХ",
+      "description": "Роберт может вводить вредоносные данные, поскольку не проверяется разрешенный формат протокола, или принимаются дубликаты, или не проверяется структура, или для отдельных элементов данных не выполняется обезвреживание, или, предпочтительно, не проверяется формат, тип, диапазон, размер, длина или присутствие в списке разрешеннных символов",
+      "sectionID": "VE3",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/VE3/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "848-711"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "743-237"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "042-550"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "031-447"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "532-878"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "314-131"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "036-725"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/VE4/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "ПРОВЕРКА И КОДИРОВАНИЕ ДАННЫХ",
+      "description": "Дэйв может ввести вредоносные имена полей или данные, потому что они не проверяются в контексте текущего пользователя и процесса",
+      "sectionID": "VE4",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/VE4/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "304-667"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "743-237"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "042-550"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "534-605"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "456-535"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/VE5/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "ПРОВЕРКА И КОДИРОВАНИЕ ДАННЫХ",
+      "description": "Джи может обойти централизованные процедуры кодирования, поскольку они не используются повсюду, или используются неправильные кодировки",
+      "sectionID": "VE5",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/VE5/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "344-611"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "366-835"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "542-445"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "538-446"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "422-005"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/VE6/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "ПРОВЕРКА И КОДИРОВАНИЕ ДАННЫХ",
+      "description": "Джейсон может обойти централизованные процедуры проверки, поскольку они используются не на всех входных данных",
+      "sectionID": "VE6",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/VE6/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "344-611"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "848-711"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "031-447"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "146-706"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "543-512"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/VE7/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "ПРОВЕРКА И КОДИРОВАНИЕ ДАННЫХ",
+      "description": "Ян может создать специальные полезные нагрузки для обхода проверки ввода, поскольку набор символов не указан/не обязателен, или данные кодируются несколько раз, или данные не полностью преобразуются в тот же формат, который использует приложение (каноникализация) перед проверкой или переменные не сильно типизированы",
+      "sectionID": "VE7",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/VE7/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "848-711"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "146-706"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "543-512"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/VE8/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "ПРОВЕРКА И КОДИРОВАНИЕ ДАННЫХ",
+      "description": "Оана может обойти централизованные процедуры обезвреживания, поскольку они не используются всесторонне",
+      "sectionID": "VE8",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/VE8/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "344-611"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "538-446"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "422-005"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/VE9/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "ПРОВЕРКА И КОДИРОВАНИЕ ДАННЫХ",
+      "description": "Шамун может обойти проверку ввода или вывода, поскольку сбои проверки не отбрасываются и/или обезвреживаются",
+      "sectionID": "VE9",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/VE9/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "184-284"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/VEX/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "ПРОВЕРКА И КОДИРОВАНИЕ ДАННЫХ",
+      "description": "Дарио может использовать доверие приложения к исходным данным (например, определяемые пользователем данные, манипулирование локально хранимыми данными, изменение данных на клиентском устройстве, отсутствие и/или ненадлежащее применение механизмов защиты на стороне клиента, отсутствие проверки идентификации во время проверки данных, из-за которых Дарио, может притворяться Колином)",
+      "sectionID": "VEX",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/VEX/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "384-344"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "031-447"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "605-735"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "175-235"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "675-168"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "737-086"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "742-056"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "112-273"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "545-243"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "316-272"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/VEJ/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "ПРОВЕРКА И КОДИРОВАНИЕ ДАННЫХ",
+      "description": "Тоби контролирует код или процедуры проверки ввходных/выходных данных, обезвреживания или кодирования вывода, в результате чего может обойти эти проверки",
+      "sectionID": "VEJ",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/VEJ/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "848-711"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/VEQ/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "ПРОВЕРКА И КОДИРОВАНИЕ ДАННЫХ",
+      "description": "Хавьер может внедрить данные в интерпретатор на стороне клиента или устройства, поскольку параметризованный интерфейс не используется или не был реализован правильно, или данные не были правильно закодированы, обезврежены или экранированы для контекста, или нет ограничений в отношении включений кода или данных",
+      "sectionID": "VEQ",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/VEQ/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "542-445"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "422-005"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "366-835"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "387-848"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/VEK/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "ПРОВЕРКА И КОДИРОВАНИЕ ДАННЫХ",
+      "description": "Гейб может внедрить данные в интерпретатор на стороне сервера (например, SQL, команды ОС, XPath, серверный JavaScript, SMTP), потому что строго типизированный параметризованный интерфейс не используется, реализован неправильно или неправильно настроен",
+      "sectionID": "VEK",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/VEK/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "542-445"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "538-446"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "732-873"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "531-558"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "857-718"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "547-283"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "134-207"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/VEA/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "ПРОВЕРКА И КОДИРОВАНИЕ ДАННЫХ",
+      "description": "Вы изобрели новую атаку против Проверки и Кодирования Данных",
+      "sectionID": "VEA",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/VEA/3.0/ru",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/AT2/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АУТЕНТИФИКАЦИЯ",
+      "description": "Джеймс может пытаться аутентифицироваться, а настоящий пользователь не будет уведомлен об этом (например, при попытке входа в систему, входа с украденными учетными данными, сброса пароля)",
+      "sectionID": "AT2",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/AT2/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "772-358"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "240-274"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "555-048"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "841-710"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "473-758"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "617-524"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "046-257"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "715-304"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/AT3/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АУТЕНТИФИКАЦИЯ",
+      "description": "Мухаммед может получить пароль пользователя или другие секреты, такие как MFA-коды или биометрия, наблюдением во время входа, или из локального кэша, или из памяти, или при передаче, или читая их из незащищенного хранилища, или потому что они широко известны, или потому что они никогда не истекают, или потому что пользователь не может изменить свой собственный пароль",
+      "sectionID": "AT3",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/AT3/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "772-358"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "543-621"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/AT4/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АУТЕНТИФИКАЦИЯ",
+      "description": "Себастьен может легко идентифицировать имена пользователей или перебирать их",
+      "sectionID": "AT4",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/AT4/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "802-056"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "166-151"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/AT5/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АУТЕНТИФИКАЦИЯ",
+      "description": "Хавьер может использовать для аутентификации стандартные, тестовые или легко угадываемые учетные данные или использовать старую учетную запись или учетную запись, не обязательную (избыточную) для работы приложения",
+      "sectionID": "AT5",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/AT5/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "166-151"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/AT6/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АУТЕНТИФИКАЦИЯ",
+      "description": "Свен может повторно использовать временный пароль, код восстановления, активации, аутентификации или MFA-код, потому что они не меняются после использования, не могут быть сброшены пользователем или администратором, или некорректно реализованы, или имеют слишком длинный срок истечения или не имеют его, или остаются действующими после применения, сброса или отзыва, или не используется безопасный сторонний метод доставки (например, почта, мобильное приложение, СМС)",
+      "sectionID": "AT6",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/AT6/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "581-525"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/AT7/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АУТЕНТИФИКАЦИЯ",
+      "description": "Сесилия может использовать перебор и атаки по словарю против одной или многих учетных записей без ограничений, или эти атаки упрощены из-за недостаточной сложности, длины, срока действия или требований к использованию паролей, кодам восстановления, активации или MFA-кодам",
+      "sectionID": "AT7",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/AT7/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "158-874"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "576-651"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "338-370"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "802-056"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/AT8/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АУТЕНТИФИКАЦИЯ",
+      "description": "Кейт может обойти аутентификацию, потому что ошибки обрабатываются небезопасно (т.е. по-умолчанию разрешен неаутентифицированный доступ)",
+      "sectionID": "AT8",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/AT8/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "166-151"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/AT9/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АУТЕНТИФИКАЦИЯ",
+      "description": "Клаудия может выполнять более критические функции, поскольку требования к аутентификации неоднородны (например, не используются ключи доступа или строгая аутентификация, например, рекомендованный способ MFA), или не требуется повторная аутентификация",
+      "sectionID": "AT9",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/AT9/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "801-310"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "327-505"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "333-858"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "368-633"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "284-521"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/ATX/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АУТЕНТИФИКАЦИЯ",
+      "description": "Правин может обойти аутентификацию, потому что централизованный стандартный, протестированный, проверенный, рекомендованный и утвержденный модуль/фреймворк/сервис аутентификации, функционирующий отдельно от запрашиваемого ресурса, не используется, неправильно настроен или некорректно реализован",
+      "sectionID": "ATX",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/ATX/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "344-611"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "117-371"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/ATJ/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АУТЕНТИФИКАЦИЯ",
+      "description": "Марк может получить доступ к ресурсам или услугам, потому что не требуется аутентификация, или она не применяется из-за ошибок в конфигурации, проектировании или реализации, или ошибочно предполагается, что аутентификация выполняется какой-либо другой подсистемой или выполнена на каком-то предыдущем этапе",
+      "sectionID": "ATJ",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/ATJ/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "801-310"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "201-246"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/ATQ/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АУТЕНТИФИКАЦИЯ",
+      "description": "Йохан может обойти аутентификацию, потому что она не требуется с равной строгостью для всех типов функциональности аутентификации (например, регистрация, изменение пароля, восстановление пароля, вход в систему, администрирование) или во всех версиях/каналах (например, мобильный веб сайт, мобильное приложение, полный веб-сайт, API, колл-центр)",
+      "sectionID": "ATQ",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/ATQ/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "801-310"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "581-525"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "358-860"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "201-246"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/ATK/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АУТЕНТИФИКАЦИЯ",
+      "description": "Ольга может влиять на код/процедуры аутентификации или изменять их, чтобы их можно было обойти",
+      "sectionID": "ATK",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/ATK/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "650-560"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "838-636"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "418-525"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "265-800"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "154-031"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/ATA/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АУТЕНТИФИКАЦИЯ",
+      "description": "Вы изобрели новую атаку против Аутентификации",
+      "sectionID": "ATA",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/ATA/3.0/ru",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/SM2/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "УПРАВЛЕНИЕ СЕССИЯМИ",
+      "description": "Уильям контролирует генерацию идентификаторов сессий или токенов авторизации",
+      "sectionID": "SM2",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/SM2/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "582-541"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/SM3/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "УПРАВЛЕНИЕ СЕССИЯМИ",
+      "description": "Райан может продолжать использовать украденную сессию в течение её максимальной продолжительности, потому что пользователь не может проверить, может ли сессия быть украдена, или завершить её самостоятельно или через администратора, а само приложение не обеспечивает защиту от перехвата кодов авторизации",
+      "sectionID": "SM3",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/SM3/3.0/ru",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/SM4/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "УПРАВЛЕНИЕ СЕССИЯМИ",
+      "description": "Элисон может установить идентификационные cookie или использовать токены для другого веб-приложения, потому что домен, путь или (в случае токенов) целевая аудитория (audience) недостаточно ограничены",
+      "sectionID": "SM4",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/SM4/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "688-081"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "804-220"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "342-055"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "232-034"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "705-182"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/SM5/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "УПРАВЛЕНИЕ СЕССИЯМИ",
+      "description": "Джон может предсказать или угадать идентификаторы сессии, потому что они не изменяются, когда роль пользователя изменяется (например, до и после аутентификации), или не проверяются с помощью доверенного бэкенд-сервиса, или недостаточно длинные и случайные или не изменяются периодически",
+      "sectionID": "SM5",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/SM5/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "002-630"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "704-530"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "727-043"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "457-165"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/SM6/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "УПРАВЛЕНИЕ СЕССИЯМИ",
+      "description": "Гэри может захватить сессию пользователя, потому что тайм-аут бездействия длинный или отсутствует, или время жизни сессии длительное или без ограничения, или одна и та же сессия может использоваться с более чем одного устройства/местоположения",
+      "sectionID": "SM6",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/SM6/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "065-782"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "238-346"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "673-736"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/SM7/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "УПРАВЛЕНИЕ СЕССИЯМИ",
+      "description": "Грэм может использовать сессию Адама после того, как тот её закончил, потому что нет функции выхода из системы, или функция выхода труднодоступна, или потому что функция выхода и средства управления параметрами аутентификации не позволяют пользователю завершить одну или несколько сессий",
+      "sectionID": "SM7",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/SM7/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "457-165"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "673-736"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/SM8/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "УПРАВЛЕНИЕ СЕССИЯМИ",
+      "description": "Мэтт может злоупотреблять сессиями, потому что приложение не требует повторной аутентификации после истечения срока действия сессии, при удалении учетной записи или изменении привилегий, или после любых внезапных и рискованных изменений в настройках аутентификации пользователя или атрибутов среды и контекста (например, IP-адрес, устройство, местоположение, время суток, браузер и т.д.)",
+      "sectionID": "SM8",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/SM8/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "065-782"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "618-403"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/SM9/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "УПРАВЛЕНИЕ СЕССИЯМИ",
+      "description": "Иван может украсть идентификаторы сессий или токены авторизации, потому что они отправляются по небезопасным каналам, или логируются, или раскрываются в сообщениях об ошибках, или включены в URL-адреса, или доступны без необходимости со стороны кода, кэша или балансировщиков нагрузки, на которые атакующий может влиять или которые может изменять",
+      "sectionID": "SM9",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/SM9/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "527-034"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "402-133"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "067-050"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "240-274"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "841-710"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "248-646"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "636-854"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/SMX/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "УПРАВЛЕНИЕ СЕССИЯМИ",
+      "description": "Марсэ может подделать запросы, потому что для критичных меняющих состояние операций, на уровне сессии или запроса не используются надежные случайные токены (анти-CSRF токены) или аналоги",
+      "sectionID": "SMX",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/SMX/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "060-472"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/SMJ/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "УПРАВЛЕНИЕ СЕССИЯМИ",
+      "description": "Джефф может повторно использовать украденные идентификаторы сессий и/или токены, потому что они обрабатываются без соблюдения конфиденциальности, или потому что отсутствует строгое доказательство владения (например, привязка к сертификату, устройству, IP-адресу, user-agent и т.д.)",
+      "sectionID": "SMJ",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/SMJ/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "534-605"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "456-535"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "746-705"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/SMQ/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "УПРАВЛЕНИЕ СЕССИЯМИ",
+      "description": "Салим может обойти управление сессиями, потому что оно не применяется всесторонне и последовательно по всему приложению",
+      "sectionID": "SMQ",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/SMQ/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "344-611"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "582-541"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/SMK/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "УПРАВЛЕНИЕ СЕССИЯМИ",
+      "description": "Петр может обойти контроль управления сессиями, потому что вместо использования стандартных фреймворков или проверенных оттестированных модулей был реализован свой ненадёжный",
+      "sectionID": "SMK",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/SMK/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "344-611"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/SMA/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "УПРАВЛЕНИЕ СЕССИЯМИ",
+      "description": "Вы изобрели новую атаку против Управления Сессиями",
+      "sectionID": "SMA",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/SMA/3.0/ru",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/AZ2/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АВТОРИЗАЦИЯ",
+      "description": "Тим может повлиять на то, куда данные отправляются или пересылаются",
+      "sectionID": "AZ2",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/AZ2/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "368-633"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "304-667"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "232-217"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/AZ3/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АВТОРИЗАЦИЯ",
+      "description": "Кристиан может получить доступ к информации, на которую он не должен иметь разрешения с помощью другого механизма, который имеет разрешение (например, поиска, логирования, отчетов) или потому, что данные кэшируется или хранятся дольше, чем необходимо, или через другую утечку информации",
+      "sectionID": "AZ3",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/AZ3/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "368-633"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "166-151"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "157-430"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "473-758"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "186-540"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "227-045"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "715-304"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "268-272"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "307-111"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/AZ4/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АВТОРИЗАЦИЯ",
+      "description": "Келли может обойти механизмы управления доступом, потому что они небезопасно обрабатывают ошибки (т.е. по-умолчанию доступ разрешен)",
+      "sectionID": "AZ4",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/AZ4/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "166-151"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/AZ5/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АВТОРИЗАЦИЯ",
+      "description": "Чад может получить доступ к ресурсам (включая сервисы, процессы, AJAX, видео, изображения, документы, временные файлы, данные сессий, свойства системы, данные конфигурации, настройки реестра, журналы), на которые не имеет разрешения, из -за отсутствия авторизации или чрезмерных привилегий (не используется принцип наименьших привилегий)",
+      "sectionID": "AZ5",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/AZ5/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "278-413"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "650-560"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "368-633"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "304-667"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/AZ6/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АВТОРИЗАЦИЯ",
+      "description": "Эдуардо может получить доступ к данным, на которые не имеет разрешения, если у него есть права на доступ к форме/странице/URL/точке входа",
+      "sectionID": "AZ6",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/AZ6/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "368-633"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "304-667"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/AZ7/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АВТОРИЗАЦИЯ",
+      "description": "Юаньцзин может получить доступ к функциям, объектам или свойствам приложения, на которые у него нет прав",
+      "sectionID": "AZ7",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/AZ7/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "368-633"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "304-667"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/AZ8/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АВТОРИЗАЦИЯ",
+      "description": "Том может обойти бизнес логику изменяя обычный ход процесса, или проведя процесс в неправильном порядке, или манипулируя значениями даты и времени, используемыми приложением, или используя доступные функции для непреднамеренных целей или иным образом манипулировать управляющими данными",
+      "sectionID": "AZ8",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/AZ8/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "368-633"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "304-667"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "284-521"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "770-361"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "534-605"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "456-535"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/AZ9/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АВТОРИЗАЦИЯ",
+      "description": "Михаил может получить доступ к данным, потому что административные инструменты или интерфейсы не обеспечены адекватной защитой",
+      "sectionID": "AZ9",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/AZ9/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "801-310"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "201-246"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/AZX/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АВТОРИЗАЦИЯ",
+      "description": "Ричард может обойти централизованные проверки управления доступом, поскольку они не используются всесторонне при всех взаимодействиях, или потому что настроены некорректно, или потому что приложение не использует централизованный стандартный, протестированный, проверенный, рекомендованный и утвержденный модуль/фреймворк/сервис авторизации",
+      "sectionID": "AZX",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/AZX/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "344-611"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "650-560"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/AZJ/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АВТОРИЗАЦИЯ",
+      "description": "Денис может получить доступ к информации о конфигурации безопасности или спискам управления доступом",
+      "sectionID": "AZJ",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/AZJ/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "368-633"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "838-636"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "418-525"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "265-800"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "154-031"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/AZQ/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АВТОРИЗАЦИЯ",
+      "description": "Кристофер может внедрить команду, которую приложение выполнит с высокими привилегиями",
+      "sectionID": "AZQ",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/AZQ/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "857-718"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/AZK/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АВТОРИЗАЦИЯ",
+      "description": "Адриан может влиять на контроль доступа или изменить права доступа, и поэтому может обойти их",
+      "sectionID": "AZK",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/AZK/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "650-560"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "368-633"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "838-636"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "418-525"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "265-800"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "154-031"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/AZA/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "АВТОРИЗАЦИЯ",
+      "description": "Вы изобрели новую атаку против Контроля Доступа",
+      "sectionID": "AZA",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/AZA/3.0/ru",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/CR2/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "КРИПТОГРАФИЯ",
+      "description": "Кюн может получить доступ к данным, потому что они были спрятаны, а не зашифрованы утвержденными криптографическими функциями",
+      "sectionID": "CR2",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/CR2/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "742-431"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/CR3/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "КРИПТОГРАФИЯ",
+      "description": "Аксель может изменить данные (сохраненные или передаваемые), или исходный код, или обновления/исправления, или данные конфигурации, поскольку их целостность не проверяется",
+      "sectionID": "CR3",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/CR3/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "838-636"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "838-636"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "418-525"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "265-800"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "154-031"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "028-254"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "307-507"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "253-452"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "208-355"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "347-352"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/CR4/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "КРИПТОГРАФИЯ",
+      "description": "Пауло может получить доступ к передаваемым данным, которые не зашифрованы, даже если канал зашифрован",
+      "sectionID": "CR4",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/CR4/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "227-045"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "745-045"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/CR5/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "КРИПТОГРАФИЯ",
+      "description": "Кайл может обойти криптографию, потому что ошибки обрабатываются небезопасно (по-умолчанию нет защиты)",
+      "sectionID": "CR5",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/CR5/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "527-034"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "036-810"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "248-646"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "636-854"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/CR6/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "КРИПТОГРАФИЯ",
+      "description": "Ромен может читать и изменять незашифрованные данные в памяти или при передаче (например, криптографические секреты, учетные данные, идентификаторы сессий, личную и коммерчески чувствительную информацию), используемые или передаваемые между приложениями, или между приложением и пользователем, или между приложением и внешними системами",
+      "sectionID": "CR6",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/CR6/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "527-034"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "558-807"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "270-634"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "227-045"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "715-304"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "248-646"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "636-854"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/CR7/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "КРИПТОГРАФИЯ",
+      "description": "Гюнтер может перехватывать или изменять зашифрованные и/или захешированые данные при передаче, потому что протокол плохо применен, или слабо настроен, или сертификаты недействительны, или сертификаты не доверенные, или соединение может быть дегрировано до более слабого или отсутствующего шифрования",
+      "sectionID": "CR7",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/CR7/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "530-671"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "786-224"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "745-045"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "430-636"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "537-367"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "036-147"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/CR8/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "КРИПТОГРАФИЯ",
+      "description": "Эойн может получить доступ к сохраненным бизнес-данным (например, паролям, идентификаторам сессий, перс. данным, данным платежных карт), потому что они ненадежно зашифрованы или хешированы",
+      "sectionID": "CR8",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/CR8/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "622-203"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "742-431"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "674-425"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "227-045"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/CR9/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "КРИПТОГРАФИЯ",
+      "description": "Энди может обойти генератор случайных чисел, генерацию случайных GUID, хеширование и шифрование, потому что они были самостоятельно имплементированы или ненадежны",
+      "sectionID": "CR9",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/CR9/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "742-431"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "674-425"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "542-488"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "664-571"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/CRX/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "КРИПТОГРАФИЯ",
+      "description": "Сюзанна может сломать криптографию, потому что она недостаточно сильна для требуемой степени защиты, или она недостаточно сильна для количества усилий, которые злоумышленник готов потратить",
+      "sectionID": "CRX",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/CRX/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "664-571"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/CRJ/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "КРИПТОГРАФИЯ",
+      "description": "Джастин может прочитать учетные данные для доступа к внутренним или внешним ресурсам, услугам и другим системам, потому что они хранятся в незашифрованном формате или сохраняются в исходном коде",
+      "sectionID": "CRJ",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/CRJ/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "287-305"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "508-702"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "232-325"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "774-888"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "340-375"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "032-213"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/CRQ/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "КРИПТОГРАФИЯ",
+      "description": "Артём может получить доступ или предсказать криптографический мастер-ключ",
+      "sectionID": "CRQ",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/CRQ/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "287-305"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "508-702"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "821-832"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "674-425"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "715-304"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/CRK/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "КРИПТОГРАФИЯ",
+      "description": "Дэн может влиять или изменять код/компоненты криптографии (шифрование, хэширование, цифровые подписи, генерацию случайных чисел и GUID) и поэтому может обойти их",
+      "sectionID": "CRK",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/CRK/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "508-702"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "441-132"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "433-122"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "786-224"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "878-880"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/CRA/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "КРИПТОГРАФИЯ",
+      "description": "Вы изобрели новую атаку против Криптографии",
+      "sectionID": "CRA",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/CRA/3.0/ru",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/C2/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "CORNUCOPIA",
+      "description": "Ли может обойти управление приложениями, потому что вместо более безопасных функций использовались их опасные/рискованные аналоги, или существуют ошибки конверсии типа, или потому что приложение ненадежно, когда внешний ресурс недоступен, или есть состояние гонки, или есть проблемы с инициализацией, утечкой или аллокацией ресурсов, или может возникнуть переполнение",
+      "sectionID": "C2",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/C2/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "314-131"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/C3/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "CORNUCOPIA",
+      "description": "Эндрю может получить доступ к исходному коду, или декомпилировать, или выполнить отладку, или иным образом получить доступ к бизнес-логике, чтобы понять, как работает приложение и какие секреты содержит",
+      "sectionID": "C3",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/C3/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "253-452"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/C4/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "CORNUCOPIA",
+      "description": "Кит может выполнить действие, которое невозможно с ним связать",
+      "sectionID": "C4",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/C4/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "841-710"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "443-447"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/C5/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "CORNUCOPIA",
+      "description": "Ларри может сыграть на доверии других сторон, включая пользователей, к приложению или злоупотреблять этим доверием в другом месте (например, в другом приложении)",
+      "sectionID": "C5",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/C5/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "530-671"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "232-217"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "745-045"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "430-636"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "537-367"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/C6/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "CORNUCOPIA",
+      "description": "Аарон может обойти элементы управления, потому что обработка ошибок/исключений отсутствует или реализуется непоследовательно или частично, или не закрывает доступ по-умолчанию (т.е. ошибки должны прекратить доступ/выполнение) или опирается на обработку какой-либо другой службой или системой",
+      "sectionID": "C6",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/C6/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "166-15"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "555-048"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/C7/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "CORNUCOPIA",
+      "description": "Действия Мвенгу не могут быть исследованы, потому события безопасности не записываются с нужной точностью времени, или не записывается полная цепочка событий, или Мвенгу может изменить или удалить их, или нет централизованной регистрации событий",
+      "sectionID": "C7",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/C7/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "240-274"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "555-048"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "841-710"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "443-447"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "048-612"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "713-683"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "015-063"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "668-364"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/C8/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "CORNUCOPIA",
+      "description": "Дэвид может получить доступ к данным, поскольку сеть, хост, вспомогательные сервисы/приложения не были надежно настроены, отсутствует периодическая проверка конфигурации, патчи безопасности не устанавливаются, или данные хранятся локально, или данные не защищаются физически",
+      "sectionID": "C8",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/C8/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "801-310"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "154-031"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "418-525"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "208-355"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "347-352"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "715-334"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "462-245"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/C9/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "CORNUCOPIA",
+      "description": "Майк может злоупотреблять приложением, используя функцию слишком быстро или слишком часто, или иным образом, который не предполагался, или потребляя ресурсы приложения, или вызывая состояние гонки, или чрезмерно используя функционал",
+      "sectionID": "C9",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/C9/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "746-705"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "630-573"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/CX/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "CORNUCOPIA",
+      "description": "Спирос может обойти элементы управления приложения, потому что фреймворки, библиотеки и компоненты (собственные, купленные, аутсорсинговые, открытые, внешние) содержат вредоносный код или уязвимости",
+      "sectionID": "CX",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/CX/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "053-751"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "611-158"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "838-636"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "838-636"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "418-525"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "265-800"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "715-334"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/CJ/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "CORNUCOPIA",
+      "description": "Роман может проэксплуатировать приложение, потому что оно было небезопасно скомпилировано или развернуто, или его конфигурация не безопасна по умолчанию, или потому что информация о безопасности не была задокументирована или передана обслуживающим командам, или пользователь не получает предупреждения и доступ не блокируется, когда ожидаемые функции безопасности не поддерживаются или отключены",
+      "sectionID": "CJ",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/CJ/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "053-751"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "253-452"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "314-131"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "180-488"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "208-355"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "347-352"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "715-334"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/CQ/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "CORNUCOPIA",
+      "description": "Джим может предпринять вредоносные, аномальные действия, которые не обнаруживаются приложением и не вызывают его реакции в режиме реального времени",
+      "sectionID": "CQ",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/CQ/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "176-154"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "534-605"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "456-535"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "746-705"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "630-573"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/CK/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "CORNUCOPIA",
+      "description": "Грант может занять приложение так, чтобы оно перестанет обслуживать других пользователей (часть или всех)",
+      "sectionID": "CK",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/CK/3.0/ru",
+      "links": [
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "802-056"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "746-705"
+          },
+          "ltype": "Linked To"
+        },
+        {
+          "document": {
+            "doctype": "CRE",
+            "id": "630-573"
+          },
+          "ltype": "Linked To"
+        }
+      ],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/CA/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "CORNUCOPIA",
+      "description": "Вы изобрели новую атаку любого типа",
+      "sectionID": "CA",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/CA/3.0/ru",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/JOA/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "ШАЛЬНАЯ КАРТА",
+      "description": "Алиса может использовать приложение для атаки на пользовательские системы и данные",
+      "sectionID": "JOA",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/JOA/3.0/ru",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/webapp/JOB/3.0/ru",
+      "name": "OWASP Cornucopia Website App Edition",
+      "section": "ШАЛЬНАЯ КАРТА",
+      "description": "Боб может изменить или повлиять на приложение так, что оно перестанет соответствовать юридическим, нормативным, договорным или другим организационным предписаниям",
+      "sectionID": "JOB",
+      "hyperlink": "https://cornucopia.owasp.org/edition/webapp/JOB/3.0/ru",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Website Application"
+      ],
+      "tooltype": "Defensive"
+    }
+  ]
+}

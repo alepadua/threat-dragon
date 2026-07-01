@@ -1,0 +1,1210 @@
+{
+  "meta": {
+    "edition": "OWASP Cornucopia Mobile App Edition",
+    "component": "cards",
+    "language": "en",
+    "version": "1.1"
+  },
+  "standards": [
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/PC2/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Platform & Code",
+      "description": "Andrew can expose sensitive data through the app's auto-generated screenshots when the app moves to the background",
+      "sectionID": "PC2",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/PC2/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/PC3/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Platform & Code",
+      "description": "Harold can spy sensitive data being entered through the user interface because the data is excessive, not properly masked or cleaned up after use",
+      "sectionID": "PC3",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/PC3/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/PC4/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Platform & Code",
+      "description": "Kelly can expose sensitive data by taking advantage of the app's excessive permissions connected to the app's use of location, camera, microphone, storage, etc",
+      "sectionID": "PC4",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/PC4/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/PC5/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Platform & Code",
+      "description": "Jason can provoke memory leak or corruption because the app has cyclic dependencies, manages pointers inadequately, keeps an incorrect reference count, does not release shared resources or apply stack protection",
+      "sectionID": "PC5",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/PC5/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/PC6/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Platform & Code",
+      "description": "Dawn can expose and intercept sensitive functionality through interprocess communication because permissions for broadcast and sharing are not set, not narrow enough or because sensitive functionality isn't appropriately excluded when sharing",
+      "sectionID": "PC6",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/PC6/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/PC7/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Platform & Code",
+      "description": "Lauren can traverse or modify otherwise protected files through access to the underlying file system by exploiting weaknesses in file system-based content providers, resolvers or its configuration",
+      "sectionID": "PC7",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/PC7/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/PC8/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Platform & Code",
+      "description": "Colin can expose sensitive data through the app's interprocess communication because the content provider's query methods are not properly parameterized and arguments sanitized",
+      "sectionID": "PC8",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/PC8/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/PC9/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Platform & Code",
+      "description": "Toby can modify or expose data by injection because the response from implicit intents is not properly validated",
+      "sectionID": "PC9",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/PC9/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/PCX/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Platform & Code",
+      "description": "Max can modify or expose data because input validation and sanitation are not properly applied to interprocess communication or because extensions are not properly restricted",
+      "sectionID": "PCX",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/PCX/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/PCJ/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Platform & Code",
+      "description": "Johan can modify or expose sensitive data by exploiting weaknesses in the SDK or third party libraries because updates to the app and platform are not enforced or do not patch known software vulnerabilities",
+      "sectionID": "PCJ",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/PCJ/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/PCQ/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Platform & Code",
+      "description": "Xavier can inject scripts into the web view because it allows embedding content using deep linking without proper authorization and validation of the host, schema and path of the target as these can be changed by the user or because safe browsing is disabled",
+      "sectionID": "PCQ",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/PCQ/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/PCK/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Platform & Code",
+      "description": "Grant can modify or expose data by influencing or altering JavaScript bridges, extensions or interprocess communication (e.g. shared memory, message passing, pipes, sockets)",
+      "sectionID": "PCK",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/PCK/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/PCA/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Platform & Code",
+      "description": "You have invented a new attack against “Platform and Code”",
+      "sectionID": "PCA",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/PCA/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/AA2/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Authentication & Authorization",
+      "description": "Jie can use the app to do sensitive operations because the “unlocked key” is not used during the application flow",
+      "sectionID": "AA2",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/AA2/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/AA3/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Authentication & Authorization",
+      "description": "Choi can access capabilities, objects, resources, or properties they should not be authorized to access because entitlements or permissions are too wide, not properly set or not enforced",
+      "sectionID": "AA3",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/AA3/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/AA4/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Authentication & Authorization",
+      "description": "Vandana can bypass biometric authentication because the authentication is misconfigured or not implemented correctly",
+      "sectionID": "AA4",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/AA4/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/AA5/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Authentication & Authorization",
+      "description": "Eiman can bypass the local authentication through patching and/or by instrumentation because the authentication can be patched out or overloaded",
+      "sectionID": "AA5",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/AA5/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/AA6/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Authentication & Authorization",
+      "description": "Anant can perform sensitive operations without additional authentication because authentication requirements are too weak or missing",
+      "sectionID": "AA6",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/AA6/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/AA7/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Authentication & Authorization",
+      "description": "Abdullah can bypass authentication by altering the usual process sequence or flow, or by undertaking the process in incorrect order, or by manipulating date and time values used by the app, or by using valid features for unintended purposes",
+      "sectionID": "AA7",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/AA7/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/AA8/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Authentication & Authorization",
+      "description": "Pramod can intercept credentials through misdirection because the app is vulnerable to attacks like Tapjacking, StrandHogg and/or URL scheme hijacking",
+      "sectionID": "AA8",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/AA8/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/AA9/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Authentication & Authorization",
+      "description": "Wong can bypass the authentication because it does not fail securely. (i.e. it defaults to allowing unauthenticated access)",
+      "sectionID": "AA9",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/AA9/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/AAX/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Authentication & Authorization",
+      "description": "Prasad can bypass the centralized authentication and authorization controls since they are not being used comprehensively on all interactions",
+      "sectionID": "AAX",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/AAX/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/AAJ/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Authentication & Authorization",
+      "description": "Ade can bypass authentication because it is not enforced using a remote endpoint, or it is not based on a cryptographic primitive protected by keystore/keychain access control flags",
+      "sectionID": "AAJ",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/AAJ/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/AAQ/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Authentication & Authorization",
+      "description": "Riotaro can inject and run a command that the application will run at a higher privilege level without being authenticated or authorized to do so",
+      "sectionID": "AAQ",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/AAQ/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/AAK/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Authentication & Authorization",
+      "description": "Aatif can influence or alter authentication controls and can therefore bypass them",
+      "sectionID": "AAK",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/AAK/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/AAA/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Authentication & Authorization",
+      "description": "You have invented a new attack against “Authentication & Authorization”",
+      "sectionID": "AAA",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/AAA/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/NS2/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Network & Storage",
+      "description": "Matt can inspect sensitive application log data because logging statements have not been removed or reviewed as safe before the production release",
+      "sectionID": "NS2",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/NS2/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/NS3/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Network & Storage",
+      "description": "Bil can access sensitive data for sensitive fields from the pasteboard/clipboard or keyboard cache because the pasteboard/clipboard is not timely cleared, disabled or restricted for sensitive fields, or the keyboard cache is not disabled",
+      "sectionID": "NS3",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/NS3/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/NS4/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Network & Storage",
+      "description": "Ricardo can extract data stored by the app on a stolen or decommissioned device  because it does not enforce device access security policies (e.g. PIN protected locking, app-/os-version, USB debug deactivation, device encryption and rooting)",
+      "sectionID": "NS4",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/NS4/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/NS5/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Network & Storage",
+      "description": "Kevin can read sensitive data mapped to user accounts or sessions by extracting data sent through third-party libraries and/or notifications sent between the app and embedded services (e.g. logs, notifications, backups, cache, local db)",
+      "sectionID": "NS5",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/NS5/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/NS6/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Network & Storage",
+      "description": "Sam can dump sensitive data from memory because the data is not stored as primitive data types and overwritten with random data after use or because the app's input fields use insecure SDKs to store the data in RAM",
+      "sectionID": "NS6",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/NS6/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/NS7/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Network & Storage",
+      "description": "Steve can access sensitive data by reading backups and/or local, internal/external storage",
+      "sectionID": "NS7",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/NS7/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/NS8/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Network & Storage",
+      "description": "Martin can modify or expose sensitive data through unsafe reflection when reading data from public data storage (e.g. shared preferences) because the data is not validated before being read by the app",
+      "sectionID": "NS8",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/NS8/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/NS9/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Network & Storage",
+      "description": "Adrian can compromise the app communication through a proxy because the app does not make use of certificate pinning or implements it incorrectly",
+      "sectionID": "NS9",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/NS9/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/NSX/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Network & Storage",
+      "description": "Maarten can compromise the communication between the app and the external services because the app does not verify TLS certificates and -chains, trust insecure sources, lack hostname verification or ignore TLS verification issues",
+      "sectionID": "NSX",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/NSX/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/NSJ/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Network & Storage",
+      "description": "Nihel can compromise the communication as it may fall back to an insecure or unencrypted channel,  because encryption is optional, or because of client-server protocol or security provider weaknesses",
+      "sectionID": "NSJ",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/NSJ/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/NSQ/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Network & Storage",
+      "description": "Ahmed can read and modify data in transit because the communication is transmitted over an unencrypted channel",
+      "sectionID": "NSQ",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/NSQ/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/NSK/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Network & Storage",
+      "description": "Taher can intercept, extract or modify sensitive data at rest or in transit by influencing or altering methods for transferring or storing data at rest or in transit",
+      "sectionID": "NSK",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/NSK/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/NSA/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Network & Storage",
+      "description": "You have invented a new attack against “Network & Storage”",
+      "sectionID": "NSA",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/NSA/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/RS2/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Resilience",
+      "description": "Sebastien can disclose sensitive data because the application is set up to log debug information at runtime",
+      "sectionID": "RS2",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/RS2/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/RS3/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Resilience",
+      "description": "Tobias can disclose sensitive data by dumping debug symbols while the application is running",
+      "sectionID": "RS3",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/RS3/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/RS4/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Resilience",
+      "description": "Timur can change the code of the production release because the code of the application has not been properly signed using a valid production certificate",
+      "sectionID": "RS4",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/RS4/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/RS5/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Resilience",
+      "description": "Matteo can bypass access controls and trigger functionality because debugging is left enabled in the production build",
+      "sectionID": "RS5",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/RS5/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/RS6/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Resilience",
+      "description": "Joren can bypass access controls because the anti-debugging controls aren't strong enough according to what is recommended or the perceived effort of a potential attacker",
+      "sectionID": "RS6",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/RS6/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/RS7/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Resilience",
+      "description": "Erlend can compromise the app by running it in an emulator because the prevention against emulators are not strong enough according to what is recommended or the perceived effort of a potential attacker",
+      "sectionID": "RS7",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/RS7/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/RS8/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Resilience",
+      "description": "Carlos can reverse engineer the app because the anti-reverse engineering controls aren't strong enough according to what is recommended or the perceived effort of a potential attacker",
+      "sectionID": "RS8",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/RS8/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/RS9/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Resilience",
+      "description": "Sean can reverse engineer the app because the code obfuscation isn't strong enough according to what is recommended or the perceived effort of a potential attacker",
+      "sectionID": "RS9",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/RS9/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/RSX/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Resilience",
+      "description": "Juan can bypass jailbreak and root detection and execute administrative functions to bypass integrity checks and access controls and trigger app functionality",
+      "sectionID": "RSX",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/RSX/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/RSJ/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Resilience",
+      "description": "Pekka can compromise the integrity of the storage because the file integrity checks aren't strong enough according to what is recommended or the perceived effort of a potential attacker",
+      "sectionID": "RSJ",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/RSJ/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/RSQ/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Resilience",
+      "description": "Titus can patch out critical functionality because the runtime integrity checks are not strong enough according to what is recommended or the perceived effort of a potential attacker",
+      "sectionID": "RSQ",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/RSQ/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/RSK/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Resilience",
+      "description": "Sherif can influence or alter controls against reverse engineering and runtime protection and can therefore bypass them",
+      "sectionID": "RSK",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/RSK/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/RSA/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Resilience",
+      "description": "You have invented a new attack against “Resilience”",
+      "sectionID": "RSA",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/RSA/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CRM2/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cryptography",
+      "description": "Lesego can compromise cryptographic operations and resources because keys are reused for multiple purposes, or not used according to the purpose for which they were created",
+      "sectionID": "CRM2",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CRM2/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CRM3/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cryptography",
+      "description": "Emery can access data because it has been obfuscated rather than using an approved cryptographic function",
+      "sectionID": "CRM3",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CRM3/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CRM4/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cryptography",
+      "description": "Enselme can modify sensitive data (stored or in transit) because it is not subject to integrity checking",
+      "sectionID": "CRM4",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CRM4/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CRM5/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cryptography",
+      "description": "Orace can predict the seed value used for generating cryptographic keys thereby compromising the cryptographic key",
+      "sectionID": "CRM5",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CRM5/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CRM6/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cryptography",
+      "description": "Kouti can extract sensitive data because the cryptographic key, used, is hard-coded or stored insecurely such as in local, internal/external storage",
+      "sectionID": "CRM6",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CRM6/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CRM7/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cryptography",
+      "description": "Ramsey can access stored sensitive data because it is not securely encrypted",
+      "sectionID": "CRM7",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CRM7/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CRM8/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cryptography",
+      "description": "Adel can predict and use the app's cryptographic keys because they are insufficiently long and random, can be enumerated, or derived from known values",
+      "sectionID": "CRM8",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CRM8/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CRM9/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cryptography",
+      "description": "Fady can bypass cryptographic controls because they do not fail securely (i.e. they default to unprotected)",
+      "sectionID": "CRM9",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CRM9/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CRMX/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cryptography",
+      "description": "Ash can break the cryptography because it is not strong enough according to what is recommended or the perceived effort of a potential attacker",
+      "sectionID": "CRMX",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CRMX/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CRMJ/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cryptography",
+      "description": "Hassan can extract or modify sensitive data because functions for storage and/or encryption are weak, deprecated or used incorrectly",
+      "sectionID": "CRMJ",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CRMJ/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CRMQ/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cryptography",
+      "description": "Simon can bypass hashing and encryption functions because they are custom and/or inadequately implemented",
+      "sectionID": "CRMQ",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CRMQ/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CRMK/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cryptography",
+      "description": "Tarik can influence or alter cryptographic operations and can therefore bypass them",
+      "sectionID": "CRMK",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CRMK/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CRMA/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cryptography",
+      "description": "You have invented a new attack against “Cryptography”",
+      "sectionID": "CRMA",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CRMA/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CM2/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cornucopia",
+      "description": "Garth can reduce app users' privacy because the app is not transparent about the app's data collection and usage in a concise, easily accessible and understandable way",
+      "sectionID": "CM2",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CM2/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CM3/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cornucopia",
+      "description": "Elsa can reduce app users' privacy because the app does not allow for the user to easily manage, delete and modify their data, change privacy settings and re-prompt for consent when more data is required",
+      "sectionID": "CM3",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CM3/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CM4/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cornucopia",
+      "description": "Elizabeth can reduce app users' privacy because the app sends too much personal data without the user's consent to downstream services that are outside the user's control",
+      "sectionID": "CM4",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CM4/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CM5/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cornucopia",
+      "description": "Debarghaya can reduce app users' privacy because the app repurpose personal information (e.g. device IDs, IP addresses, behavioral patterns) collected for security concerns in order to cater for commercial interests without consent",
+      "sectionID": "CM5",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CM5/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CM6/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cornucopia",
+      "description": "Kim can reduce app users' privacy because the app repurpose biometric information (e.g. fingerprints, facial recognition data, etc.) collected for security concerns in order to cater for commercial interests",
+      "sectionID": "CM6",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CM6/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CM7/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cornucopia",
+      "description": "Gastón can execute malicious actions through intent redirection because the intent is not properly sanitized and immutable",
+      "sectionID": "CM7",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CM7/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CM8/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cornucopia",
+      "description": "Roxana can do arbitrary file overwrites and potentially execute malicious code through path traversal because the target path and directory is not appropriately validated",
+      "sectionID": "CM8",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CM8/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CM9/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cornucopia",
+      "description": "Alessandro can exploit the app by taking advantage of buffer overflows and memory leaks to write foreign code within the mobile code's address space",
+      "sectionID": "CM9",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CM9/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CMX/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cornucopia",
+      "description": "Carlos can use the application's notification services to launch phishing campaigns because notifications are not sanitized and validated according to best practices",
+      "sectionID": "CMX",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CMX/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CMJ/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cornucopia",
+      "description": "Luis can influence or alter cryptographic methods to corrupt other users' data because the integrity of the encrypted data is not verified before being shared with external services",
+      "sectionID": "CMJ",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CMJ/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CMQ/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cornucopia",
+      "description": "Victor can patch the app and use it to distribute malicious code because the runtime integrity checks are not strong enough according to what is recommended or the perceived effort of a potential attacker",
+      "sectionID": "CMQ",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CMQ/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CMK/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cornucopia",
+      "description": "Ruben can use the app, without modifications, to spread malicious code because methods for transfer and storage do not perform proper data sanitization and validation",
+      "sectionID": "CMK",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CMK/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/CMA/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Cornucopia",
+      "description": "You have invented a new attack of any type",
+      "sectionID": "CMA",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/CMA/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/JOAM/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Wild Card",
+      "description": "Starr can influence, alter or affect the app so that it no longer complies with legal, regulatory, contractual or other mandates",
+      "sectionID": "JOAM",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/JOAM/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    },
+    {
+      "doctype": "Tool",
+      "id": "https://cornucopia.owasp.org/edition/mobileapp/JOBM/1.1/en",
+      "name": "OWASP Cornucopia Mobile App Edition",
+      "section": "Wild Card",
+      "description": "Mallory can use the app installed on Bob's device maliciously to surveil, spy on, eavesdrop, control remotely, track or otherwise monitor Bob, without consent and/or notification",
+      "sectionID": "JOBM",
+      "hyperlink": "https://cornucopia.owasp.org/edition/mobileapp/JOBM/1.1/en",
+      "links": [],
+      "tags": [
+        "Threat modeling",
+        "Mobile Application"
+      ],
+      "tooltype": "Defensive"
+    }
+  ]
+}
