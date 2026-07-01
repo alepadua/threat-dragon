@@ -584,43 +584,49 @@ const splitTextIntoChunks = (text, chunkSize = 1000, overlap = 150) => {
 
 
 const callAIModel = async (promptText, images, aiConfig) => {
-    if (aiConfig.provider === 'bedrock-mantle') {
-        const messages = [];
-        let userContent = [];
-        if (promptText) {
-            userContent.push({ type: 'text', text: promptText });
-        }
-        if (images && images.length > 0) {
-            images.forEach((img) => {
-                const parsed = parseBase64Image(img.data || img);
-                userContent.push({
-                    type: 'image_url',
-                    image_url: { url: `data:${parsed.mimeType};base64,${parsed.data}` }
-                });
-            });
-        }
-        
-        if (userContent.length === 1 && userContent[0].type === 'text') {
-            userContent = userContent[0].text;
-        }
-
-        messages.push({ role: 'user', content: userContent });
-
-        const response = await axios.post(
-            `${aiConfig.baseUrl}/chat/completions`,
-            {
-                model: aiConfig.model || 'meta.llama3-70b-instruct-v1:0',
-                messages: messages,
-                max_tokens: 8192
-            },
-            {
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${aiConfig.apiKey}` },
-                timeout: 90000
+    try {
+        if (aiConfig.provider === 'bedrock-mantle') {
+            const messages = [];
+            let userContent = [];
+            if (promptText) {
+                userContent.push({ type: 'text', text: promptText });
             }
-        );
+            if (images && images.length > 0) {
+                images.forEach((img) => {
+                    const parsed = parseBase64Image(img.data || img);
+                    userContent.push({
+                        type: 'image_url',
+                        image_url: { url: `data:${parsed.mimeType};base64,${parsed.data}` }
+                    });
+                });
+            }
+            
+            if (userContent.length === 1 && userContent[0].type === 'text') {
+                userContent = userContent[0].text;
+            }
 
-        return response.data.choices[0].message.content;
-    } 
+            messages.push({ role: 'user', content: userContent });
+
+            const url = `${aiConfig.baseUrl}/chat/completions`;
+            logger.info(`[callAIModel] Bedrock Mantle sending POST request to URL: ${url}`);
+
+            const response = await axios.post(
+                url,
+                {
+                    model: aiConfig.model || 'meta.llama3-70b-instruct-v1:0',
+                    messages: messages,
+                    max_tokens: 8192
+                },
+                {
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${aiConfig.apiKey}` },
+                    timeout: 90000
+                }
+            );
+
+            logger.info(`[callAIModel] Bedrock Mantle response status: ${response.status}`);
+            return response.data.choices[0].message.content;
+        } 
+        
         const parts = [];
         if (promptText) {
             parts.push({ text: promptText });
@@ -642,8 +648,11 @@ const callAIModel = async (promptText, images, aiConfig) => {
             }
         };
 
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${aiConfig.apiKey}`;
+        logger.info(`[callAIModel] Gemini sending POST request to API. Payload size: ${JSON.stringify(payload).length} characters`);
+
         const response = await axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${aiConfig.apiKey}`,
+            url,
             payload,
             {
                 headers: { 'Content-Type': 'application/json' },
@@ -651,8 +660,19 @@ const callAIModel = async (promptText, images, aiConfig) => {
             }
         );
 
+        logger.info(`[callAIModel] Gemini response status: ${response.status}`);
         return response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-    
+    } catch (err) {
+        logger.error(`[callAIModel] HTTP/API Request Failed: ${err.message}`);
+        if (err.response) {
+            logger.error(`[callAIModel] Error Response Status: ${err.response.status}`);
+            logger.error(`[callAIModel] Error Response Headers: ${JSON.stringify(err.response.headers)}`);
+            logger.error(`[callAIModel] Error Response Data: ${JSON.stringify(err.response.data)}`);
+        } else if (err.request) {
+            logger.error(`[callAIModel] Request was sent but no response was received: ${JSON.stringify(err.request)}`);
+        }
+        throw err;
+    }
 };
 
 const getEmbeddingsBatch = async (chunks, aiConfig) => {
