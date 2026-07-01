@@ -270,6 +270,15 @@ describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
             const json = '{\n  // this is a comment\n  "key": "value",\n}';
             expect(aiController._extractJson(json)).to.deep.equal({ key: "value" });
         });
+
+        it('should repair mismatched array/object brackets and premature root closing brace', () => {
+            const json = '{"threatModel":{"version":"2.0.0","summary":{"title":"Teste"},"detail":{"reviewer":"AI Threat Modeler","diagrams":[{"id":0,"cells":[]}}]}},"questions":["Por favor, valide..."]}';
+            const parsed = aiController._extractJson(json);
+            expect(parsed).to.have.property('threatModel');
+            expect(parsed).to.have.property('questions');
+            expect(parsed.threatModel.version).to.equal('2.0.0');
+            expect(parsed.questions[0]).to.equal('Por favor, valide...');
+        });
     });
 
     describe('_callAIModel', () => {

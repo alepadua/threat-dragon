@@ -29,6 +29,89 @@ const parseBase64Image = (dataUri) => {
     };
 };
 
+const closeOpenStructures = (stack, targetChar) => {
+    let closed = '';
+    while (stack.length > 0 && stack[stack.length - 1] !== targetChar) {
+        closed += stack.pop();
+    }
+    return closed;
+};
+
+const repairMismatchedBrackets = (str) => {
+    let repaired = '';
+    const stack = [];
+    let inString = false;
+    let escaped = false;
+
+    // Helper to check if there is non-whitespace content remaining in the string
+    const hasMoreContent = (index) => {
+        for (let j = index + 1; j < str.length; j++) {
+            if (str[j] !== '}' && str[j] !== ']' && !(/\s/u).test(str[j])) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    for (let i = 0; i < str.length; i++) {
+        const c = str[i];
+
+        if (inString) {
+            repaired += c;
+            if (c === '\\') {
+                escaped = !escaped;
+            } else if (c === '"' && !escaped) {
+                inString = false;
+            } else {
+                escaped = false;
+            }
+        } else if (c === '"') {
+            inString = true;
+            escaped = false;
+            repaired += c;
+        } else if (c === '{') {
+            stack.push('}');
+            repaired += c;
+        } else if (c === '[') {
+            stack.push(']');
+            repaired += c;
+        } else if (c === '}') {
+            const isPrematureRoot = (stack.length === 1 && stack[0] === '}' && hasMoreContent(i));
+            if (!isPrematureRoot) {
+                if (stack.length > 0 && stack[stack.length - 1] === ']') {
+                    const lastBraceIndex = stack.lastIndexOf('}');
+                    if (lastBraceIndex !== -1) {
+                        repaired += closeOpenStructures(stack, '}');
+                    }
+                }
+                if (stack.length > 0 && stack[stack.length - 1] === '}') {
+                    stack.pop();
+                    repaired += c;
+                }
+            }
+        } else if (c === ']') {
+            if (stack.length > 0 && stack[stack.length - 1] === '}') {
+                const lastBracketIndex = stack.lastIndexOf(']');
+                if (lastBracketIndex !== -1) {
+                    repaired += closeOpenStructures(stack, ']');
+                }
+            }
+            if (stack.length > 0 && stack[stack.length - 1] === ']') {
+                stack.pop();
+                repaired += c;
+            }
+        } else {
+            repaired += c;
+        }
+    }
+
+    while (stack.length > 0) {
+        repaired += stack.pop();
+    }
+
+    return repaired;
+};
+
 const cleanJson = (str) => {
     let clean = str.trim();
     clean = clean.replace(/^```json/iu, '').replace(/```$/u, '').
@@ -36,6 +119,7 @@ trim();
     clean = clean.replace(/\/\*[\s\S]*?\*\//gu, '');
     clean = clean.replace(/(?<prefix>^|[^:])\/\/.*$/gmu, '$<prefix>');
     clean = clean.replace(/,\s*(?<brace>[\]}])/gu, '$<brace>');
+    clean = repairMismatchedBrackets(clean);
     return clean.trim();
 };
 
