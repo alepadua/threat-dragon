@@ -70,6 +70,58 @@
                         </b-col>
                     </b-form-row>
 
+                    <!-- AI Provider Selection -->
+                    <b-form-group
+                        id="provider-group"
+                        :label="$t('aiThreatModeler.aiProvider')"
+                        label-for="aiProvider"
+                        label-class="font-weight-bold"
+                    >
+                        <td-form-select
+                            id="aiProvider"
+                            v-model="form.aiProvider"
+                            :options="[
+                                { value: 'gemini', text: 'Google Gemini' },
+                                { value: 'bedrock-mantle', text: 'Bedrock Mantle (OpenAI Compatible)' }
+                            ]"
+                        />
+                    </b-form-group>
+
+                    <b-form-row v-if="form.aiProvider === 'bedrock-mantle'">
+                        <b-col md="6">
+                            <b-form-group
+                                id="base-url-group"
+                                :label="$t('aiThreatModeler.baseUrl')"
+                                label-for="customBaseUrl"
+                                label-class="font-weight-bold"
+                            >
+                                <b-form-input
+                                    id="customBaseUrl"
+                                    v-model="form.customBaseUrl"
+                                    type="text"
+                                    placeholder="https://bedrock-mantle.us-east-1.api.aws/v1"
+                                    class="custom-input"
+                                ></b-form-input>
+                            </b-form-group>
+                        </b-col>
+                        <b-col md="6">
+                            <b-form-group
+                                id="model-group"
+                                :label="$t('aiThreatModeler.modelName')"
+                                label-for="customModel"
+                                label-class="font-weight-bold"
+                            >
+                                <b-form-input
+                                    id="customModel"
+                                    v-model="form.customModel"
+                                    type="text"
+                                    placeholder="meta.llama3-70b-instruct-v1:0"
+                                    class="custom-input"
+                                ></b-form-input>
+                            </b-form-group>
+                        </b-col>
+                    </b-form-row>
+
                     <b-form-row>
                         <b-col md="12">
                             <b-form-group
@@ -1145,7 +1197,10 @@ export default {
                 title: '',
                 description: '',
                 apiKey: '',
-                methodology: 'STRIDE'
+                methodology: 'STRIDE',
+                aiProvider: 'gemini',
+                customBaseUrl: '',
+                customModel: ''
             },
             sessionId: null,
             evaluation: null,
@@ -1392,6 +1447,9 @@ export default {
                     images: this.images,
                     apiKey: this.form.apiKey,
                     methodology: this.form.methodology,
+                    aiProvider: this.form.aiProvider,
+                    customBaseUrl: this.form.customBaseUrl,
+                    customModel: this.form.customModel,
                     currentModel: this.generatedModel
                 };
 
@@ -1441,6 +1499,9 @@ export default {
                     refinementHistory: this.refinementHistory,
                     sessionId: this.sessionId,
                     methodology: this.form.methodology,
+                    aiProvider: this.form.aiProvider,
+                    customBaseUrl: this.form.customBaseUrl,
+                    customModel: this.form.customModel,
                     dfdApproved: this.dfdApproved,
                     threatModelApproved: this.threatModelApproved
                 };
@@ -1648,6 +1709,10 @@ export default {
                 this.form.title = result.title || '';
                 this.form.description = result.description || '';
                 this.form.methodology = result.methodology || 'STRIDE';
+                this.form.aiProvider = result.aiProvider || 'gemini';
+                this.form.customBaseUrl = result.customBaseUrl || '';
+                this.form.customModel = result.customModel || '';
+                this.form.apiKey = result.apiKey || '';
                 
                 this.updateLocalState(result);
                 
@@ -1674,7 +1739,12 @@ export default {
         async approveThreatModel() {
             this.step = 'generating-proposals';
             try {
-                const response = await axios.get(`/api/ai/session/${this.sessionId}/deduplicate-proposals`);
+                const response = await axios.post(`/api/ai/session/${this.sessionId}/deduplicate-proposals`, {
+                    aiProvider: this.form.aiProvider,
+                    customBaseUrl: this.form.customBaseUrl,
+                    customModel: this.form.customModel,
+                    apiKey: this.form.apiKey
+                });
                 const proposals = response.data.data;
                 
                 const hasControls = proposals.controlDeduplications && proposals.controlDeduplications.length > 0;

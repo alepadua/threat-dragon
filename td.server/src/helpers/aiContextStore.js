@@ -40,7 +40,11 @@ export const createSession = (data) => {
         history: [],
         methodology: data.methodology || 'STRIDE',
         questionPlan: data.questionPlan || null,
-        answeredQuestionIds: data.answeredQuestionIds || []
+        answeredQuestionIds: data.answeredQuestionIds || [],
+        aiProvider: data.aiProvider || 'gemini',
+        customBaseUrl: data.customBaseUrl || '',
+        customModel: data.customModel || '',
+        apiKey: data.apiKey || ''
     };
 
     fs.writeFileSync(getSessionPath(sessionId), JSON.stringify(sessionData, null, 2), 'utf-8');

@@ -26,7 +26,7 @@ const unauthRoutes = (router) => {
     router.get('/api/ai/session/:sessionId', aiController.getSessionState);
     router.put('/api/ai/session/:sessionId', aiController.updateSessionState);
     router.post('/api/ai/threatmodel/undo', aiController.undoRefinement);
-    router.get('/api/ai/session/:sessionId/deduplicate-proposals', aiController.getDeduplicateProposals);
+    router.post('/api/ai/session/:sessionId/deduplicate-proposals', aiController.getDeduplicateProposals);
     router.post('/api/ai/session/:sessionId/apply-deduplication', aiController.applyDeduplication);
     router.get('/api/ai/session/:sessionId/question-count', aiController.getQuestionCount);
     router.post('/api/ai/question-count', aiController.computeQuestionCountStateless);

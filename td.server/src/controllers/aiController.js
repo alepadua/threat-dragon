@@ -1,12 +1,12 @@
-/* eslint-disable max-lines-per-function, complexity, max-lines */
-import { badRequest, serverError } from './errors.js';
+/* eslint-disable max-lines-per-function, complexity, max-lines, sort-imports */
+import { DOMMatrix } from '@napi-rs/canvas';
+import { PDFParse } from 'pdf-parse';
 import aiContextStore from '../helpers/aiContextStore.js';
 import axios from 'axios';
+import { badRequest, serverError } from './errors.js';
 import env from '../env/Env.js';
 import loggerHelper from '../helpers/logger.helper.js';
 import mammoth from 'mammoth';
-import { PDFParse } from 'pdf-parse';
-import { DOMMatrix } from '@napi-rs/canvas';
 import questionPlanningEngine from '../helpers/questionPlanningEngine.js';
 
 // Polyfill DOMMatrix for pdfjs-dist used by pdf-parse
@@ -582,53 +582,163 @@ const splitTextIntoChunks = (text, chunkSize = 1000, overlap = 150) => {
     return chunks;
 };
 
-const getEmbeddingsBatch = async (chunks, apiKey) => {
+
+const callAIModel = async (promptText, images, aiConfig) => {
+    if (aiConfig.provider === 'bedrock-mantle') {
+        const messages = [];
+        let userContent = [];
+        if (promptText) {
+            userContent.push({ type: 'text', text: promptText });
+        }
+        if (images && images.length > 0) {
+            images.forEach((img) => {
+                const parsed = parseBase64Image(img.data || img);
+                userContent.push({
+                    type: 'image_url',
+                    image_url: { url: `data:${parsed.mimeType};base64,${parsed.data}` }
+                });
+            });
+        }
+        
+        if (userContent.length === 1 && userContent[0].type === 'text') {
+            userContent = userContent[0].text;
+        }
+
+        messages.push({ role: 'user', content: userContent });
+
+        const response = await axios.post(
+            `${aiConfig.baseUrl}/chat/completions`,
+            {
+                model: aiConfig.model || 'meta.llama3-70b-instruct-v1:0',
+                messages: messages,
+                max_tokens: 8192
+            },
+            {
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${aiConfig.apiKey}` },
+                timeout: 90000
+            }
+        );
+
+        return response.data.choices[0].message.content;
+    } 
+        const parts = [];
+        if (promptText) {
+            parts.push({ text: promptText });
+        }
+        if (images && images.length > 0) {
+            images.forEach((img) => {
+                const parsed = parseBase64Image(img.data || img);
+                parts.push({
+                    inlineData: { mimeType: parsed.mimeType, data: parsed.data }
+                });
+            });
+        }
+
+        const payload = {
+            contents: [{ parts }],
+            generationConfig: {
+                maxOutputTokens: 8192,
+                responseMimeType: 'application/json'
+            }
+        };
+
+        const response = await axios.post(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${aiConfig.apiKey}`,
+            payload,
+            {
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 90000
+            }
+        );
+
+        return response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+    
+};
+
+const getEmbeddingsBatch = async (chunks, aiConfig) => {
     if (chunks.length === 0) {return [];}
     const batchSize = 100;
     const allEmbeddings = [];
     
     for (let i = 0; i < chunks.length; i += batchSize) {
         const slice = chunks.slice(i, i + batchSize);
-        const requests = slice.map((chunk) => ({
-            model: 'models/gemini-embedding-001',
-            content: { parts: [{ text: chunk }] }
-        }));
-        
-        /* eslint-disable-next-line no-await-in-loop */
-        const response = await axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:batchEmbedContents?key=${apiKey}`,
-            { requests },
-            {
-                headers: { 'Content-Type': 'application/json' },
-                timeout: 30000
-            }
-        );
-        
-        if (response.data && response.data.embeddings) {
-            response.data.embeddings.forEach((emb) => {
-                if (emb && emb.values) {
-                    allEmbeddings.push(emb.values);
+        if (aiConfig.provider === 'bedrock-mantle') {
+            /* eslint-disable-next-line no-await-in-loop */
+            const response = await axios.post(
+                `${aiConfig.baseUrl}/embeddings`,
+                {
+                    model: aiConfig.embeddingModel || 'amazon.titan-embed-text-v1',
+                    input: slice
+                },
+                {
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${aiConfig.apiKey}` },
+                    timeout: 30000
                 }
-            });
+            );
+            if (response.data && response.data.data) {
+                response.data.data.forEach((emb) => {
+                    allEmbeddings.push(emb.embedding);
+                });
+            }
+        } else {
+            const requests = slice.map((chunk) => ({
+                model: 'models/gemini-embedding-001',
+                content: { parts: [{ text: chunk }] }
+            }));
+            
+            /* eslint-disable-next-line no-await-in-loop */
+            const response = await axios.post(
+                `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:batchEmbedContents?key=${aiConfig.apiKey}`,
+                { requests },
+                {
+                    headers: { 'Content-Type': 'application/json' },
+                    timeout: 30000
+                }
+            );
+            
+            if (response.data && response.data.embeddings) {
+                response.data.embeddings.forEach((emb) => {
+                    if (emb && emb.values) {
+                        allEmbeddings.push(emb.values);
+                    }
+                });
+            }
         }
     }
     return allEmbeddings;
 };
 
-const getEmbedding = async (text, apiKey) => {
-    const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${apiKey}`,
-        {
-            model: 'models/gemini-embedding-001',
-            content: { parts: [{ text }] }
-        },
-        {
-            headers: { 'Content-Type': 'application/json' },
-            timeout: 20000
+const getEmbedding = async (text, aiConfig) => {
+    if (aiConfig.provider === 'bedrock-mantle') {
+        const response = await axios.post(
+            `${aiConfig.baseUrl}/embeddings`,
+            {
+                model: aiConfig.embeddingModel || 'amazon.titan-embed-text-v1',
+                input: text
+            },
+            {
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${aiConfig.apiKey}` },
+                timeout: 20000
+            }
+        );
+        if (response.data && response.data.data && response.data.data[0]) {
+            return response.data.data[0].embedding;
         }
-    );
-    if (response.data && response.data.embedding && response.data.embedding.values) {
-        return response.data.embedding.values;
+    } else {
+        const response = await axios.post(
+            `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${aiConfig.apiKey}`,
+            {
+                model: 'models/gemini-embedding-001',
+                content: { parts: [{ text }] }
+            },
+            {
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 20000
+            }
+        );
+        if (response.data && response.data.embedding && response.data.embedding.values) {
+            return response.data.embedding.values;
+        }
     }
     throw new Error('Failed to generate query embedding');
 };
@@ -647,7 +757,7 @@ const cosineSimilarity = (vecA, vecB) => {
     return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 };
 
-const retrieveContext = async (query, sessionId, apiKey, topK = 8) => {
+const retrieveContext = async (query, sessionId, aiConfig, topK = 8) => {
     try {
         const chunks = aiContextStore.getVectors(sessionId);
         if (!chunks || chunks.length === 0) {
@@ -656,7 +766,7 @@ const retrieveContext = async (query, sessionId, apiKey, topK = 8) => {
         }
         
         logger.info(`Retrieving context from local RAG for query: "${query}"`);
-        const queryEmbedding = await getEmbedding(query, apiKey);
+        const queryEmbedding = await getEmbedding(query, aiConfig);
         
         const chunksWithScores = chunks.map((chunk) => {
             const score = cosineSimilarity(queryEmbedding, chunk.vector);
@@ -713,7 +823,7 @@ const extractTextFromDocs = (docs) => {
     return Promise.all(docPromises);
 };
 
-const generateAndSaveEmbeddings = async (sessionId, docsTexts, apiKey) => {
+const generateAndSaveEmbeddings = async (sessionId, docsTexts, aiConfig) => {
     if (!docsTexts || docsTexts.length === 0) {return;}
     try {
         let allChunks = [];
@@ -735,7 +845,7 @@ const generateAndSaveEmbeddings = async (sessionId, docsTexts, apiKey) => {
 
         if (allChunks.length > 0) {
             logger.info(`Generating embeddings for ${allChunks.length} chunks in session ${sessionId}...`);
-            const rawEmbeddings = await getEmbeddingsBatch(allChunks.map((c) => c.text), apiKey);
+            const rawEmbeddings = await getEmbeddingsBatch(allChunks.map((c) => c.text), aiConfig);
             const chunksWithVectors = allChunks.map((chunk, idx) => ({
                 ...chunk,
                 vector: rawEmbeddings[idx] || []
@@ -754,6 +864,10 @@ const generate = async (req, res) => {
         docs,
         images,
         apiKey: clientApiKey,
+        aiProvider,
+        customBaseUrl,
+        customModel,
+        customEmbeddingModel,
         currentModel,
         refinementHistory,
         methodology = 'STRIDE',
@@ -762,23 +876,35 @@ const generate = async (req, res) => {
         threatModelApproved
     } = req.body;
 
-    const apiKey = clientApiKey || env.get().config.GEMINI_API_KEY;
+    let activeSession = null;
+    if (sessionId) {
+        activeSession = aiContextStore.getSession(sessionId);
+    }
+
+    const provider = aiProvider || (activeSession && activeSession.aiProvider) || 'gemini';
+    const aiConfig = {
+        provider: provider,
+        apiKey: clientApiKey || (activeSession && activeSession.apiKey) || (provider === 'bedrock-mantle' ? env.get().config.BEDROCK_MANTLE_API_KEY : env.get().config.GEMINI_API_KEY),
+        baseUrl: customBaseUrl || (activeSession && activeSession.customBaseUrl) || env.get().config.BEDROCK_MANTLE_BASE_URL,
+        model: customModel || (activeSession && activeSession.customModel) || env.get().config.BEDROCK_MANTLE_MODEL,
+        embeddingModel: customEmbeddingModel || (activeSession && activeSession.customEmbeddingModel) || env.get().config.BEDROCK_MANTLE_EMBEDDING_MODEL || 'amazon.titan-embed-text-v1'
+    };
+
+    const apiKey = aiConfig.apiKey;
     const dfdApprovedBool = (dfdApproved === true || dfdApproved === 'true');
     let threatModelApprovedBool = (threatModelApproved === true || threatModelApproved === 'true');
 
     if (!apiKey) {
-        return badRequest('Gemini API key is missing. Please configure GEMINI_API_KEY in the server environment or provide it in the API Key input.', res, logger);
+        return badRequest(`API key is missing for provider ${provider}. Please configure it in the server environment or provide it in the API Key input.`, res, logger);
     }
 
     try {
-        let activeSession = null;
         let finalDocs = docs || [];
         let finalImages = images || [];
         let finalMethodology = methodology;
 
         // Stage 1: RAG Context Evolution
         if (sessionId) {
-            activeSession = aiContextStore.getSession(sessionId);
             if (activeSession) {
                 logger.info(`Resuming existing RAG threat modeling session: ${sessionId}`);
                 // Load original documents/images from session if not sent in refinement request
@@ -793,7 +919,11 @@ const generate = async (req, res) => {
                 // Update history and model in session store
                 aiContextStore.updateSession(sessionId, {
                     refinementHistory: refinementHistory || [],
-                    currentModel: currentModel || null
+                    currentModel: currentModel || null,
+                    aiProvider: provider,
+                    customBaseUrl: aiConfig.baseUrl,
+                    customModel: aiConfig.model,
+                    apiKey: aiConfig.apiKey
                 });
             }
         }
@@ -864,12 +994,16 @@ const generate = async (req, res) => {
                 images: finalImages,
                 refinementHistory: refinementHistory || [],
                 currentModel: currentModel || null,
-                methodology: finalMethodology
+                methodology: finalMethodology,
+                aiProvider: provider,
+                customBaseUrl: aiConfig.baseUrl || '',
+                customModel: aiConfig.model || '',
+                apiKey: aiConfig.apiKey || ''
             });
             logger.info(`Initialized new RAG session: ${activeSession.sessionId}`);
 
             // Stage 1: Local RAG Chunking and Embedding Generation
-            await generateAndSaveEmbeddings(activeSession.sessionId, docsTexts, apiKey);
+            await generateAndSaveEmbeddings(activeSession.sessionId, docsTexts, aiConfig);
         }
 
         // Process / Retrieve context from RAG
@@ -1218,16 +1352,17 @@ Every object inside the "threats" array of any cell must have:
 - "status": One of: "Open", "Mitigated", "NA". Note: Every threat generated MUST have "status": "Open" by default. You MUST NOT mark a threat's status as "Mitigated" unless the user's refinement conversation history explicitly states that they have implemented the corresponding security control.
 - "type": One of the STRIDE/F3 categories matching the element shape rules.
 - "modelType": Exactly "STRIDE" or "MITRE_F3" (matching methodology).
-- "number": A unique sequential integer
+- "number": A unique sequential integer`;
 
-Do not wrap the JSON output in markdown formatting. Follow this exact JSON output schema:
-{
+        let jsonOutputSchema = '';
+        if (!dfdApprovedBool) {
+            jsonOutputSchema = `{
   "threatModel": {
     "version": "2.0.0",
     "summary": {
-      "title": "${title || activeSession.title}",
+      "title": "${title || (activeSession && activeSession.title) || ''}",
       "owner": "Security Team",
-      "description": "${description || activeSession.description || ''}",
+      "description": "${description || (activeSession && activeSession.description) || ''}",
       "id": 0
     },
     "detail": {
@@ -1251,11 +1386,55 @@ Do not wrap the JSON output in markdown formatting. Follow this exact JSON outpu
     }
   },
   "questions": [
-    "Question 1...",
-    "Question 2..."
+    "Validation question string"
   ]
-}
-`;
+}`;
+        } else {
+            jsonOutputSchema = `{
+  "threatModel": {
+    "version": "2.0.0",
+    "summary": {
+      "title": "${title || (activeSession && activeSession.title) || ''}",
+      "owner": "Security Team",
+      "description": "${description || (activeSession && activeSession.description) || ''}",
+      "id": 0
+    },
+    "detail": {
+      "contributors": [{"name": "AI Threat Modeler"}],
+      "reviewer": "AI Threat Modeler",
+      "diagrams": [
+        {
+          "id": 0,
+          "title": "Main System DFD",
+          "diagramType": "${finalMethodology === 'MITRE_F3' ? 'MITRE_F3' : 'STRIDE'}",
+          "placeholder": "Main System DFD description",
+          "thumbnail": "./public/content/images/thumbnail.stride.jpg",
+          "version": "2.0.0",
+          "cells": [
+            // List of cells conforming to the strict schemas above
+          ]
+        }
+      ],
+      "diagramTop": 1,
+      "threatTop": 100
+    }
+  },
+  "questions": [
+    {
+      "id": "The exact Question ID from the ASSIGNED QUESTIONS FOR THIS ROUND list",
+      "elementId": "The exact Element ID",
+      "category": "The exact Category",
+      "text": "A technical, specific question in Portuguese related to the assigned element and category"
+    }
+  ],
+  "resolvedQuestionIds": [
+    "Question ID 1",
+    "Question ID 2"
+  ]
+}`;
+        }
+
+        promptText += `\nDo not wrap the JSON output in markdown formatting. Follow this exact JSON output schema:\n${jsonOutputSchema}\n`;
 
         const parts = [{ text: promptText }];
 
@@ -1273,30 +1452,12 @@ Do not wrap the JSON output in markdown formatting. Follow this exact JSON outpu
         }
 
         // Call 1: Generator Model
-        logger.info(`[${agentName}] Sending request to Gemini for generation (Session ID: ${sessionId || 'new'})`);
-        const generatorResponse = await axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`,
-            {
-                contents: [{ parts }],
-                generationConfig: {
-                    responseMimeType: 'application/json',
-                    maxOutputTokens: 8192
-                }
-            },
-            {
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                timeout: 90000
-            }
-        );
-
-        const candidate = generatorResponse.data?.candidates?.[0];
-        const responseText = candidate?.content?.parts?.[0]?.text;
+        logger.info(`[${agentName}] Sending request to AI Provider (${aiConfig.provider}) for generation (Session ID: ${sessionId || 'new'})`);
+        const responseText = await callAIModel(promptText, finalImages, aiConfig);
 
         if (!responseText) {
-            logger.error('Gemini API returned an empty response during generation');
-            return serverError('Failed to generate threat model. Gemini returned an empty response.', res, logger);
+            logger.error('AI API returned an empty response during generation');
+            return serverError('Failed to generate threat model. AI returned an empty response.', res, logger);
         }
 
         let parsedOutput;
@@ -1477,25 +1638,7 @@ Do not wrap the JSON output in markdown formatting.
 
             try {
                 logger.info(`[${criticAgentName}] Auditing model (Session ID: ${activeSession?.sessionId || 'new'})...`);
-                const criticResponse = await axios.post(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`,
-                    {
-                        contents: [{ parts: [{ text: critiquePromptText }] }],
-                        generationConfig: {
-                            responseMimeType: 'application/json',
-                            maxOutputTokens: 4096
-                        }
-                    },
-                    {
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        timeout: 45000
-                    }
-                );
-
-                const criticCandidate = criticResponse.data?.candidates?.[0];
-                const criticResponseText = criticCandidate?.content?.parts?.[0]?.text;
+                const criticResponseText = await callAIModel(critiquePromptText, [], aiConfig);
 
                 if (criticResponseText) {
                     const parsedCritique = extractJson(criticResponseText);
@@ -1544,23 +1687,7 @@ Return ONLY a JSON object containing the keys "threatModel" and "questions" (as 
             }
 
             try {
-                const revisionResponse = await axios.post(
-                    `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`,
-                    {
-                        contents: [{ parts: revisionParts }],
-                        generationConfig: {
-                            responseMimeType: 'application/json',
-                            maxOutputTokens: 8192
-                        }
-                    },
-                    {
-                        headers: { 'Content-Type': 'application/json' },
-                        timeout: 90000
-                    }
-                );
-
-                const revCandidate = revisionResponse.data?.candidates?.[0];
-                const revResponseText = revCandidate?.content?.parts?.[0]?.text;
+                const revResponseText = await callAIModel(revisionPromptText, finalImages, aiConfig);
 
                 const parsedRevision = revResponseText ? extractJson(revResponseText) : null;
                 if (parsedRevision && parsedRevision.threatModel) {
@@ -1715,6 +1842,10 @@ const getSessionState = (req, res) => {
             title: session.title,
             description: session.description,
             methodology: session.methodology || 'STRIDE',
+            aiProvider: session.aiProvider || 'gemini',
+            customBaseUrl: session.customBaseUrl || '',
+            customModel: session.customModel || '',
+            apiKey: session.apiKey || '',
             refinementHistory: ensureModelMessageInHistory(session.refinementHistory || [], session.questions || [], session.dfdApproved || false),
             dfdApproved: session.dfdApproved || false,
             threatModelApproved: session.threatModelApproved || false,
@@ -1798,11 +1929,19 @@ const getDeduplicateProposals = async (req, res) => {
     }
 
     try {
-        const apiKey = env.get().config.GEMINI_API_KEY;
-        if (!apiKey) {
+        const { aiProvider, customBaseUrl, customModel, apiKey: clientApiKey } = req.body;
+        const provider = aiProvider || session.aiProvider || 'gemini';
+        const aiConfig = {
+            provider: provider,
+            apiKey: clientApiKey || session.apiKey || (provider === 'bedrock-mantle' ? env.get().config.BEDROCK_MANTLE_API_KEY : env.get().config.GEMINI_API_KEY),
+            baseUrl: customBaseUrl || session.customBaseUrl || env.get().config.BEDROCK_MANTLE_BASE_URL,
+            model: customModel || session.customModel || env.get().config.BEDROCK_MANTLE_MODEL
+        };
+
+        if (!aiConfig.apiKey) {
             return res.status(500).json({
                 status: 500,
-                message: 'Gemini API key is not configured on the server.'
+                message: `API key is not configured for provider ${provider}.`
             });
         }
 
@@ -1877,25 +2016,11 @@ All proposed titles, userAnswers, descriptions, mitigations, and details MUST be
 Return ONLY the raw JSON object, without any markdown code block formatting.
 `;
 
-        logger.info(`Requesting deduplication proposals from Gemini for session: ${sessionId}`);
-        const response = await axios.post(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`,
-            {
-                contents: [{ parts: [{ text: promptText }] }],
-                generationConfig: {
-                    responseMimeType: 'application/json',
-                    maxOutputTokens: 8192
-                }
-            },
-            {
-                headers: { 'Content-Type': 'application/json' },
-                timeout: 60000
-            }
-        );
-
-        const candidateText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        logger.info(`Requesting deduplication proposals from AI Provider (${aiConfig.provider}) for session: ${sessionId}`);
+        const candidateText = await callAIModel(promptText, [], aiConfig);
+        
         if (!candidateText) {
-            throw new Error('Gemini API returned an empty response for deduplication proposals');
+            throw new Error('AI API returned an empty response for deduplication proposals');
         }
 
         const parsedProposals = extractJson(candidateText);
