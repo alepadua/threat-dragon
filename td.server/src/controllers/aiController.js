@@ -112,6 +112,93 @@ const repairMismatchedBrackets = (str) => {
     return repaired;
 };
 
+const healDiagramCells = (cells) => {
+    if (!Array.isArray(cells)) {
+        return cells;
+    }
+
+    const nodes = [];
+    const edges = [];
+
+    // Helper to generate a slug from a string (lowercased, keeping alphanumeric and hyphens)
+    const toSlug = (str) => {
+        if (!str || typeof str !== 'string') {
+            return '';
+        }
+        return str.
+            toLowerCase().
+            normalize('NFD').
+            replace(/[\u0300-\u036f]/gu, ''). // remove diacritics
+            replace(/[^a-z0-9]/gu, '-'). // replace non-alphanumeric with hyphen
+            replace(/-+/gu, '-'). // collapse consecutive hyphens
+            replace(/^-+|-+$/gu, ''); // trim hyphens
+    };
+
+    // 1. Separate nodes and edges, and build mapping tables
+    const idToNode = new Map();
+    const slugToId = new Map();
+
+    cells.forEach((cell) => {
+        if (cell && typeof cell === 'object') {
+            if (cell.source && cell.target) {
+                edges.push(cell);
+            } else if (cell.id) {
+                nodes.push(cell);
+                idToNode.set(cell.id, cell);
+                const nodeName = cell.data?.name || cell.attrs?.text?.text || '';
+                if (nodeName) {
+                    const slug = toSlug(nodeName);
+                    if (slug) {
+                        slugToId.set(slug, cell.id);
+                    }
+                }
+            }
+        }
+    });
+
+    const healedEdges = [];
+
+    // Helper to try matching a reference ID to a node ID
+    const resolveReference = (refId) => {
+        if (idToNode.has(refId)) {
+            return refId;
+        }
+        const refSlug = toSlug(refId.replace(/^(?:proc|actor|store|boundary|flow)-/u, ''));
+        let matchedId = slugToId.get(refSlug);
+        if (!matchedId) {
+            // Try fuzzy matching
+            for (const [slug, id] of slugToId.entries()) {
+                if (slug.includes(refSlug) || refSlug.includes(slug)) {
+                    matchedId = id;
+                    break;
+                }
+            }
+        }
+        return matchedId || null;
+    };
+
+    // 2. Validate and heal each edge
+    edges.forEach((edge) => {
+        const sourceCellId = edge.source?.cell;
+        const targetCellId = edge.target?.cell;
+
+        if (sourceCellId && targetCellId) {
+            const finalSourceId = resolveReference(sourceCellId);
+            const finalTargetId = resolveReference(targetCellId);
+
+            if (finalSourceId && finalTargetId) {
+                edge.source.cell = finalSourceId;
+                edge.target.cell = finalTargetId;
+                healedEdges.push(edge);
+            } else {
+                logger.warn(`[healDiagramCells] Discarding edge "${edge.id || 'unnamed'}" because source (${sourceCellId} -> ${finalSourceId}) or target (${targetCellId} -> ${finalTargetId}) does not exist.`);
+            }
+        }
+    });
+
+    return [...nodes, ...healedEdges];
+};
+
 const cleanJson = (str) => {
     let clean = str.trim();
     clean = clean.replace(/^```json/iu, '').replace(/```$/u, '').
@@ -298,7 +385,7 @@ const repairTruncatedJson = (text) => {
     return repaired;
 };
 
-const extractJson = (str) => {
+const _rawExtractJson = (str) => {
     const cleaned = cleanJson(str);
     const parsedCleaned = tryParse(cleaned);
     if (parsedCleaned) {
@@ -346,6 +433,14 @@ const extractJson = (str) => {
         }
         throw e2;
     }
+};
+
+const extractJson = (str) => {
+    const parsed = _rawExtractJson(str);
+    if (parsed && parsed.threatModel && parsed.threatModel.detail && parsed.threatModel.detail.diagrams && parsed.threatModel.detail.diagrams[0]) {
+        parsed.threatModel.detail.diagrams[0].cells = healDiagramCells(parsed.threatModel.detail.diagrams[0].cells);
+    }
+    return parsed;
 };
 
 const ensureModelMessageInHistory = (refinementHistory, questions, dfdApproved) => {
@@ -752,7 +847,7 @@ const mergeDiagramCells = (currentModel, revisedModel, refinementHistory, dfdApp
             }
         });
 
-        revisedDiagram.cells = deduplicateDiagramCells(preservedCells);
+        revisedDiagram.cells = healDiagramCells(deduplicateDiagramCells(preservedCells));
         normalizeCellThreats(revisedDiagram.cells, diagramType);
         return revisedModel;
     }
@@ -855,7 +950,7 @@ const mergeDiagramCells = (currentModel, revisedModel, refinementHistory, dfdApp
         });
     }
 
-    revisedDiagram.cells = deduplicateDiagramCells(mergedCells);
+    revisedDiagram.cells = healDiagramCells(deduplicateDiagramCells(mergedCells));
     normalizeCellThreats(revisedDiagram.cells, diagramType);
     return revisedModel;
 };

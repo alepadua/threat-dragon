@@ -287,6 +287,58 @@ describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
             expect(parsed.threatModel.version).to.equal('2.0.0');
             expect(parsed.threatModel.detail.diagrams[0].cells[0].data.cell).to.equal('b20f4d68');
         });
+
+        it('should heal cell references in diagram edges/flows when source/target IDs are mismatched or invalid', () => {
+            const jsonObj = {
+                threatModel: {
+                    version: "2.0.0",
+                    detail: {
+                        diagrams: [
+                            {
+                                cells: [
+                                    {
+                                        id: "p44t8r02-ss19-0469-q257-p98s4oq68o01",
+                                        shape: "process",
+                                        attrs: { text: { text: "Azure Key Vault" } },
+                                        data: { name: "Azure Key Vault" }
+                                    },
+                                    {
+                                        id: "a10e3c57-dad4-4914-b702-a43d9bf13956",
+                                        shape: "actor",
+                                        attrs: { text: { text: "Aplicativos Cliente" } },
+                                        data: { name: "Aplicativos Cliente" }
+                                    },
+                                    {
+                                        id: "edge-1",
+                                        shape: "flow",
+                                        source: { cell: "a10e3c57-dad4-4914-b702-a43d9bf13956" },
+                                        target: { cell: "proc-azure-key-vault" }
+                                    },
+                                    {
+                                        id: "edge-2",
+                                        shape: "flow",
+                                        source: { cell: "nonexistent-node" },
+                                        target: { cell: "a10e3c57-dad4-4914-b702-a43d9bf13956" }
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            };
+            const json = JSON.stringify(jsonObj);
+            const parsed = aiController._extractJson(json);
+            
+            const cells = parsed.threatModel.detail.diagrams[0].cells;
+            expect(cells).to.have.lengthOf(3);
+            
+            const edge = cells.find(c => c.id === 'edge-1');
+            expect(edge).to.exist;
+            expect(edge.target.cell).to.equal("p44t8r02-ss19-0469-q257-p98s4oq68o01");
+            
+            const discarded = cells.find(c => c.id === 'edge-2');
+            expect(discarded).not.to.exist;
+        });
     });
 
     describe('_callAIModel', () => {
