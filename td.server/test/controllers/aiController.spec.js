@@ -279,6 +279,14 @@ describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
             expect(parsed.threatModel.version).to.equal('2.0.0');
             expect(parsed.questions[0]).to.equal('Por favor, valide...');
         });
+
+        it('should successfully repair truncated JSON cut off mid-string in the middle of generation', () => {
+            const json = '{"threatModel":{"version":"2.0.0","summary":{"title":"Teste"},"detail":{"reviewer":"AI Threat Modeler","diagrams":[{"id":0,"cells":[{"id":"a1","shape":"actor","data":{"cell":"b20f4d68';
+            const parsed = aiController._extractJson(json);
+            expect(parsed).to.have.property('threatModel');
+            expect(parsed.threatModel.version).to.equal('2.0.0');
+            expect(parsed.threatModel.detail.diagrams[0].cells[0].data.cell).to.equal('b20f4d68');
+        });
     });
 
     describe('_callAIModel', () => {

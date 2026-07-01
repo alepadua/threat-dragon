@@ -13,7 +13,7 @@ import questionPlanningEngine from '../helpers/questionPlanningEngine.js';
 global.DOMMatrix = DOMMatrix;
 
 const logger = loggerHelper.get('controllers/aiController.js');
-const REQUEST_TIMEOUT = parseInt(process.env.AI_REQUEST_TIMEOUT, 10) || 180000;
+const REQUEST_TIMEOUT = parseInt(process.env.AI_REQUEST_TIMEOUT, 10) || 300000;
 
 const parseBase64Image = (dataUri) => {
     const matches = dataUri.match(/^data:(?<mime>[a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(?<data>.+)$/u);
@@ -119,7 +119,6 @@ trim();
     clean = clean.replace(/\/\*[\s\S]*?\*\//gu, '');
     clean = clean.replace(/(?<prefix>^|[^:])\/\/.*$/gmu, '$<prefix>');
     clean = clean.replace(/,\s*(?<brace>[\]}])/gu, '$<brace>');
-    clean = repairMismatchedBrackets(clean);
     return clean.trim();
 };
 
@@ -306,6 +305,11 @@ const extractJson = (str) => {
         return parsedCleaned;
     }
 
+    const parsedMismatched = tryParse(repairMismatchedBrackets(cleaned));
+    if (parsedMismatched) {
+        return parsedMismatched;
+    }
+
     const firstBrace = cleaned.indexOf('{');
     const lastBrace = cleaned.lastIndexOf('}');
     if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
@@ -327,7 +331,7 @@ const extractJson = (str) => {
     // Attempt truncation repair: the LLM response may have been cut off by max_tokens
     const truncationBase = firstBrace !== -1 ? cleaned.slice(firstBrace) : cleaned;
     try {
-        const repairedTruncated = repairTruncatedJson(escapeControlCharsInStrings(escapeInternalQuotes(truncationBase)));
+        const repairedTruncated = escapeControlCharsInStrings(escapeInternalQuotes(repairTruncatedJson(truncationBase)));
         const parsedRepaired = JSON.parse(repairedTruncated);
         logger.warn('[extractJson] Successfully recovered truncated JSON via auto-repair.');
         return parsedRepaired;
