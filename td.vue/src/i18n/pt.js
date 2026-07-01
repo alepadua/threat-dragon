@@ -67,6 +67,7 @@ const messages = {
         baseUrl: 'URL Base (Endpoint compatível com OpenAI)',
         modelName: 'Nome do Modelo',
         extendedThinking: 'Ativar Raciocínio Estendido (Claude 3.7+ / Modelos de Raciocínio)',
+        switchModel: 'Alterar Modelo de IA',
         generateBtn: 'Gerar Modelo de Ameaças com IA',
         generating: 'A Gerar Modelo de Ameaças...',
         dropFiles: 'Arraste e largue ficheiros aqui ou clique para selecionar',
