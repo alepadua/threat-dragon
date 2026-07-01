@@ -296,6 +296,11 @@
                     <h4 class="font-weight-bold">{{ $t('aiThreatModeler.generating') }}</h4>
                 </div>
 
+                <div v-if="jobStatus" class="text-muted font-weight-bold mb-2">
+                    Status: <span class="text-warning uppercase">{{ jobStatus }}</span> ({{ jobProgress }}%)
+                </div>
+                <b-progress :value="jobProgress" :max="100" show-progress animated variant="warning" class="my-3 mx-auto col-md-8 px-0"></b-progress>
+
                 <div class="progress-steps text-left mx-auto col-md-8 px-0 mt-4">
                     <div
                         v-for="(progressStep, idx) in progressSteps"
@@ -787,6 +792,11 @@
                     <b-spinner variant="success" label="Spinning" class="mb-3" style="width: 4rem; height: 4rem;"></b-spinner>
                     <h3 class="font-weight-bold text-success mt-3">Analisando duplicatas e redundâncias...</h3>
                     <p class="text-muted">Aguarde enquanto identificamos oportunidades de deduplicação sem perda de contexto.</p>
+
+                    <div v-if="jobStatus" class="text-muted font-weight-bold mb-2 mt-4">
+                        Status: <span class="text-success uppercase">{{ jobStatus }}</span> ({{ jobProgress }}%)
+                    </div>
+                    <b-progress :value="jobProgress" :max="100" show-progress animated variant="success" class="my-3 mx-auto col-md-8 px-0"></b-progress>
                 </div>
             </b-card>
 
@@ -1204,13 +1214,17 @@ export default {
             },
             sessionId: null,
             evaluation: null,
+            jobId: null,
+            jobStatus: '',
+            jobProgress: 0,
+            jobError: null,
             docs: [], // Array of { name, content }
             images: [], // Array of { name, data } (base64 string)
             progressIndex: 0,
             progressSteps: [
                 { label: 'Reading uploaded documents (parsing DOCX)...', state: 'pending' },
                 { label: 'Formulating architectural context and STRIDE rules...', state: 'pending' },
-                { label: 'Invoking Gemini model to analyze system diagrams...', state: 'pending' },
+                { label: 'Invoking AI model to analyze system diagrams...', state: 'pending' },
                 { label: 'Running component-level threat generation...', state: 'pending' },
                 { label: 'Building refined diagram JSON & questions...', state: 'pending' }
             ],
@@ -1424,6 +1438,56 @@ export default {
             if (this.progressIndex === idx) return 'text-warning animate-pulse';
             return 'text-secondary';
         },
+        // Job Polling Helper
+        async pollJobStatus(jobId, successCallback, errorCallback) {
+            try {
+                const res = await axios.get(`/api/ai/job/${jobId}/status`);
+                const job = res.data.data;
+                this.jobId = job.jobId;
+                this.jobStatus = job.status;
+                this.jobProgress = job.progress;
+                this.jobError = job.error;
+
+                // Dynamically map job.progress to progressIndex
+                if (this.jobProgress < 25) {
+                    this.progressIndex = 1;
+                } else if (this.jobProgress < 55) {
+                    this.progressIndex = 2;
+                } else if (this.jobProgress < 75) {
+                    this.progressIndex = 3;
+                } else if (this.jobProgress < 95) {
+                    this.progressIndex = 4;
+                } else {
+                    this.progressIndex = 5;
+                }
+
+                // Update progress step states
+                this.progressSteps.forEach((step, idx) => {
+                    if (this.progressIndex > idx) {
+                        step.state = 'completed';
+                    } else if (this.progressIndex === idx) {
+                        step.state = 'active';
+                    } else {
+                        step.state = 'pending';
+                    }
+                });
+
+                if (job.status === 'completed') {
+                    this.progressSteps.forEach(step => step.state = 'completed');
+                    successCallback(job.result);
+                } else if (job.status === 'failed') {
+                    errorCallback(new Error(job.error || 'Job execution failed.'));
+                } else {
+                    // Poll again after 2 seconds
+                    setTimeout(() => {
+                        this.pollJobStatus(jobId, successCallback, errorCallback);
+                    }, 2000);
+                }
+            } catch (err) {
+                console.error('Error polling job status:', err);
+                errorCallback(err);
+            }
+        },
         // Initial Generation
         async generateModel() {
             this.step = 'generating';
@@ -1431,13 +1495,9 @@ export default {
             this.refinementRound = 1;
             this.refinementHistory = [];
             this.progressSteps.forEach(step => step.state = 'pending');
-
-            // Steps animations
-            this.progressIndex = 1;
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            this.progressIndex = 2;
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            this.progressIndex = 3;
+            this.jobProgress = 0;
+            this.jobStatus = 'queued';
+            this.jobError = null;
 
             try {
                 const payload = {
@@ -1454,16 +1514,19 @@ export default {
                 };
 
                 const response = await axios.post('/api/ai/threatmodel', payload);
-                
-                this.progressIndex = 4;
-                await new Promise(resolve => setTimeout(resolve, 800));
-                this.progressIndex = 5;
+                const jobData = response.data.data;
+                this.jobId = jobData.jobId;
+                this.sessionId = jobData.sessionId;
 
-                const result = response.data.data;
-                this.updateLocalState(result);
-
-                this.dfdApproved = false;
-                this.step = 'validate-dfd';
+                this.pollJobStatus(jobData.jobId, (result) => {
+                    this.progressIndex = 5;
+                    this.updateLocalState(result);
+                    this.dfdApproved = false;
+                    this.step = 'validate-dfd';
+                }, (err) => {
+                    this.errorMessage = err.message || 'An error occurred during threat model generation.';
+                    this.step = 'error';
+                });
 
             } catch (err) {
                 console.error(err);
@@ -1485,10 +1548,9 @@ export default {
             this.step = 'generating';
             this.progressSteps.forEach(step => step.state = 'pending');
             this.progressIndex = 1;
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            this.progressIndex = 2;
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            this.progressIndex = 3;
+            this.jobProgress = 0;
+            this.jobStatus = 'queued';
+            this.jobError = null;
 
             try {
                 const payload = {
@@ -1508,21 +1570,34 @@ export default {
 
                 const response = await axios.post('/api/ai/threatmodel', payload);
 
-                this.progressIndex = 4;
-                await new Promise(resolve => setTimeout(resolve, 800));
-                this.progressIndex = 5;
-
-                const result = response.data.data;
-                
-                this.updateLocalState(result);
-
-                this.refinementRound++;
-
-                if (this.dfdApproved) {
-                    this.step = 'interactive';
-                } else {
-                    this.step = 'validate-dfd';
+                if (response.status === 200) {
+                    const result = response.data.data;
+                    this.updateLocalState(result);
+                    this.refinementRound++;
+                    if (this.dfdApproved) {
+                        this.step = 'interactive';
+                    } else {
+                        this.step = 'validate-dfd';
+                    }
+                    return;
                 }
+
+                const jobData = response.data.data;
+                this.jobId = jobData.jobId;
+
+                this.pollJobStatus(jobData.jobId, (result) => {
+                    this.progressIndex = 5;
+                    this.updateLocalState(result);
+                    this.refinementRound++;
+                    if (this.dfdApproved) {
+                        this.step = 'interactive';
+                    } else {
+                        this.step = 'validate-dfd';
+                    }
+                }, (err) => {
+                    this.errorMessage = err.message || 'An error occurred during threat model refinement.';
+                    this.step = 'error';
+                });
 
             } catch (err) {
                 console.error(err);
@@ -1738,6 +1813,9 @@ export default {
         },
         async approveThreatModel() {
             this.step = 'generating-proposals';
+            this.jobProgress = 0;
+            this.jobStatus = 'queued';
+            this.jobError = null;
             try {
                 const response = await axios.post(`/api/ai/session/${this.sessionId}/deduplicate-proposals`, {
                     aiProvider: this.form.aiProvider,
@@ -1745,22 +1823,31 @@ export default {
                     customModel: this.form.customModel,
                     apiKey: this.form.apiKey
                 });
-                const proposals = response.data.data;
                 
-                const hasControls = proposals.controlDeduplications && proposals.controlDeduplications.length > 0;
-                const hasThreats = proposals.threatDeduplications && proposals.threatDeduplications.length > 0;
-                
-                if (!hasControls && !hasThreats) {
+                const jobData = response.data.data;
+                this.jobId = jobData.jobId;
+
+                this.pollJobStatus(jobData.jobId, async (proposals) => {
+                    const hasControls = proposals.controlDeduplications && proposals.controlDeduplications.length > 0;
+                    const hasThreats = proposals.threatDeduplications && proposals.threatDeduplications.length > 0;
+                    
+                    if (!hasControls && !hasThreats) {
+                        await this.confirmDeduplicationAndApprove([], []);
+                        return;
+                    }
+                    
+                    this.deduplicateProposals = proposals;
+                    this.selectedControlDups = (proposals.controlDeduplications || []).map(p => p.id);
+                    this.selectedThreatDups = (proposals.threatDeduplications || []).map(p => p.id);
+                    
+                    this.step = 'deduplicate-review';
+                }, async (err) => {
+                    console.error('Deduplication job failed:', err);
                     await this.confirmDeduplicationAndApprove([], []);
-                    return;
-                }
-                
-                this.deduplicateProposals = proposals;
-                this.selectedControlDups = (proposals.controlDeduplications || []).map(p => p.id);
-                this.selectedThreatDups = (proposals.threatDeduplications || []).map(p => p.id);
-                
-                this.step = 'deduplicate-review';
+                });
+
             } catch (err) {
+                console.error('Failed to start deduplication job:', err);
                 await this.confirmDeduplicationAndApprove([], []);
             }
         },

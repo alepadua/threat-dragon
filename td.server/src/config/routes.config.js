@@ -31,6 +31,7 @@ const unauthRoutes = (router) => {
     router.get('/api/ai/session/:sessionId/question-count', aiController.getQuestionCount);
     router.post('/api/ai/question-count', aiController.computeQuestionCountStateless);
     router.get('/api/ai/frameworks', aiController.getAvailableFrameworks);
+    router.get('/api/ai/job/:jobId/status', aiController.getJobStatus);
     
 
     router.get('/api/login/:provider', auth.login);

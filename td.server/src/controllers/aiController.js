@@ -1,4 +1,4 @@
-/* eslint-disable max-lines-per-function, complexity, max-lines, sort-imports */
+/* eslint-disable max-lines-per-function, complexity, max-lines, sort-imports, require-atomic-updates, require-await */
 import { DOMMatrix } from '@napi-rs/canvas';
 import { PDFParse } from 'pdf-parse';
 import aiContextStore from '../helpers/aiContextStore.js';
@@ -878,154 +878,79 @@ const generateAndSaveEmbeddings = async (sessionId, docsTexts, aiConfig) => {
     }
 };
 
-const generate = async (req, res) => {
-    const {
-        title,
-        description,
-        docs,
-        images,
-        apiKey: clientApiKey,
-        aiProvider,
-        customBaseUrl,
-        customModel,
-        customEmbeddingModel,
-        currentModel,
-        refinementHistory,
-        methodology = 'STRIDE',
-        sessionId,
-        dfdApproved,
-        threatModelApproved
-    } = req.body;
+const activeJobs = new Map();
 
-    let activeSession = null;
-    if (sessionId) {
-        activeSession = aiContextStore.getSession(sessionId);
-    }
-
-    const provider = aiProvider || (activeSession && activeSession.aiProvider) || 'gemini';
-    const aiConfig = {
-        provider: provider,
-        apiKey: clientApiKey || (activeSession && activeSession.apiKey) || (provider === 'bedrock-mantle' ? env.get().config.BEDROCK_MANTLE_API_KEY : env.get().config.GEMINI_API_KEY),
-        baseUrl: customBaseUrl || (activeSession && activeSession.customBaseUrl) || env.get().config.BEDROCK_MANTLE_BASE_URL,
-        model: customModel || (activeSession && activeSession.customModel) || env.get().config.BEDROCK_MANTLE_MODEL,
-        embeddingModel: customEmbeddingModel || (activeSession && activeSession.customEmbeddingModel) || env.get().config.BEDROCK_MANTLE_EMBEDDING_MODEL || 'amazon.titan-embed-text-v1'
+// Helper to create and track a job
+const createJob = () => {
+    const jobId = 'job-' + Math.random().toString(36).
+substring(2, 15);
+    const job = {
+        jobId,
+        status: 'queued',
+        progress: 0,
+        error: null,
+        result: null,
+        createdAt: Date.now()
     };
-
-    const apiKey = aiConfig.apiKey;
-    const dfdApprovedBool = (dfdApproved === true || dfdApproved === 'true');
-    let threatModelApprovedBool = (threatModelApproved === true || threatModelApproved === 'true');
-
-    if (!apiKey) {
-        return badRequest(`API key is missing for provider ${provider}. Please configure it in the server environment or provide it in the API Key input.`, res, logger);
+    activeJobs.set(jobId, job);
+    
+    // Clean up jobs older than 30 minutes
+    const now = Date.now();
+    for (const [id, item] of activeJobs.entries()) {
+        if (now - item.createdAt > 30 * 60 * 1000) {
+            activeJobs.delete(id);
+        }
     }
+    
+    return job;
+};
 
+// Polling status handler
+const getJobStatus = (req, res) => {
+    const { jobId } = req.params;
+    const job = activeJobs.get(jobId);
+    if (!job) {
+        return res.status(404).json({
+            status: 404,
+            message: 'Job not found'
+        });
+    }
+    return res.status(200).json({
+        status: 200,
+        data: job
+    });
+};
+
+const runGenerateJob = async (job, body, activeSession, finalDocs, finalImages, finalMethodology, dfdApprovedBool, aiConfig) => {
     try {
-        let finalDocs = docs || [];
-        let finalImages = images || [];
-        let finalMethodology = methodology;
+        const {
+            title,
+            description,
+            currentModel,
+            refinementHistory,
+            threatModelApproved
+        } = body;
 
-        // Stage 1: RAG Context Evolution
-        if (sessionId) {
-            if (activeSession) {
-                logger.info(`Resuming existing RAG threat modeling session: ${sessionId}`);
-                // Load original documents/images from session if not sent in refinement request
-                if (finalDocs.length === 0 && activeSession.docs.length > 0) {
-                    finalDocs = activeSession.docs;
-                }
-                if (finalImages.length === 0 && activeSession.images.length > 0) {
-                    finalImages = activeSession.images;
-                }
-                finalMethodology = activeSession.methodology || methodology;
-                
-                // Update history and model in session store
-                aiContextStore.updateSession(sessionId, {
-                    refinementHistory: refinementHistory || [],
-                    currentModel: currentModel || null,
-                    aiProvider: provider,
-                    customBaseUrl: aiConfig.baseUrl,
-                    customModel: aiConfig.model,
-                    apiKey: aiConfig.apiKey
-                });
-            }
-        }
+        const agentName = !dfdApprovedBool ? 'DFDAgent' : 'ThreatAgent';
+        let threatModelApprovedBool = (threatModelApproved === true || threatModelApproved === 'true');
 
-        // Compute or update question plan on DFD approval transition (pre-LLM)
-        if (dfdApprovedBool && activeSession && !activeSession.questionPlan) {
-            const modelToUse = currentModel || activeSession.currentModel;
-            if (modelToUse && modelToUse.detail && modelToUse.detail.diagrams && modelToUse.detail.diagrams[0]) {
-                const diagramCells = modelToUse.detail.diagrams[0].cells || [];
-                const computedPlan = questionPlanningEngine.computeQuestionPlan(diagramCells, finalMethodology);
-                logger.info(`Question plan computed pre-LLM: ${computedPlan.totalQuestions} questions for ${finalMethodology}`);
-                activeSession.questionPlan = computedPlan;
-                aiContextStore.updateSession(activeSession.sessionId, {
-                    questionPlan: computedPlan
-                });
-            }
-        }
-
-        // Bypassing LLM generation on explicit human approval of the final threat model
-        if (threatModelApprovedBool && activeSession) {
-            const previousHistory = activeSession.history || [];
-            if (activeSession.currentModel) {
-                previousHistory.push({
-                    currentModel: activeSession.currentModel,
-                    questions: activeSession.questions || [],
-                    evaluation: activeSession.evaluation || null,
-                    refinementHistory: activeSession.refinementHistory || [],
-                    dfdApproved: activeSession.dfdApproved || false,
-                    threatModelApproved: activeSession.threatModelApproved || false
-                });
-            }
-
-            aiContextStore.updateSession(activeSession.sessionId, {
-                history: previousHistory,
-                threatModelApproved: true
-            });
-
-            logger.info(`Threat model session approved by human. Session ID: ${activeSession.sessionId}`);
-            return res.status(200).json({
-                status: 200,
-                message: 'Threat model successfully approved and concluded.',
-                data: {
-                    threatModel: activeSession.currentModel,
-                    questions: [],
-                    evaluation: activeSession.evaluation,
-                    sessionId: activeSession.sessionId,
-                    dfdApproved: activeSession.dfdApproved || false,
-                    threatModelApproved: true,
-                    refinementHistory: activeSession.refinementHistory || []
-                }
-            });
-        }
+        job.status = 'generating';
+        job.progress = 10;
+        activeJobs.set(job.jobId, { ...job });
 
         let docsTexts = [];
         if (finalDocs && finalDocs.length > 0) {
             docsTexts = await extractTextFromDocs(finalDocs);
         }
 
-        if (!activeSession) {
-            // First round: create new session
-            if (!title || title.trim() === '') {
-                return badRequest('Threat model title is required to initialize a session', res, logger);
-            }
-            activeSession = aiContextStore.createSession({
-                title,
-                description,
-                docs: finalDocs,
-                images: finalImages,
-                refinementHistory: refinementHistory || [],
-                currentModel: currentModel || null,
-                methodology: finalMethodology,
-                aiProvider: provider,
-                customBaseUrl: aiConfig.baseUrl || '',
-                customModel: aiConfig.model || '',
-                apiKey: aiConfig.apiKey || ''
-            });
-            logger.info(`Initialized new RAG session: ${activeSession.sessionId}`);
-
+        if (docsTexts.length > 0 && (!activeSession || !activeSession.embeddingsGenerated)) {
             // Stage 1: Local RAG Chunking and Embedding Generation
             await generateAndSaveEmbeddings(activeSession.sessionId, docsTexts, aiConfig);
+            aiContextStore.updateSession(activeSession.sessionId, { embeddingsGenerated: true });
         }
+
+        job.progress = 25;
+        activeJobs.set(job.jobId, { ...job });
 
         // Process / Retrieve context from RAG
         let docsContext = '';
@@ -1042,11 +967,10 @@ const generate = async (req, res) => {
                 if (activeSession && activeSession.evaluation && activeSession.evaluation.feedback) {
                     critiqueContextQuery = ' ' + activeSession.evaluation.feedback.slice(0, 300);
                 }
-                // Expansão de consulta genérica para cobrir múltiplos conceitos de topologia de rede/sistemas
                 const expandedQuery = `${baseQuery} network boundaries databases actors data flows microservices components security${critiqueContextQuery}`.trim();
 
                 // Get RAG context
-                docsContext = await retrieveContext(expandedQuery, activeSession.sessionId, apiKey);
+                docsContext = await retrieveContext(expandedQuery, activeSession.sessionId, aiConfig);
 
                 if (!docsContext || docsContext.trim() === '') {
                     logger.warn('RAG retrieval returned empty context. Falling back to first 12,000 characters of full documentation.');
@@ -1130,7 +1054,6 @@ For each threat, the threat's "type" property MUST be set to one of the STRIDE c
         // 2. Build the detailed instruction prompt for generator (separated into DFDAgent and ThreatAgent)
         let promptText = '';
         let jsonKeysInstruction = '';
-        const agentName = !dfdApprovedBool ? 'DFDAgent' : 'ThreatAgent';
         let questionsInstruction = '';
 
         if (!dfdApprovedBool) {
@@ -1457,28 +1380,16 @@ Every object inside the "threats" array of any cell must have:
 
         promptText += `\nDo not wrap the JSON output in markdown formatting. Follow this exact JSON output schema:\n${jsonOutputSchema}\n`;
 
-        const parts = [{ text: promptText }];
-
-        if (finalImages && finalImages.length > 0) {
-            finalImages.forEach((img) => {
-                const parsed = parseBase64Image(img.data);
-                parts.push({
-                    inlineData: {
-                        mimeType: parsed.mimeType,
-                        data: parsed.data
-                    }
-                });
-            });
-            logger.info(`Attached ${finalImages.length} images to Gemini payload`);
-        }
-
         // Call 1: Generator Model
-        logger.info(`[${agentName}] Sending request to AI Provider (${aiConfig.provider}) for generation (Session ID: ${sessionId || 'new'})`);
+        logger.info(`[Job ${job.jobId}] [${agentName}] Sending request to AI Provider (${aiConfig.provider}) for generation`);
+        
+        job.progress = 35;
+        activeJobs.set(job.jobId, { ...job });
+
         const responseText = await callAIModel(promptText, finalImages, aiConfig);
 
         if (!responseText) {
-            logger.error('AI API returned an empty response during generation');
-            return serverError('Failed to generate threat model. AI returned an empty response.', res, logger);
+            throw new Error('AI API returned an empty response during generation');
         }
 
         let parsedOutput;
@@ -1488,9 +1399,13 @@ Every object inside the "threats" array of any cell must have:
                 parsedOutput.threatModel = mergeDiagramCells(currentModel, parsedOutput.threatModel, refinementHistory, dfdApprovedBool);
             }
         } catch (parseErr) {
-            logger.error(`Failed to parse Gemini generator output as JSON. Output was: ${responseText}`);
-            return serverError('Failed to parse the generated output as valid JSON. Please try again.', res, logger);
+            logger.error(`[Job ${job.jobId}] Failed to parse generator output as JSON. Output was: ${responseText}`);
+            throw new Error('Failed to parse the generated output as valid JSON.');
         }
+
+        job.status = 'critiquing';
+        job.progress = 55;
+        activeJobs.set(job.jobId, { ...job });
 
         // Call 2: Critic Model (Independent critique and completeness score evaluation)
         const getCritique = async (threatModel, questionsCount, isDfdApproved) => {
@@ -1512,7 +1427,7 @@ CURRENT REFINEMENT PHASE: DFD TOPOLOGY AUDIT (Phase 1)
                 outputRequirements = `
 CRITICAL OUTPUT REQUIREMENTS FOR THE JSON SCHEMA:
 - "missingElements": List any missing System Processes, External Actors, Data Stores, or Data Flows that should exist to accurately map the system's architecture.
-- "missingBoundaries": List any missing trust boundaries that are required (e.g. network perimeter, container boundary, cloud resource boundary).
+- "missingBoundaries": List any missing trust boundaries that are required.
 - "missingMetadata": List any elements or flows that are missing descriptive metadata (descriptions, out-of-scope flags, flow protocols, or data properties).
 `;
                 missingElementsSchema = `["Process X", "Actor Y", "Store Z", "Dataflow W"]`;
@@ -1524,19 +1439,13 @@ CRITICAL OUTPUT REQUIREMENTS FOR THE JSON SCHEMA:
 CURRENT REFINEMENT PHASE: THREATS AND MITIGATIONS AUDIT (Phase 2)
 - We are in Phase 2 (Threat Analysis & Security Controls). The DFD topology has been approved.
 - You must critically evaluate the completeness of the threat mapping/analysis.
-- Threat modeling completeness measures the thoroughness of the threat identification process, NOT the security posture or whether threats are already mitigated.
-- THREAT COVERAGE EVALUATION RULE: Review if each process, store, and flow has been evaluated for applicable threats (e.g. STRIDE/MITRE). Verify that:
-  - Each element or flow is correctly assessed (can have zero, 1, or multiple threats depending on complexity and security posture).
-  - Mapped threats are realistic and cover all relevant categories.
-  - Descriptions and planned mitigations are highly detailed, concrete, and specific.
-- RISK STATUS VS COMPLETENESS RULE:
-  - The completenessScore and mitigationCompleteness MUST measure ONLY if the threats and their corresponding mitigations/actions have been identified and documented in the model.
-  - Do NOT penalize the completenessScore or mitigationCompleteness if the user's system does not have mitigations implemented yet or if threats are marked as "Open". The threat model is 100% complete once all threats are identified and their potential/planned mitigations are documented, regardless of whether they are active or open.
+- Threat modeling completeness measures the thoroughness of the threat identification process, NOT the security posture.
+- THREAT COVERAGE EVALUATION RULE: Review if each process, store, and flow has been evaluated for applicable threats.
+- RISK STATUS VS COMPLETENESS RULE: The completenessScore and mitigationCompleteness MUST measure ONLY if the threats and their corresponding mitigations/actions have been identified and documented.
 - CRITIQUE RIGOR AND COMPLETENESS SCORE RULE:
-  - Do NOT give a high completenessScore (>80%) or mark status as "Ready" if the threat mapping is shallow (e.g., missing critical threat categories for key components), or if descriptions are too short.
-  - Only mark the status as "Ready" and score >= 85% when the threat identification is genuinely complete, robust, highly detailed, and all components/flows have been thoroughly analyzed.
-- SEMANTIC REDUNDANCY AUDIT:
-  - Search for semantic duplicates or redundant threats mapped to the same element (e.g. "Comprometimento por credenciais estáticas" vs "Uso de credenciais estáticas sem rotação"). If you find two or more threat entries on a single element that represent the same basic threat scenario, flag this as a critical duplication error in your feedback. Demand that they be merged and unified into a single, high-quality, comprehensive threat entry, and lower the completenessScore.
+  - Do NOT give a high completenessScore (>80%) or mark status as "Ready" if the threat mapping is shallow.
+  - Only mark the status as "Ready" and score >= 85% when the threat identification is genuinely complete, robust, and highly detailed.
+- SEMANTIC REDUNDANCY AUDIT: Search for semantic duplicates or redundant threats mapped to the same element. If found, flag this as a critical duplication error.
 `;
                 outputRequirements = `
 CRITICAL OUTPUT REQUIREMENTS FOR THE JSON SCHEMA:
@@ -1553,17 +1462,17 @@ CRITICAL OUTPUT REQUIREMENTS FOR THE JSON SCHEMA:
             if (!isDfdApproved) {
                 reviewCriteriaPrompt = `
 Specifically, evaluate:
-1. Component Coverage: Are all system components, actors, and data flows from the documentation represented? Check if there are any isolated elements (nodes) that have no data flows connecting them. Check if there are any hallucinated elements (components that have no basis in the documentation or diagrams).
+1. Component Coverage: Are all system components, actors, and data flows from the documentation represented? Check if there are any isolated elements or hallucinated elements.
 2. Layout and Structure: Verify that trust boundaries separate execution zones properly and coordinates are clean.
 `;
             } else {
                 reviewCriteriaPrompt = `
 Specifically, evaluate:
-1. Component Coverage: Verify that all elements (processes, stores, flows) have been assessed. If a component is critical or exposed, it should have multiple distinct STRIDE/MITRE threats mapped.
-2. Threat Mapping Completeness: Have all identified threats been documented with detailed technical descriptions and suggested/planned mitigation actions? Do NOT penalize the score if the mitigations are not yet implemented in the system or if threats are marked as "Open". The threat model is 100% complete if the risks are fully documented and cataloged, regardless of how secure the system actually is.
+1. Component Coverage: Verify that all elements (processes, stores, flows) have been assessed.
+2. Threat Mapping Completeness: Have all identified threats been documented with detailed technical descriptions and suggested/planned mitigation actions?
 3. Gaps and Genuineness: Are the threats realistic and are there any critical threat categories missing?
-4. Security Control Documentation Efficacy: Analyze each answer/response provided by the user. Evaluate if the details, decisions, or controls mentioned by the user are accurately documented in the threat model. Do NOT lower the completenessScore because the user's security posture is weak or missing controls; instead, ensure the model correctly represents those open risks.
-5. ANTI-HALLUCINATION AUDIT: Verify that the model does not assume a security control is active if the user stated it is missing. If the user indicates a control is missing, the model MUST keep the threat status as "Open" with its mitigation documented as planned. This counts as a correctly mapped threat and should NOT lower the completenessScore.
+4. Security Control Documentation Efficacy: Analyze each answer/response provided by the user.
+5. ANTI-HALLUCINATION AUDIT: Verify that the model does not assume a security control is active if the user stated it is missing.
 `;
             }
 
@@ -1572,38 +1481,26 @@ Specifically, evaluate:
 LANGUAGE REQUIREMENT:
 You MUST write all evaluation texts, feedback/critique paragraphs, and assessment details in Portuguese.
 
+${reviewCriteriaPrompt}
 
 Here is the system architecture documentation:
 ${docsContext}
 
 Here is the generated Threat Dragon V2 JSON DFD model to review:
 ${JSON.stringify(threatModel, null, 2)}
-
-Here is the user refinement conversation history:
-${refinementHistory && refinementHistory.length > 0 ? refinementHistory.map((m) => `${m.role.toUpperCase()}: ${m.text}`).join('\n') : 'No history yet.'}
-
-Please perform a critical review of the generated DFD diagram topology.
-${reviewCriteriaPrompt}
 `;
             } else {
                 critiquePromptText += `
 LANGUAGE REQUIREMENT:
 You MUST write all evaluation texts, feedback/critique paragraphs, security control categories, and assessment details in Portuguese.
 
+${reviewCriteriaPrompt}
 
 Here is the system architecture documentation:
 ${docsContext}
 
 Here is the generated Threat Dragon V2 JSON DFD model to review:
 ${JSON.stringify(threatModel, null, 2)}
-
-Here is the user refinement conversation history:
-${refinementHistory && refinementHistory.length > 0 ? refinementHistory.map((m) => `${m.role.toUpperCase()}: ${m.text}`).join('\n') : 'No history yet.'}
-
-Please perform a critical review of the generated model using the ${
-    { MITRE_F3: 'MITRE Fight Fraud (F3) Framework', LINDDUN: 'LINDDUN privacy methodology', CIA: 'CIA triad', DIE: 'DIE model', PLOT4ai: 'PLOT4ai framework' }[finalMethodology] || 'STRIDE methodology'
-}.
-${reviewCriteriaPrompt}
 `;
             }
 
@@ -1636,7 +1533,7 @@ You MUST return ONLY a JSON object containing a single key "evaluation" structur
 }
 
 CRITICAL RULES FOR STATUS FIELD:
-- The "status" property MUST be "AwaitingHumanApproval" unless the user has explicitly approved the diagram/model in the refinement conversation history (e.g. by saying "aprovado", "ok", "pode seguir", "suficiente", "está bom", "está de acordo").
+- The "status" property MUST be "AwaitingHumanApproval" unless the user has explicitly approved the diagram/model in the refinement conversation history.
 - Once you see an explicit approval or consent in the conversation history, you can set the status to "Ready" (if the completenessScore is >= 80). Otherwise, it must remain "AwaitingHumanApproval" or "Refining".
 
 Do not wrap the JSON output in markdown formatting.
@@ -1658,7 +1555,7 @@ Do not wrap the JSON output in markdown formatting.
             };
 
             try {
-                logger.info(`[${criticAgentName}] Auditing model (Session ID: ${activeSession?.sessionId || 'new'})...`);
+                logger.info(`[Job ${job.jobId}] [${criticAgentName}] Auditing model...`);
                 const criticResponseText = await callAIModel(critiquePromptText, [], aiConfig);
 
                 if (criticResponseText) {
@@ -1668,7 +1565,7 @@ Do not wrap the JSON output in markdown formatting.
                     }
                 }
             } catch (criticErr) {
-                logger.warn(`Critique step failed, falling back to default evaluation: ${criticErr.message}`);
+                logger.warn(`[Job ${job.jobId}] Critique step failed, falling back to default evaluation: ${criticErr.message}`);
             }
             return evalResult;
         };
@@ -1677,7 +1574,11 @@ Do not wrap the JSON output in markdown formatting.
 
         // Self-Correction Loop: If the critic score is low, perform one automatic correction round
         if (evaluation.completenessScore < 80) {
-            logger.info(`[${agentName}] Initial completeness score is ${evaluation.completenessScore}/100. Triggering automatic self-correction revision pass...`);
+            job.status = 'revising';
+            job.progress = 75;
+            activeJobs.set(job.jobId, { ...job });
+
+            logger.info(`[Job ${job.jobId}] Initial completeness score is ${evaluation.completenessScore}/100. Triggering automatic self-correction revision pass...`);
             
             const revisionPromptText = `${promptText}
 
@@ -1694,19 +1595,6 @@ You MUST revise and correct the threat model to address all these points. Specif
 Return ONLY a JSON object containing the keys "threatModel" and "questions" (as specified in the original instructions). Do not wrap the JSON output in markdown formatting.
 `;
 
-            const revisionParts = [{ text: revisionPromptText }];
-            if (finalImages && finalImages.length > 0) {
-                finalImages.forEach((img) => {
-                    const parsed = parseBase64Image(img.data);
-                    revisionParts.push({
-                        inlineData: {
-                            mimeType: parsed.mimeType,
-                            data: parsed.data
-                        }
-                    });
-                });
-            }
-
             try {
                 const revResponseText = await callAIModel(revisionPromptText, finalImages, aiConfig);
 
@@ -1714,12 +1602,12 @@ Return ONLY a JSON object containing the keys "threatModel" and "questions" (as 
                 if (parsedRevision && parsedRevision.threatModel) {
                     parsedOutput = parsedRevision;
                     parsedOutput.threatModel = mergeDiagramCells(currentModel, parsedOutput.threatModel, refinementHistory, dfdApprovedBool);
-                    logger.info("Successfully received revised threat model from self-correction loop. Re-evaluating revised model...");
+                    logger.info(`[Job ${job.jobId}] Successfully received revised threat model from self-correction loop. Re-evaluating revised model...`);
                     // Re-run the critic once on the revised model to get the updated evaluation score
                     evaluation = await getCritique(parsedOutput.threatModel, parsedOutput.questions?.length || 3, dfdApprovedBool);
                 }
             } catch (revErr) {
-                logger.error(`Self-correction revision pass failed: ${revErr.message}`);
+                logger.error(`[Job ${job.jobId}] Self-correction revision pass failed: ${revErr.message}`);
             }
         }
 
@@ -1753,7 +1641,7 @@ Return ONLY a JSON object containing the keys "threatModel" and "questions" (as 
             if (!questionPlan) {
                 // First time DFD is approved: compute the full question plan
                 questionPlan = questionPlanningEngine.computeQuestionPlan(diagramCells, finalMethodology);
-                logger.info(`Question plan computed: ${questionPlan.totalQuestions} questions for ${finalMethodology} across ${diagramCells.length} cells`);
+                logger.info(`[Job ${job.jobId}] Question plan computed: ${questionPlan.totalQuestions} questions for ${finalMethodology} across ${diagramCells.length} cells`);
             }
 
             // Extract resolved question IDs from LLM response
@@ -1806,39 +1694,184 @@ Return ONLY a JSON object containing the keys "threatModel" and "questions" (as 
             refinementHistory: updatedHistory
         });
 
-        logger.info(`Threat model session round processed. Session ID: ${activeSession.sessionId}`);
-        return res.status(200).json({
-            status: 200,
-            message: 'Successfully processed threat modeling session round',
+        logger.info(`[Job ${job.jobId}] Threat model session round processed. Session ID: ${activeSession.sessionId}`);
+        
+        job.status = 'completed';
+        job.progress = 100;
+        job.result = {
+            threatModel: parsedOutput.threatModel,
+            questions: parsedOutput.questions || [],
+            evaluation: evaluation,
+            sessionId: activeSession.sessionId,
+            dfdApproved: dfdApprovedBool,
+            threatModelApproved: threatModelApprovedBool,
+            refinementHistory: updatedHistory,
+            questionPlan: questionPlan ? {
+                methodology: questionPlan.methodology,
+                totalQuestions: questionPlan.totalQuestions,
+                breakdown: questionPlan.breakdown,
+                byCategory: questionPlan.progress?.byCategory || questionPlan.byCategory,
+                estimatedRounds: questionPlan.estimatedRounds,
+                progress: questionPlan.progress
+            } : null
+        };
+        activeJobs.set(job.jobId, { ...job });
+
+    } catch (err) {
+        logger.error(`[Job ${job.jobId}] Background generation job failed: ${err.message}`);
+        job.status = 'failed';
+        job.progress = 100;
+        job.error = err.message;
+        activeJobs.set(job.jobId, { ...job });
+    }
+};
+
+const generate = async (req, res) => {
+    const {
+        title,
+        description,
+        docs,
+        images,
+        apiKey: clientApiKey,
+        aiProvider,
+        customBaseUrl,
+        customModel,
+        customEmbeddingModel,
+        currentModel,
+        refinementHistory,
+        methodology = 'STRIDE',
+        sessionId,
+        dfdApproved,
+        threatModelApproved
+    } = req.body;
+
+    let activeSession = null;
+    if (sessionId) {
+        activeSession = aiContextStore.getSession(sessionId);
+    }
+
+    const provider = aiProvider || (activeSession && activeSession.aiProvider) || 'gemini';
+    const aiConfig = {
+        provider: provider,
+        apiKey: clientApiKey || (activeSession && activeSession.apiKey) || (provider === 'bedrock-mantle' ? env.get().config.BEDROCK_MANTLE_API_KEY : env.get().config.GEMINI_API_KEY),
+        baseUrl: customBaseUrl || (activeSession && activeSession.customBaseUrl) || env.get().config.BEDROCK_MANTLE_BASE_URL,
+        model: customModel || (activeSession && activeSession.customModel) || env.get().config.BEDROCK_MANTLE_MODEL,
+        embeddingModel: customEmbeddingModel || (activeSession && activeSession.customEmbeddingModel) || env.get().config.BEDROCK_MANTLE_EMBEDDING_MODEL || 'amazon.titan-embed-text-v1'
+    };
+
+    const apiKey = aiConfig.apiKey;
+    const dfdApprovedBool = (dfdApproved === true || dfdApproved === 'true');
+    const threatModelApprovedBool = (threatModelApproved === true || threatModelApproved === 'true');
+
+    if (!apiKey) {
+        return badRequest(`API key is missing for provider ${provider}. Please configure it in the server environment or provide it in the API Key input.`, res, logger);
+    }
+
+    try {
+        let finalDocs = docs || [];
+        let finalImages = images || [];
+        let finalMethodology = methodology;
+
+        // Stage 1: RAG Context Evolution
+        if (sessionId) {
+            if (activeSession) {
+                logger.info(`Resuming existing RAG threat modeling session: ${sessionId}`);
+                // Load original documents/images from session if not sent in refinement request
+                if (finalDocs.length === 0 && activeSession.docs.length > 0) {
+                    finalDocs = activeSession.docs;
+                }
+                if (finalImages.length === 0 && activeSession.images.length > 0) {
+                    finalImages = activeSession.images;
+                }
+                finalMethodology = activeSession.methodology || methodology;
+                
+                // Update history and model in session store
+                aiContextStore.updateSession(sessionId, {
+                    refinementHistory: refinementHistory || [],
+                    currentModel: currentModel || null,
+                    aiProvider: provider,
+                    customBaseUrl: aiConfig.baseUrl,
+                    customModel: aiConfig.model,
+                    apiKey: aiConfig.apiKey
+                });
+            }
+        }
+
+        // Bypassing LLM generation on explicit human approval of the final threat model
+        if (threatModelApprovedBool && activeSession) {
+            const previousHistory = activeSession.history || [];
+            if (activeSession.currentModel) {
+                previousHistory.push({
+                    currentModel: activeSession.currentModel,
+                    questions: activeSession.questions || [],
+                    evaluation: activeSession.evaluation || null,
+                    refinementHistory: activeSession.refinementHistory || [],
+                    dfdApproved: activeSession.dfdApproved || false,
+                    threatModelApproved: activeSession.threatModelApproved || false
+                });
+            }
+
+            aiContextStore.updateSession(activeSession.sessionId, {
+                history: previousHistory,
+                threatModelApproved: true
+            });
+
+            logger.info(`Threat model session approved by human. Session ID: ${activeSession.sessionId}`);
+            return res.status(200).json({
+                status: 200,
+                message: 'Threat model successfully approved and concluded.',
+                data: {
+                    threatModel: activeSession.currentModel,
+                    questions: [],
+                    evaluation: activeSession.evaluation,
+                    sessionId: activeSession.sessionId,
+                    dfdApproved: activeSession.dfdApproved || false,
+                    threatModelApproved: true,
+                    refinementHistory: activeSession.refinementHistory || []
+                }
+            });
+        }
+
+        if (!activeSession) {
+            // First round: create new session
+            if (!title || title.trim() === '') {
+                return badRequest('Threat model title is required to initialize a session', res, logger);
+            }
+            activeSession = aiContextStore.createSession({
+                title,
+                description,
+                docs: finalDocs,
+                images: finalImages,
+                refinementHistory: refinementHistory || [],
+                currentModel: currentModel || null,
+                methodology: finalMethodology,
+                aiProvider: provider,
+                customBaseUrl: aiConfig.baseUrl || '',
+                customModel: aiConfig.model || '',
+                apiKey: aiConfig.apiKey || ''
+            });
+            logger.info(`Initialized new RAG session: ${activeSession.sessionId}`);
+        }
+
+        const job = createJob();
+        job.sessionId = activeSession.sessionId;
+
+        // Kick off the background execution
+        runGenerateJob(job, req.body, activeSession, finalDocs, finalImages, finalMethodology, dfdApprovedBool, aiConfig);
+
+        return res.status(202).json({
+            status: 202,
+            message: 'Threat modeling job started asynchronously.',
             data: {
-                threatModel: parsedOutput.threatModel,
-                questions: parsedOutput.questions || [],
-                evaluation: evaluation,
+                jobId: job.jobId,
                 sessionId: activeSession.sessionId,
-                dfdApproved: dfdApprovedBool,
-                threatModelApproved: threatModelApprovedBool,
-                refinementHistory: updatedHistory,
-                questionPlan: questionPlan ? {
-                    methodology: questionPlan.methodology,
-                    totalQuestions: questionPlan.totalQuestions,
-                    breakdown: questionPlan.breakdown,
-                    byCategory: questionPlan.progress?.byCategory || questionPlan.byCategory,
-                    estimatedRounds: questionPlan.estimatedRounds,
-                    progress: questionPlan.progress
-                } : null
+                status: job.status,
+                progress: job.progress
             }
         });
 
     } catch (err) {
-        logger.error('Error in AI threat model controller:', err.message);
-        if (err.response) {
-            logger.error('Gemini API error details:', JSON.stringify(err.response.data));
-            return res.status(err.response.status || 500).json({
-                status: err.response.status || 500,
-                message: err.response.data?.error?.message || 'Error occurred while contacting Gemini API',
-                details: err.response.data
-            });
-        }
+        logger.error(`Error in threat modeling generation setup: ${err.message}`);
         return serverError(err.message, res, logger);
     }
 };
@@ -1939,18 +1972,9 @@ const undoRefinement = (req, res) => {
     }
 };
 
-const getDeduplicateProposals = async (req, res) => {
-    const { sessionId } = req.params;
-    const session = aiContextStore.getSession(sessionId);
-    if (!session) {
-        return res.status(404).json({
-            status: 404,
-            message: 'Session not found'
-        });
-    }
-
+const runDeduplicateJob = async (job, body, session) => {
     try {
-        const { aiProvider, customBaseUrl, customModel, apiKey: clientApiKey } = req.body;
+        const { aiProvider, customBaseUrl, customModel, apiKey: clientApiKey } = body;
         const provider = aiProvider || session.aiProvider || 'gemini';
         const aiConfig = {
             provider: provider,
@@ -1960,11 +1984,12 @@ const getDeduplicateProposals = async (req, res) => {
         };
 
         if (!aiConfig.apiKey) {
-            return res.status(500).json({
-                status: 500,
-                message: `API key is not configured for provider ${provider}.`
-            });
+            throw new Error(`API key is not configured for provider ${provider}.`);
         }
+
+        job.status = 'generating';
+        job.progress = 30;
+        activeJobs.set(job.jobId, { ...job });
 
         const currentModel = session.currentModel;
         const controlsAssessment = session.evaluation?.controlsAssessment || [];
@@ -2037,7 +2062,11 @@ All proposed titles, userAnswers, descriptions, mitigations, and details MUST be
 Return ONLY the raw JSON object, without any markdown code block formatting.
 `;
 
-        logger.info(`Requesting deduplication proposals from AI Provider (${aiConfig.provider}) for session: ${sessionId}`);
+        logger.info(`[Job ${job.jobId}] Requesting deduplication proposals from AI Provider (${aiConfig.provider})`);
+        
+        job.progress = 50;
+        activeJobs.set(job.jobId, { ...job });
+
         const candidateText = await callAIModel(promptText, [], aiConfig);
         
         if (!candidateText) {
@@ -2048,16 +2077,50 @@ Return ONLY the raw JSON object, without any markdown code block formatting.
         
         // Cache the proposals in the session context
         session.deduplicateProposals = parsedProposals;
-        aiContextStore.updateSession(sessionId, { deduplicateProposals: parsedProposals });
+        aiContextStore.updateSession(session.sessionId, { deduplicateProposals: parsedProposals });
 
-        return res.status(200).json({
-            status: 200,
-            message: 'Deduplication proposals generated successfully',
-            data: parsedProposals
-        });
+        job.status = 'completed';
+        job.progress = 100;
+        job.result = parsedProposals;
+        activeJobs.set(job.jobId, { ...job });
 
     } catch (err) {
-        logger.error(`Error generating deduplication proposals for session ${sessionId}: ${err.message}`);
+        logger.error(`[Job ${job.jobId}] Background deduplication job failed: ${err.message}`);
+        job.status = 'failed';
+        job.progress = 100;
+        job.error = err.message;
+        activeJobs.set(job.jobId, { ...job });
+    }
+};
+
+const getDeduplicateProposals = async (req, res) => {
+    const { sessionId } = req.params;
+    const session = aiContextStore.getSession(sessionId);
+    if (!session) {
+        return res.status(404).json({
+            status: 404,
+            message: 'Session not found'
+        });
+    }
+
+    try {
+        const job = createJob();
+        job.sessionId = sessionId;
+        
+        // Kick off deduplication in background
+        runDeduplicateJob(job, req.body, session);
+
+        return res.status(202).json({
+            status: 202,
+            message: 'Deduplication job started asynchronously',
+            data: {
+                jobId: job.jobId,
+                status: job.status,
+                progress: job.progress
+            }
+        });
+    } catch (err) {
+        logger.error(`Error initiating deduplication job: ${err.message}`);
         return serverError(err.message, res, logger);
     }
 };
@@ -2253,6 +2316,7 @@ export default {
     getQuestionCount,
     computeQuestionCountStateless,
     getAvailableFrameworks,
+    getJobStatus,
     _areTitlesSimilar: areTitlesSimilar,
     _mergeDiagramCells: mergeDiagramCells,
     _mergeControlsAssessment: mergeControlsAssessment,
