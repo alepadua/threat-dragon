@@ -1,4 +1,6 @@
 import { expect } from 'chai';
+import sinon from 'sinon';
+import axios from 'axios';
 import aiController from '../../src/controllers/aiController.js';
 
 describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
@@ -237,6 +239,91 @@ describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
             );
             expect(controlsAssessment).to.have.lengthOf(2);
             expect(model.detail.diagrams[0].cells[0].data.threats).to.have.lengthOf(2);
+        });
+    });
+
+    describe('_extractJson', () => {
+        it('should parse simple valid JSON', () => {
+            const json = '{"key": "value"}';
+            expect(aiController._extractJson(json)).to.deep.equal({ key: "value" });
+        });
+
+        it('should strip markdown code blocks and whitespace', () => {
+            const json = '```json\n{\n  "key": "value"\n}\n```';
+            expect(aiController._extractJson(json)).to.deep.equal({ key: "value" });
+        });
+
+        it('should escape raw newlines and tabs inside string properties', () => {
+            const json = '{\n  "key": "line1\nline2\\tline3"\n}';
+            const parsed = aiController._extractJson(json);
+            expect(parsed.key).to.equal("line1\nline2\tline3");
+        });
+
+        it('should escape internal unescaped double quotes in string values', () => {
+            const json = '{"mitigation": "Use "Network Policies" to restrict traffic", "key": "value"}';
+            const parsed = aiController._extractJson(json);
+            expect(parsed.mitigation).to.equal('Use "Network Policies" to restrict traffic');
+            expect(parsed.key).to.equal("value");
+        });
+
+        it('should handle single-line comments and trailing commas', () => {
+            const json = '{\n  // this is a comment\n  "key": "value",\n}';
+            expect(aiController._extractJson(json)).to.deep.equal({ key: "value" });
+        });
+    });
+
+    describe('_callAIModel', () => {
+        let postStub;
+
+        beforeEach(() => {
+            postStub = sinon.stub(axios, 'post');
+        });
+
+        afterEach(() => {
+            postStub.restore();
+        });
+
+        it('should call Bedrock Mantle without thinking block if extendedThinking is false/undefined', async () => {
+            postStub.resolves({ status: 200, data: { choices: [{ message: { content: 'Threat response' } }] } });
+            
+            const aiConfig = {
+                provider: 'bedrock-mantle',
+                apiKey: 'test-key',
+                baseUrl: 'http://localhost:3000',
+                model: 'meta.llama3'
+            };
+
+            const response = await aiController._callAIModel('Hello', [], aiConfig);
+            expect(response).to.equal('Threat response');
+            
+            expect(postStub).to.have.been.calledOnce;
+            const callArgs = postStub.firstCall.args;
+            expect(callArgs[0]).to.equal('http://localhost:3000/chat/completions');
+            expect(callArgs[1].thinking).to.be.undefined;
+            expect(callArgs[1].reasoning_effort).to.be.undefined;
+        });
+
+        it('should inject thinking and reasoning_effort blocks into Bedrock Mantle payload if extendedThinking is true', async () => {
+            postStub.resolves({ status: 200, data: { choices: [{ message: { content: 'Threat response' } }] } });
+            
+            const aiConfig = {
+                provider: 'bedrock-mantle',
+                apiKey: 'test-key',
+                baseUrl: 'http://localhost:3000',
+                model: 'meta.llama3',
+                extendedThinking: true
+            };
+
+            const response = await aiController._callAIModel('Hello', [], aiConfig);
+            expect(response).to.equal('Threat response');
+            
+            expect(postStub).to.have.been.calledOnce;
+            const callArgs = postStub.firstCall.args;
+            expect(callArgs[1].thinking).to.deep.equal({
+                type: 'enabled',
+                budget_tokens: 2048
+            });
+            expect(callArgs[1].reasoning_effort).to.equal('medium');
         });
     });
 });

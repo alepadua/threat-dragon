@@ -55,7 +55,7 @@
                         <b-col md="6">
                             <b-form-group
                                 id="api-key-group"
-                                :label="$t('aiThreatModeler.apiKeyOverride')"
+                                :label="form.aiProvider === 'bedrock-mantle' ? $t('aiThreatModeler.apiKeyOverrideBedrock') : $t('aiThreatModeler.apiKeyOverrideGemini')"
                                 label-for="apiKey"
                                 label-class="font-weight-bold"
                             >
@@ -63,7 +63,7 @@
                                     id="apiKey"
                                     v-model="form.apiKey"
                                     type="password"
-                                    :placeholder="$t('aiThreatModeler.apiKeyPlaceholder')"
+                                    :placeholder="form.aiProvider === 'bedrock-mantle' ? $t('aiThreatModeler.apiKeyPlaceholderBedrock') : $t('aiThreatModeler.apiKeyPlaceholderGemini')"
                                     class="custom-input"
                                 ></b-form-input>
                             </b-form-group>
@@ -119,6 +119,15 @@
                                     class="custom-input"
                                 ></b-form-input>
                             </b-form-group>
+                        </b-col>
+                        <b-col md="12">
+                            <b-form-checkbox
+                                id="extendedThinking"
+                                v-model="form.extendedThinking"
+                                class="mb-3 font-weight-bold"
+                            >
+                                {{ $t('aiThreatModeler.extendedThinking') }}
+                            </b-form-checkbox>
                         </b-col>
                     </b-form-row>
 
@@ -396,9 +405,38 @@
                                 <font-awesome-icon icon="undo" class="mr-2" />
                                 Desfazer Última Evolução
                             </b-button>
-                            <b-button variant="outline-danger" class="w-100" size="sm" @click="resetForm">
+                            <b-button variant="outline-danger" class="w-100 mb-2" size="sm" @click="resetForm">
                                 Start Over
                             </b-button>
+                        </div>
+
+                        <!-- Collapsible Model Config Panel -->
+                        <div class="mt-2 pt-2 border-top">
+                            <b-button variant="link" size="sm" class="text-muted p-0 font-weight-bold" @click="showModelConfig = !showModelConfig">
+                                <font-awesome-icon :icon="showModelConfig ? 'chevron-up' : 'chevron-down'" class="mr-1" />
+                                {{ $t('aiThreatModeler.switchModel') || 'Switch AI Model' }}
+                            </b-button>
+                            <b-collapse v-model="showModelConfig" class="mt-2">
+                                <div class="bg-light border rounded p-2">
+                                    <b-form-group label="Model Name" label-class="font-weight-bold font-size-xs" class="mb-2">
+                                        <b-form-input
+                                            v-model="form.customModel"
+                                            type="text"
+                                            size="sm"
+                                            placeholder="meta.llama3-70b-instruct-v1:0"
+                                            class="custom-input font-size-sm"
+                                        ></b-form-input>
+                                    </b-form-group>
+                                    <b-form-checkbox
+                                        v-if="form.aiProvider === 'bedrock-mantle'"
+                                        v-model="form.extendedThinking"
+                                        size="sm"
+                                        class="font-size-xs font-weight-bold"
+                                    >
+                                        {{ $t('aiThreatModeler.extendedThinking') }}
+                                    </b-form-checkbox>
+                                </div>
+                            </b-collapse>
                         </div>
                     </b-card>
                 </b-col>
@@ -781,6 +819,35 @@
                                     </b-button>
                                 </div>
                             </b-form>
+
+                            <!-- Collapsible Model Config Panel -->
+                            <div class="mt-3 pt-2 border-top">
+                                <b-button variant="link" size="sm" class="text-muted p-0 font-weight-bold" @click="showModelConfig = !showModelConfig">
+                                    <font-awesome-icon :icon="showModelConfig ? 'chevron-up' : 'chevron-down'" class="mr-1" />
+                                    {{ $t('aiThreatModeler.switchModel') || 'Switch AI Model' }}
+                                </b-button>
+                                <b-collapse v-model="showModelConfig" class="mt-2">
+                                    <div class="bg-light border rounded p-2">
+                                        <b-form-group label="Model Name" label-class="font-weight-bold font-size-xs" class="mb-2">
+                                            <b-form-input
+                                                v-model="form.customModel"
+                                                type="text"
+                                                size="sm"
+                                                placeholder="meta.llama3-70b-instruct-v1:0"
+                                                class="custom-input font-size-sm"
+                                            ></b-form-input>
+                                        </b-form-group>
+                                        <b-form-checkbox
+                                            v-if="form.aiProvider === 'bedrock-mantle'"
+                                            v-model="form.extendedThinking"
+                                            size="sm"
+                                            class="font-size-xs font-weight-bold"
+                                        >
+                                            {{ $t('aiThreatModeler.extendedThinking') }}
+                                        </b-form-checkbox>
+                                    </div>
+                                </b-collapse>
+                            </div>
                         </div>
                     </b-card>
                 </b-col>
@@ -1210,7 +1277,8 @@ export default {
                 methodology: 'STRIDE',
                 aiProvider: 'gemini',
                 customBaseUrl: '',
-                customModel: ''
+                customModel: '',
+                extendedThinking: false
             },
             sessionId: null,
             evaluation: null,
@@ -1247,7 +1315,8 @@ export default {
             previewElements: [], // list of elements parsed for stats
             errorMessage: '',
             questionPlan: null,
-            questionProgress: { answered: 0, total: 0, percentage: 0 }
+            questionProgress: { answered: 0, total: 0, percentage: 0 },
+            showModelConfig: false
         };
     },
     computed: {
@@ -1510,7 +1579,8 @@ export default {
                     aiProvider: this.form.aiProvider,
                     customBaseUrl: this.form.customBaseUrl,
                     customModel: this.form.customModel,
-                    currentModel: this.generatedModel
+                    currentModel: this.generatedModel,
+                    extendedThinking: this.form.extendedThinking
                 };
 
                 const response = await axios.post('/api/ai/threatmodel', payload);
@@ -1565,7 +1635,8 @@ export default {
                     customBaseUrl: this.form.customBaseUrl,
                     customModel: this.form.customModel,
                     dfdApproved: this.dfdApproved,
-                    threatModelApproved: this.threatModelApproved
+                    threatModelApproved: this.threatModelApproved,
+                    extendedThinking: this.form.extendedThinking
                 };
 
                 const response = await axios.post('/api/ai/threatmodel', payload);
@@ -1788,6 +1859,7 @@ export default {
                 this.form.customBaseUrl = result.customBaseUrl || '';
                 this.form.customModel = result.customModel || '';
                 this.form.apiKey = result.apiKey || '';
+                this.form.extendedThinking = result.extendedThinking === true || result.extendedThinking === 'true';
                 
                 this.updateLocalState(result);
                 

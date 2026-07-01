@@ -39,18 +39,224 @@ trim();
     return clean.trim();
 };
 
+const escapeControlCharsInStrings = (str) => {
+    let inString = false;
+    let escaped = false;
+    let result = '';
+    for (let i = 0; i < str.length; i++) {
+        const char = str[i];
+        if (char === '"' && !escaped) {
+            inString = !inString;
+            result += char;
+        } else if (inString) {
+            if (char === '\\') {
+                escaped = !escaped;
+                result += char;
+            } else {
+                escaped = false;
+                if (char === '\n') {
+                    result += '\\n';
+                } else if (char === '\r') {
+                    result += '\\r';
+                } else if (char === '\t') {
+                    result += '\\t';
+                } else if (char.charCodeAt(0) < 32) {
+                    result += '\\u' + ('0000' + char.charCodeAt(0).toString(16)).slice(-4);
+                } else {
+                    result += char;
+                }
+            }
+        } else {
+            escaped = false;
+            result += char;
+        }
+    }
+    return result;
+};
+
+const isEscaped = (s, pos) => {
+    let count = 0;
+    let index = pos - 1;
+    while (index >= 0 && s[index] === '\\') {
+        count++;
+        index--;
+    }
+    return count % 2 === 1;
+};
+
+const findCandidates = (str, startIndex) => {
+    const candidates = [];
+    let j = startIndex;
+    while (j < str.length) {
+        if (str[j] === '"' && !isEscaped(str, j)) {
+            let k = j + 1;
+            while (k < str.length && (/\s/u).test(str[k])) {
+                k++;
+            }
+            const nextChar = str[k];
+            if (nextChar === ':' || nextChar === ',' || nextChar === '}' || nextChar === ']' || k === str.length) {
+                candidates.push(j);
+            }
+        }
+        j++;
+    }
+    return candidates;
+};
+
+const escapeRange = (str, start, end) => {
+    let result = '';
+    for (let index = start; index < end; index++) {
+        const c = str[index];
+        if (c === '"' && !isEscaped(str, index)) {
+            result += '\\"';
+        } else {
+            result += c;
+        }
+    }
+    return result;
+};
+
+const escapeInternalQuotes = (str) => {
+    let result = '';
+    let i = 0;
+    while (i < str.length) {
+        const char = str[i];
+        if (char !== '"') {
+            result += char;
+            i++;
+        } else {
+            result += '"';
+            i++;
+            
+            const candidates = findCandidates(str, i);
+            if (candidates.length === 0) {
+                result += '"';
+            } else {
+                const trueClosingIndex = candidates[0];
+                result += escapeRange(str, i, trueClosingIndex);
+                result += '"';
+                i = trueClosingIndex + 1;
+            }
+        }
+    }
+    return result;
+};
+
+const getErrorPosition = (err) => {
+    const match = err.message.match(/position\s+(?<position>\d+)/iu);
+    if (match && match.groups && match.groups.position) {
+        return parseInt(match.groups.position, 10);
+    }
+    return null;
+};
+
+const tryParse = (text) => {
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        try {
+            return JSON.parse(escapeControlCharsInStrings(escapeInternalQuotes(text)));
+        } catch (e2) {
+            return null;
+        }
+    }
+};
+
+/**
+ * Attempt to repair truncated JSON by closing open strings, arrays, and objects.
+ * This handles LLM responses cut off mid-output due to max_tokens limits.
+ */
+const repairTruncatedJson = (text) => {
+    let repaired = text.trimEnd();
+    // If the JSON ends mid-string, close the string
+    let inString = false;
+    let escaped = false;
+    for (let i = 0; i < repaired.length; i++) {
+        const c = repaired[i];
+        if (c === '\\' && inString) {
+            escaped = !escaped;
+        } else if (c === '"' && !escaped) {
+            inString = !inString;
+        } else {
+            escaped = false;
+        }
+    }
+    if (inString) {
+        repaired += '"';
+    }
+
+    // Remove trailing comma or colon left after truncation
+    repaired = repaired.replace(/[,:\s]+$/u, '');
+
+    // Count open brackets/braces and close them
+    const stack = [];
+    let inStr = false;
+    let esc = false;
+    for (let i = 0; i < repaired.length; i++) {
+        const c = repaired[i];
+        if (c === '\\' && inStr) {
+            esc = !esc;
+        } else if (c === '"' && !esc) {
+            inStr = !inStr;
+        } else if (!inStr) {
+            esc = false;
+            if (c === '{') { stack.push('}'); }
+            if (c === '[') { stack.push(']'); }
+            if (c === '}' || c === ']') { stack.pop(); }
+        } else {
+            esc = false;
+        }
+    }
+
+    // Close all remaining open structures
+    while (stack.length > 0) {
+        repaired += stack.pop();
+    }
+    return repaired;
+};
+
 const extractJson = (str) => {
     const cleaned = cleanJson(str);
-    try {
-        return JSON.parse(cleaned);
-    } catch (e) {
-        const firstBrace = cleaned.indexOf('{');
-        const lastBrace = cleaned.lastIndexOf('}');
-        if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-            const substring = cleaned.slice(firstBrace, lastBrace + 1);
-            return JSON.parse(substring);
+    const parsedCleaned = tryParse(cleaned);
+    if (parsedCleaned) {
+        return parsedCleaned;
+    }
+
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        const substring = cleaned.slice(firstBrace, lastBrace + 1);
+        const parsedSubstring = tryParse(substring);
+        if (parsedSubstring) {
+            return parsedSubstring;
         }
-        throw e;
+
+        try {
+            const repairedSub = escapeControlCharsInStrings(escapeInternalQuotes(substring));
+            return JSON.parse(repairedSub);
+        } catch (e) {
+            // Fall through to truncation repair below
+            logger.warn(`[extractJson] Standard repair failed: ${e.message}. Attempting truncation repair...`);
+        }
+    }
+
+    // Attempt truncation repair: the LLM response may have been cut off by max_tokens
+    const truncationBase = firstBrace !== -1 ? cleaned.slice(firstBrace) : cleaned;
+    try {
+        const repairedTruncated = repairTruncatedJson(escapeControlCharsInStrings(escapeInternalQuotes(truncationBase)));
+        const parsedRepaired = JSON.parse(repairedTruncated);
+        logger.warn('[extractJson] Successfully recovered truncated JSON via auto-repair.');
+        return parsedRepaired;
+    } catch (e2) {
+        const pos = getErrorPosition(e2);
+        if (pos !== null) {
+            const start = Math.max(0, pos - 100);
+            const end = Math.min(truncationBase.length, pos + 100);
+            logger.error(`[extractJson] JSON parse failed at position ${pos}. Message: ${e2.message}. Context: ...${truncationBase.slice(start, pos)}[ERROR_HERE]${truncationBase.slice(pos, end)}...`);
+        } else {
+            logger.error(`[extractJson] JSON parse failed. Message: ${e2.message}.`);
+        }
+        throw e2;
     }
 };
 
@@ -611,13 +817,23 @@ const callAIModel = async (promptText, images, aiConfig) => {
             const url = `${aiConfig.baseUrl}/chat/completions`;
             logger.info(`[callAIModel] Bedrock Mantle sending POST request to URL: ${url}`);
 
+            const requestPayload = {
+                model: aiConfig.model || 'meta.llama3-70b-instruct-v1:0',
+                messages: messages,
+                max_tokens: 16384
+            };
+
+            if (aiConfig.extendedThinking) {
+                requestPayload.thinking = {
+                    type: 'enabled',
+                    budget_tokens: 2048
+                };
+                requestPayload.reasoning_effort = 'medium';
+            }
+
             const response = await axios.post(
                 url,
-                {
-                    model: aiConfig.model || 'meta.llama3-70b-instruct-v1:0',
-                    messages: messages,
-                    max_tokens: 8192
-                },
+                requestPayload,
                 {
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${aiConfig.apiKey}` },
                     timeout: REQUEST_TIMEOUT
@@ -644,7 +860,7 @@ const callAIModel = async (promptText, images, aiConfig) => {
         const payload = {
             contents: [{ parts }],
             generationConfig: {
-                maxOutputTokens: 8192,
+                maxOutputTokens: 16384,
                 responseMimeType: 'application/json'
             }
         };
@@ -1742,8 +1958,25 @@ const generate = async (req, res) => {
         methodology = 'STRIDE',
         sessionId,
         dfdApproved,
-        threatModelApproved
+        threatModelApproved,
+        extendedThinking
     } = req.body;
+
+    logger.info(`[AI Generate Request] Incoming payload: ${JSON.stringify({
+        title,
+        description,
+        docsCount: docs ? docs.length : 0,
+        imagesCount: images ? images.length : 0,
+        aiProvider,
+        customBaseUrl,
+        customModel,
+        sessionId,
+        dfdApproved,
+        threatModelApproved,
+        extendedThinking,
+        hasApiKey: Boolean(clientApiKey),
+        apiKeyLength: clientApiKey ? clientApiKey.length : 0
+    })}`);
 
     let activeSession = null;
     if (sessionId) {
@@ -1751,13 +1984,30 @@ const generate = async (req, res) => {
     }
 
     const provider = aiProvider || (activeSession && activeSession.aiProvider) || 'gemini';
+    let extendedThinkingVal = false;
+    if (extendedThinking !== undefined) {
+        extendedThinkingVal = extendedThinking === true || extendedThinking === 'true';
+    } else if (activeSession && activeSession.extendedThinking) {
+        extendedThinkingVal = true;
+    }
     const aiConfig = {
         provider: provider,
         apiKey: clientApiKey || (activeSession && activeSession.apiKey) || (provider === 'bedrock-mantle' ? env.get().config.BEDROCK_MANTLE_API_KEY : env.get().config.GEMINI_API_KEY),
         baseUrl: customBaseUrl || (activeSession && activeSession.customBaseUrl) || env.get().config.BEDROCK_MANTLE_BASE_URL,
         model: customModel || (activeSession && activeSession.customModel) || env.get().config.BEDROCK_MANTLE_MODEL,
-        embeddingModel: customEmbeddingModel || (activeSession && activeSession.customEmbeddingModel) || env.get().config.BEDROCK_MANTLE_EMBEDDING_MODEL || 'amazon.titan-embed-text-v1'
+        embeddingModel: customEmbeddingModel || (activeSession && activeSession.customEmbeddingModel) || env.get().config.BEDROCK_MANTLE_EMBEDDING_MODEL || 'amazon.titan-embed-text-v1',
+        extendedThinking: extendedThinkingVal
     };
+
+    logger.info(`[AI Generate Request] Resolved aiConfig: ${JSON.stringify({
+        provider: aiConfig.provider,
+        baseUrl: aiConfig.baseUrl,
+        model: aiConfig.model,
+        embeddingModel: aiConfig.embeddingModel,
+        extendedThinking: aiConfig.extendedThinking,
+        hasApiKey: Boolean(aiConfig.apiKey),
+        apiKeyLength: aiConfig.apiKey ? aiConfig.apiKey.length : 0
+    })}`);
 
     const apiKey = aiConfig.apiKey;
     const dfdApprovedBool = (dfdApproved === true || dfdApproved === 'true');
@@ -1792,7 +2042,8 @@ const generate = async (req, res) => {
                     aiProvider: provider,
                     customBaseUrl: aiConfig.baseUrl,
                     customModel: aiConfig.model,
-                    apiKey: aiConfig.apiKey
+                    apiKey: aiConfig.apiKey,
+                    extendedThinking: aiConfig.extendedThinking
                 });
             }
         }
@@ -1848,7 +2099,8 @@ const generate = async (req, res) => {
                 aiProvider: provider,
                 customBaseUrl: aiConfig.baseUrl || '',
                 customModel: aiConfig.model || '',
-                apiKey: aiConfig.apiKey || ''
+                apiKey: aiConfig.apiKey || '',
+                extendedThinking: aiConfig.extendedThinking
             });
             logger.info(`Initialized new RAG session: ${activeSession.sessionId}`);
         }
@@ -1982,6 +2234,22 @@ const runDeduplicateJob = async (job, body, session) => {
             baseUrl: customBaseUrl || session.customBaseUrl || env.get().config.BEDROCK_MANTLE_BASE_URL,
             model: customModel || session.customModel || env.get().config.BEDROCK_MANTLE_MODEL
         };
+
+        logger.info(`[AI Deduplicate Job] Incoming body: ${JSON.stringify({
+            aiProvider,
+            customBaseUrl,
+            customModel,
+            hasApiKey: Boolean(clientApiKey),
+            apiKeyLength: clientApiKey ? clientApiKey.length : 0
+        })}`);
+
+        logger.info(`[AI Deduplicate Job] Resolved aiConfig: ${JSON.stringify({
+            provider: aiConfig.provider,
+            baseUrl: aiConfig.baseUrl,
+            model: aiConfig.model,
+            hasApiKey: Boolean(aiConfig.apiKey),
+            apiKeyLength: aiConfig.apiKey ? aiConfig.apiKey.length : 0
+        })}`);
 
         if (!aiConfig.apiKey) {
             throw new Error(`API key is not configured for provider ${provider}.`);
@@ -2320,5 +2588,7 @@ export default {
     _areTitlesSimilar: areTitlesSimilar,
     _mergeDiagramCells: mergeDiagramCells,
     _mergeControlsAssessment: mergeControlsAssessment,
-    _applyDeduplicationChanges: applyDeduplicationChanges
+    _applyDeduplicationChanges: applyDeduplicationChanges,
+    _extractJson: extractJson,
+    _callAIModel: callAIModel
 };
