@@ -833,15 +833,74 @@ const callAIModel = async (promptText, images, aiConfig) => {
 
             const response = await axios.post(
                 url,
-                requestPayload,
+                { ...requestPayload, stream: true },
                 {
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${aiConfig.apiKey}` },
-                    timeout: REQUEST_TIMEOUT
+                    timeout: REQUEST_TIMEOUT,
+                    responseType: 'stream'
                 }
             );
 
             logger.info(`[callAIModel] Bedrock Mantle response status: ${response.status}`);
-            return response.data.choices[0].message.content;
+
+            // Check if the response is a stream (e.g. has 'on' method)
+            if (response.data && typeof response.data.on === 'function') {
+                let fullContent = '';
+                let buffer = '';
+
+                await new Promise((resolve, reject) => {
+                    response.data.on('data', (chunk) => {
+                        const str = chunk.toString();
+                        buffer += str;
+                        let lineIndex;
+                        while ((lineIndex = buffer.indexOf('\n')) !== -1) {
+                            const line = buffer.slice(0, lineIndex).trim();
+                            buffer = buffer.slice(lineIndex + 1);
+                            if (line.startsWith('data: ')) {
+                                const dataStr = line.slice(6).trim();
+                                if (dataStr !== '[DONE]') {
+                                    try {
+                                        const parsed = JSON.parse(dataStr);
+                                        const content = parsed.choices?.[0]?.delta?.content || '';
+                                        fullContent += content;
+                                    } catch (err) {
+                                        // Ignore json parse errors for incomplete lines or heartbeat comments
+                                    }
+                                }
+                            }
+                        }
+                    });
+
+                    response.data.on('end', () => {
+                        // Process any remaining data in the buffer
+                        if (buffer.trim().startsWith('data: ')) {
+                            const dataStr = buffer.trim().slice(6).
+trim();
+                            if (dataStr !== '[DONE]') {
+                                try {
+                                    const parsed = JSON.parse(dataStr);
+                                    const content = parsed.choices?.[0]?.delta?.content || '';
+                                    fullContent += content;
+                                } catch (err) {
+                                    // Ignore
+                                }
+                            }
+                        }
+                        resolve();
+                    });
+
+                    response.data.on('error', (err) => {
+                        reject(err);
+                    });
+                });
+
+                logger.info(`[callAIModel] Bedrock Mantle stream read complete. Content length: ${fullContent.length}`);
+                return fullContent;
+            } 
+                // Fallback for non-streamed responses (e.g. in test mock environments)
+                logger.info('[callAIModel] Bedrock Mantle response is not a stream, falling back to standard parsing');
+                return response.data?.choices?.[0]?.message?.content || '';
+            
         } 
         
         const parts = [];
