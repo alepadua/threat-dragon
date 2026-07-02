@@ -510,7 +510,7 @@ describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
             expect(callArgs[0].reasoning_effort).to.equal('medium');
         });
 
-        it('should recover response from Bedrock Mantle on timeout', async () => {
+        it('should recover response from Bedrock Mantle on timeout if prompt matches', async () => {
             const timeoutError = new Error('Request timed out');
             timeoutError.name = 'APITimeoutError';
             createStub.rejects(timeoutError);
@@ -521,6 +521,9 @@ describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
                         {
                             id: 'resp-123',
                             status: 'completed',
+                            input: {
+                                messages: [{ role: 'user', content: 'Hello' }]
+                            },
                             output: {
                                 choices: [{ message: { content: 'Recovered threat response' } }]
                             }
@@ -549,6 +552,64 @@ describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
             expect(getCallArgs[1].params.limit).to.equal(5);
 
             getStub.restore();
+        });
+
+        it('should poll for completion if recovered response is in_progress', async () => {
+            const clock = sinon.useFakeTimers();
+            const timeoutError = new Error('Request timed out');
+            timeoutError.name = 'APITimeoutError';
+            createStub.rejects(timeoutError);
+            
+            const getStub = sinon.stub(axios, 'get');
+            // First call (listing) returns in_progress
+            getStub.onFirstCall().resolves({
+                data: {
+                    data: [
+                        {
+                            id: 'resp-456',
+                            status: 'in_progress',
+                            input: {
+                                messages: [{ role: 'user', content: 'Hello' }]
+                            }
+                        }
+                    ]
+                }
+            });
+            // Second call (polling retrieve) returns completed
+            getStub.onSecondCall().resolves({
+                data: {
+                    id: 'resp-456',
+                    status: 'completed',
+                    output: {
+                        choices: [{ message: { content: 'Polled threat response' } }]
+                    }
+                }
+            });
+
+            const aiConfig = {
+                provider: 'bedrock-mantle',
+                apiKey: 'test-key',
+                baseUrl: 'http://localhost:3000',
+                model: 'meta.llama3'
+            };
+
+            const promise = aiController._callAIModel('Hello', [], aiConfig);
+            
+            // Advance the fake timers so the setTimeout completes
+            await clock.tickAsync(2000);
+            
+            const response = await promise;
+            expect(response).to.equal('Polled threat response');
+            
+            expect(getClientStub).to.have.been.calledOnceWith(aiConfig);
+            expect(createStub).to.have.been.calledOnce;
+            expect(getStub).to.have.been.calledTwice;
+            
+            expect(getStub.firstCall.args[0]).to.equal('http://localhost:3000/responses');
+            expect(getStub.secondCall.args[0]).to.equal('http://localhost:3000/responses/resp-456');
+
+            getStub.restore();
+            clock.restore();
         });
     });
 });

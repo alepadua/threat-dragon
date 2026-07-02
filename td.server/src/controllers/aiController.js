@@ -1135,15 +1135,60 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
                         });
                         
                         if (listResponse.data && listResponse.data.data && listResponse.data.data.length > 0) {
-                            const latestCompleted = listResponse.data.data.find(r => r.status === 'completed');
-                            if (latestCompleted) {
-                                logger.info(`[callAIModel] Successfully recovered timed-out response from Bedrock Mantle. Response ID: ${latestCompleted.id}`);
-                                const content = latestCompleted.output?.choices?.[0]?.message?.content || 
-                                                latestCompleted.output?.output_text || 
-                                                latestCompleted.output || '';
-                                if (content) {
-                                    return content;
+                            const matchingResponse = listResponse.data.data.find(r => {
+                                const serialized = JSON.stringify(r);
+                                return serialized.includes(promptText.slice(0, 200));
+                            });
+                            
+                            if (matchingResponse) {
+                                let targetResponse = matchingResponse;
+                                
+                                if (targetResponse.status === 'in_progress' || targetResponse.status === 'pending') {
+                                    logger.info(`[callAIModel] Found matching response ${targetResponse.id} with status ${targetResponse.status}. Polling for completion...`);
+                                    const retrieveUrl = `${aiConfig.baseUrl}/responses/${targetResponse.id}`;
+                                    
+                                    for (let attempt = 1; attempt <= 5; attempt++) {
+                                        /* eslint-disable-next-line no-await-in-loop */
+                                        await new Promise(resolve => setTimeout(resolve, 2000));
+                                        
+                                        try {
+                                            /* eslint-disable-next-line no-await-in-loop */
+                                            const pollResponse = await axios.get(retrieveUrl, {
+                                                headers: {
+                                                    'Authorization': `Bearer ${aiConfig.apiKey}`,
+                                                    'Content-Type': 'application/json'
+                                                },
+                                                timeout: 5000
+                                            });
+                                            if (pollResponse.data) {
+                                                targetResponse = pollResponse.data;
+                                                logger.info(`[callAIModel] Polling attempt ${attempt}: status is ${targetResponse.status}`);
+                                                if (targetResponse.status === 'completed') {
+                                                    break;
+                                                }
+                                                if (targetResponse.status === 'failed') {
+                                                    break;
+                                                }
+                                            }
+                                        } catch (pollErr) {
+                                            logger.error(`[callAIModel] Polling attempt ${attempt} failed: ${pollErr.message}`);
+                                        }
+                                    }
                                 }
+                                
+                                if (targetResponse.status === 'completed') {
+                                    logger.info(`[callAIModel] Successfully recovered timed-out response from Bedrock Mantle. Response ID: ${targetResponse.id}`);
+                                    const content = targetResponse.output?.choices?.[0]?.message?.content || 
+                                                    targetResponse.output?.output_text || 
+                                                    targetResponse.output || '';
+                                    if (content) {
+                                        return content;
+                                    }
+                                } else {
+                                    logger.warn(`[callAIModel] Recovered response ${targetResponse.id} status is ${targetResponse.status}, not completed.`);
+                                }
+                            } else {
+                                logger.warn(`[callAIModel] No matching response found in the recent list for the current prompt.`);
                             }
                         }
                     } catch (recoverErr) {
