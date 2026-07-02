@@ -973,7 +973,24 @@ const splitTextIntoChunks = (text, chunkSize = 1000, overlap = 150) => {
 };
 
 
-const callAIModel = async (promptText, images, aiConfig) => {
+const processStreamLine = (line) => {
+    if (!line.startsWith('data: ')) { return null; }
+    const dataStr = line.slice(6).trim();
+    if (dataStr === '[DONE]') { return null; }
+    try {
+        const parsed = JSON.parse(dataStr);
+        return parsed.choices?.[0]?.delta?.content || '';
+    } catch (err) {
+        return null;
+    }
+};
+
+
+const callAIModel = async (promptText, images, aiConfig, job = null) => {
+    if (job) {
+        job.streamText = '';
+        activeJobs.set(job.jobId, { ...job });
+    }
     try {
         if (aiConfig.provider === 'bedrock-mantle') {
             const messages = [];
@@ -1039,16 +1056,12 @@ const callAIModel = async (promptText, images, aiConfig) => {
                         while ((lineIndex = buffer.indexOf('\n')) !== -1) {
                             const line = buffer.slice(0, lineIndex).trim();
                             buffer = buffer.slice(lineIndex + 1);
-                            if (line.startsWith('data: ')) {
-                                const dataStr = line.slice(6).trim();
-                                if (dataStr !== '[DONE]') {
-                                    try {
-                                        const parsed = JSON.parse(dataStr);
-                                        const content = parsed.choices?.[0]?.delta?.content || '';
-                                        fullContent += content;
-                                    } catch (err) {
-                                        // Ignore json parse errors for incomplete lines or heartbeat comments
-                                    }
+                            const content = processStreamLine(line);
+                            if (content !== null) {
+                                fullContent += content;
+                                if (job) {
+                                    job.streamText = (job.streamText || '') + content;
+                                    activeJobs.set(job.jobId, { ...job });
                                 }
                             }
                         }
@@ -1056,17 +1069,13 @@ const callAIModel = async (promptText, images, aiConfig) => {
 
                     response.data.on('end', () => {
                         // Process any remaining data in the buffer
-                        if (buffer.trim().startsWith('data: ')) {
-                            const dataStr = buffer.trim().slice(6).
-trim();
-                            if (dataStr !== '[DONE]') {
-                                try {
-                                    const parsed = JSON.parse(dataStr);
-                                    const content = parsed.choices?.[0]?.delta?.content || '';
-                                    fullContent += content;
-                                } catch (err) {
-                                    // Ignore
-                                }
+                        const remainingLine = buffer.trim();
+                        const content = processStreamLine(remainingLine);
+                        if (content !== null) {
+                            fullContent += content;
+                            if (job) {
+                                job.streamText = (job.streamText || '') + content;
+                                activeJobs.set(job.jobId, { ...job });
                             }
                         }
                         resolve();
@@ -1859,7 +1868,7 @@ Every object inside the "threats" array of any cell must have:
         job.progress = 35;
         activeJobs.set(job.jobId, { ...job });
 
-        const responseText = await callAIModel(promptText, finalImages, getStageConfig('generator', aiConfig));
+        const responseText = await callAIModel(promptText, finalImages, getStageConfig('generator', aiConfig), job);
 
         if (!responseText) {
             throw new Error('AI API returned an empty response during generation');
@@ -2029,7 +2038,7 @@ Do not wrap the JSON output in markdown formatting.
 
             try {
                 logger.info(`[Job ${job.jobId}] [${criticAgentName}] Auditing model...`);
-                const criticResponseText = await callAIModel(critiquePromptText, [], getStageConfig('critic', aiConfig));
+                const criticResponseText = await callAIModel(critiquePromptText, [], getStageConfig('critic', aiConfig), job);
 
                 if (criticResponseText) {
                     const parsedCritique = extractJson(criticResponseText);
@@ -2069,7 +2078,7 @@ Return ONLY a JSON object containing the keys "threatModel" and "questions" (as 
 `;
 
             try {
-                const revResponseText = await callAIModel(revisionPromptText, finalImages, getStageConfig('revision', aiConfig));
+                const revResponseText = await callAIModel(revisionPromptText, finalImages, getStageConfig('revision', aiConfig), job);
 
                 const parsedRevision = revResponseText ? extractJson(revResponseText) : null;
                 if (parsedRevision && parsedRevision.threatModel) {
@@ -2655,7 +2664,7 @@ Return ONLY the raw JSON object, without any markdown code block formatting.
         job.progress = 50;
         activeJobs.set(job.jobId, { ...job });
 
-        const candidateText = await callAIModel(promptText, [], aiConfig);
+        const candidateText = await callAIModel(promptText, [], aiConfig, job);
         
         if (!candidateText) {
             throw new Error('AI API returned an empty response for deduplication proposals');

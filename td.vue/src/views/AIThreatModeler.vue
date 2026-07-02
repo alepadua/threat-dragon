@@ -398,6 +398,11 @@
                 </div>
                 <b-progress :value="jobProgress" :max="100" show-progress animated variant="warning" class="my-3 mx-auto col-md-8 px-0"></b-progress>
 
+                <div v-if="jobStreamText" class="text-left mx-auto col-md-8 px-3 py-2 border rounded bg-dark text-light mb-3" style="max-height: 200px; overflow-y: auto; font-family: monospace; white-space: pre-wrap; font-size: 0.85rem;">
+                    <div class="small font-weight-bold text-warning border-bottom border-secondary pb-1 mb-2">Live AI Stream Preview</div>
+                    {{ jobStreamText }}
+                </div>
+
                 <div class="progress-steps text-left mx-auto col-md-8 px-0 mt-4">
                     <div
                         v-for="(progressStep, idx) in progressSteps"
@@ -952,6 +957,11 @@
                         Status: <span class="text-success uppercase">{{ jobStatus }}</span> ({{ jobProgress }}%)
                     </div>
                     <b-progress :value="jobProgress" :max="100" show-progress animated variant="success" class="my-3 mx-auto col-md-8 px-0"></b-progress>
+
+                    <div v-if="jobStreamText" class="text-left mx-auto col-md-8 px-3 py-2 border rounded bg-dark text-light mb-3" style="max-height: 200px; overflow-y: auto; font-family: monospace; white-space: pre-wrap; font-size: 0.85rem;">
+                        <div class="small font-weight-bold text-success border-bottom border-secondary pb-1 mb-2">Live AI Stream Preview</div>
+                        {{ jobStreamText }}
+                    </div>
                 </div>
             </b-card>
 
@@ -1383,6 +1393,7 @@ export default {
             jobStatus: '',
             jobProgress: 0,
             jobError: null,
+            jobStreamText: '',
             docs: [], // Array of { name, content }
             images: [], // Array of { name, data } (base64 string)
             progressIndex: 0,
@@ -1613,6 +1624,7 @@ export default {
                 this.jobStatus = job.status;
                 this.jobProgress = job.progress;
                 this.jobError = job.error;
+                this.jobStreamText = job.streamText || '';
 
                 // Dynamically map job.progress to progressIndex
                 if (this.jobProgress < 25) {
@@ -1664,6 +1676,7 @@ export default {
             this.jobProgress = 0;
             this.jobStatus = 'queued';
             this.jobError = null;
+            this.jobStreamText = '';
 
             try {
                 const payload = {
@@ -1727,6 +1740,7 @@ export default {
             this.jobProgress = 0;
             this.jobStatus = 'queued';
             this.jobError = null;
+            this.jobStreamText = '';
 
             try {
                 const payload = {
@@ -2012,6 +2026,7 @@ export default {
             this.jobProgress = 0;
             this.jobStatus = 'queued';
             this.jobError = null;
+            this.jobStreamText = '';
             try {
                 const response = await axios.post(`/api/ai/session/${this.sessionId}/deduplicate-proposals`, {
                     aiProvider: this.form.aiProvider,
