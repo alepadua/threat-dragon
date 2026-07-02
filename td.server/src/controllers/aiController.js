@@ -1119,7 +1119,16 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
                 logger.info(`[callAIModel] Bedrock Mantle response received via OpenAI SDK.`);
                 return response.choices?.[0]?.message?.content || '';
             } catch (err) {
-                if (err.name === 'APITimeoutError' || err.name === 'APIConnectionTimeoutError' || err.message?.toLowerCase().includes('timeout') || err.code === 'ETIMEDOUT') {
+                const errName = err?.name;
+                const errMessage = err?.message;
+                const errCode = err?.code;
+                
+                if (
+                    errName === 'APITimeoutError' || 
+                    errName === 'APIConnectionTimeoutError' || 
+                    errMessage?.toLowerCase().includes('timeout') || 
+                    errCode === 'ETIMEDOUT'
+                ) {
                     logger.warn(`[callAIModel] Bedrock Mantle request timed out. Attempting to recover response from stored state...`);
                     try {
                         const listUrl = `${aiConfig.baseUrl}/responses`;
@@ -1134,10 +1143,10 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
                             timeout: 10000
                         });
                         
-                        if (listResponse.data && listResponse.data.data && listResponse.data.data.length > 0) {
+                        if (listResponse?.data && Array.isArray(listResponse.data.data) && listResponse.data.data.length > 0) {
                             const matchingResponse = listResponse.data.data.find(r => {
                                 const serialized = JSON.stringify(r);
-                                return serialized.includes(promptText.slice(0, 200));
+                                return serialized.includes((promptText || '').slice(0, 200));
                             });
                             
                             if (matchingResponse) {
@@ -1160,7 +1169,7 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
                                                 },
                                                 timeout: 5000
                                             });
-                                            if (pollResponse.data) {
+                                            if (pollResponse?.data) {
                                                 targetResponse = pollResponse.data;
                                                 logger.info(`[callAIModel] Polling attempt ${attempt}: status is ${targetResponse.status}`);
                                                 if (targetResponse.status === 'completed') {
@@ -1171,7 +1180,8 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
                                                 }
                                             }
                                         } catch (pollErr) {
-                                            logger.error(`[callAIModel] Polling attempt ${attempt} failed: ${pollErr.message}`);
+                                            const pollErrMessage = pollErr?.message || String(pollErr);
+                                            logger.error(`[callAIModel] Polling attempt ${attempt} failed: ${pollErrMessage}`);
                                         }
                                     }
                                 }
@@ -1192,7 +1202,8 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
                             }
                         }
                     } catch (recoverErr) {
-                        logger.error(`[callAIModel] Failed to recover response from Bedrock Mantle stored state: ${recoverErr.message}`);
+                        const recoverErrMessage = recoverErr?.message || String(recoverErr);
+                        logger.error(`[callAIModel] Failed to recover response from Bedrock Mantle stored state: ${recoverErrMessage}`);
                     }
                 }
                 throw err;
@@ -2309,10 +2320,11 @@ Return ONLY a JSON object containing the keys "threatModel" and "questions" (as 
         activeJobs.set(job.jobId, { ...job });
 
     } catch (err) {
-        logger.error(`[Job ${job.jobId}] Background generation job failed: ${err.message}`);
+        const errMessage = err?.message || String(err);
+        logger.error(`[Job ${job.jobId}] Background generation job failed: ${errMessage}`);
         job.status = 'failed';
         job.progress = 100;
-        job.error = err.message;
+        job.error = errMessage;
         activeJobs.set(job.jobId, { ...job });
     }
 };
@@ -2791,10 +2803,11 @@ Return ONLY the raw JSON object, without any markdown code block formatting.
         activeJobs.set(job.jobId, { ...job });
 
     } catch (err) {
-        logger.error(`[Job ${job.jobId}] Background deduplication job failed: ${err.message}`);
+        const errMessage = err?.message || String(err);
+        logger.error(`[Job ${job.jobId}] Background deduplication job failed: ${errMessage}`);
         job.status = 'failed';
         job.progress = 100;
-        job.error = err.message;
+        job.error = errMessage;
         activeJobs.set(job.jobId, { ...job });
     }
 };
