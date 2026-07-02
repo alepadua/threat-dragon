@@ -1392,6 +1392,21 @@ const runGenerateJob = async (job, body, activeSession, finalDocs, finalImages, 
         const agentName = !dfdApprovedBool ? 'DFDAgent' : 'ThreatAgent';
         let threatModelApprovedBool = (threatModelApproved === true || threatModelApproved === 'true');
 
+        const customizeStageModels = activeSession && (activeSession.customizeStageModels === true || activeSession.customizeStageModels === 'true');
+        
+        const getStageConfig = (stagePrefix, baseConfig) => {
+            if (!customizeStageModels) {
+                return baseConfig;
+            }
+            const stageModel = activeSession[`${stagePrefix}Model`];
+            const stageExtended = activeSession[`${stagePrefix}ExtendedThinking`];
+            return {
+                ...baseConfig,
+                model: (stageModel && stageModel.trim() !== '') ? stageModel : baseConfig.model,
+                extendedThinking: stageExtended === true || stageExtended === 'true'
+            };
+        };
+
         job.status = 'generating';
         job.progress = 10;
         activeJobs.set(job.jobId, { ...job });
@@ -1844,7 +1859,7 @@ Every object inside the "threats" array of any cell must have:
         job.progress = 35;
         activeJobs.set(job.jobId, { ...job });
 
-        const responseText = await callAIModel(promptText, finalImages, aiConfig);
+        const responseText = await callAIModel(promptText, finalImages, getStageConfig('generator', aiConfig));
 
         if (!responseText) {
             throw new Error('AI API returned an empty response during generation');
@@ -2014,7 +2029,7 @@ Do not wrap the JSON output in markdown formatting.
 
             try {
                 logger.info(`[Job ${job.jobId}] [${criticAgentName}] Auditing model...`);
-                const criticResponseText = await callAIModel(critiquePromptText, [], aiConfig);
+                const criticResponseText = await callAIModel(critiquePromptText, [], getStageConfig('critic', aiConfig));
 
                 if (criticResponseText) {
                     const parsedCritique = extractJson(criticResponseText);
@@ -2054,7 +2069,7 @@ Return ONLY a JSON object containing the keys "threatModel" and "questions" (as 
 `;
 
             try {
-                const revResponseText = await callAIModel(revisionPromptText, finalImages, aiConfig);
+                const revResponseText = await callAIModel(revisionPromptText, finalImages, getStageConfig('revision', aiConfig));
 
                 const parsedRevision = revResponseText ? extractJson(revResponseText) : null;
                 if (parsedRevision && parsedRevision.threatModel) {
@@ -2201,7 +2216,16 @@ const generate = async (req, res) => {
         sessionId,
         dfdApproved,
         threatModelApproved,
-        extendedThinking
+        extendedThinking,
+        customizeStageModels,
+        generatorModel,
+        generatorExtendedThinking,
+        criticModel,
+        criticExtendedThinking,
+        revisionModel,
+        revisionExtendedThinking,
+        deduplicatorModel,
+        deduplicatorExtendedThinking
     } = req.body;
 
     logger.info(`[AI Generate Request] Incoming payload: ${JSON.stringify({
@@ -2216,6 +2240,15 @@ const generate = async (req, res) => {
         dfdApproved,
         threatModelApproved,
         extendedThinking,
+        customizeStageModels,
+        generatorModel,
+        generatorExtendedThinking,
+        criticModel,
+        criticExtendedThinking,
+        revisionModel,
+        revisionExtendedThinking,
+        deduplicatorModel,
+        deduplicatorExtendedThinking,
         hasApiKey: Boolean(clientApiKey),
         apiKeyLength: clientApiKey ? clientApiKey.length : 0
     })}`);
@@ -2285,7 +2318,16 @@ const generate = async (req, res) => {
                     customBaseUrl: aiConfig.baseUrl,
                     customModel: aiConfig.model,
                     apiKey: aiConfig.apiKey,
-                    extendedThinking: aiConfig.extendedThinking
+                    extendedThinking: aiConfig.extendedThinking,
+                    customizeStageModels: customizeStageModels === true || customizeStageModels === 'true',
+                    generatorModel: generatorModel || '',
+                    generatorExtendedThinking: generatorExtendedThinking === true || generatorExtendedThinking === 'true',
+                    criticModel: criticModel || '',
+                    criticExtendedThinking: criticExtendedThinking === true || criticExtendedThinking === 'true',
+                    revisionModel: revisionModel || '',
+                    revisionExtendedThinking: revisionExtendedThinking === true || revisionExtendedThinking === 'true',
+                    deduplicatorModel: deduplicatorModel || '',
+                    deduplicatorExtendedThinking: deduplicatorExtendedThinking === true || deduplicatorExtendedThinking === 'true'
                 });
             }
         }
@@ -2342,7 +2384,16 @@ const generate = async (req, res) => {
                 customBaseUrl: aiConfig.baseUrl || '',
                 customModel: aiConfig.model || '',
                 apiKey: aiConfig.apiKey || '',
-                extendedThinking: aiConfig.extendedThinking
+                extendedThinking: aiConfig.extendedThinking,
+                customizeStageModels: customizeStageModels === true || customizeStageModels === 'true',
+                generatorModel: generatorModel || '',
+                generatorExtendedThinking: generatorExtendedThinking === true || generatorExtendedThinking === 'true',
+                criticModel: criticModel || '',
+                criticExtendedThinking: criticExtendedThinking === true || criticExtendedThinking === 'true',
+                revisionModel: revisionModel || '',
+                revisionExtendedThinking: revisionExtendedThinking === true || revisionExtendedThinking === 'true',
+                deduplicatorModel: deduplicatorModel || '',
+                deduplicatorExtendedThinking: deduplicatorExtendedThinking === true || deduplicatorExtendedThinking === 'true'
             });
             logger.info(`Initialized new RAG session: ${activeSession.sessionId}`);
         }
@@ -2397,6 +2448,16 @@ const getSessionState = (req, res) => {
             refinementHistory: ensureModelMessageInHistory(session.refinementHistory || [], session.questions || [], session.dfdApproved || false),
             dfdApproved: session.dfdApproved || false,
             threatModelApproved: session.threatModelApproved || false,
+            extendedThinking: session.extendedThinking === true || session.extendedThinking === 'true',
+            customizeStageModels: session.customizeStageModels === true || session.customizeStageModels === 'true',
+            generatorModel: session.generatorModel || '',
+            generatorExtendedThinking: session.generatorExtendedThinking === true || session.generatorExtendedThinking === 'true',
+            criticModel: session.criticModel || '',
+            criticExtendedThinking: session.criticExtendedThinking === true || session.criticExtendedThinking === 'true',
+            revisionModel: session.revisionModel || '',
+            revisionExtendedThinking: session.revisionExtendedThinking === true || session.revisionExtendedThinking === 'true',
+            deduplicatorModel: session.deduplicatorModel || '',
+            deduplicatorExtendedThinking: session.deduplicatorExtendedThinking === true || session.deduplicatorExtendedThinking === 'true',
             questionPlan: session.questionPlan ? {
                 methodology: session.questionPlan.methodology,
                 totalQuestions: session.questionPlan.totalQuestions,
@@ -2468,13 +2529,30 @@ const undoRefinement = (req, res) => {
 
 const runDeduplicateJob = async (job, body, session) => {
     try {
-        const { aiProvider, customBaseUrl, customModel, apiKey: clientApiKey } = body;
+        const {
+            aiProvider,
+            customBaseUrl,
+            customModel,
+            apiKey: clientApiKey,
+            customizeStageModels,
+            deduplicatorModel,
+            deduplicatorExtendedThinking
+        } = body;
+
+        const customizeStageModelsVal = customizeStageModels !== undefined ? (customizeStageModels === true || customizeStageModels === 'true') : (session.customizeStageModels === true || session.customizeStageModels === 'true');
+        const dedupModelVal = deduplicatorModel || session.deduplicatorModel;
+        const dedupExtendedVal = deduplicatorExtendedThinking !== undefined ? (deduplicatorExtendedThinking === true || deduplicatorExtendedThinking === 'true') : (session.deduplicatorExtendedThinking === true || session.deduplicatorExtendedThinking === 'true');
+
         const provider = aiProvider || session.aiProvider || 'gemini';
+        const baseModel = customModel || session.customModel || env.get().config.BEDROCK_MANTLE_MODEL;
+        const baseExtendedThinking = body.extendedThinking !== undefined ? (body.extendedThinking === true || body.extendedThinking === 'true') : (session.extendedThinking === true || session.extendedThinking === 'true');
+
         const aiConfig = {
             provider: provider,
             apiKey: clientApiKey || session.apiKey || (provider === 'bedrock-mantle' ? env.get().config.BEDROCK_MANTLE_API_KEY : env.get().config.GEMINI_API_KEY),
             baseUrl: customBaseUrl || session.customBaseUrl || env.get().config.BEDROCK_MANTLE_BASE_URL,
-            model: customModel || session.customModel || env.get().config.BEDROCK_MANTLE_MODEL
+            model: (customizeStageModelsVal && dedupModelVal && dedupModelVal.trim() !== '') ? dedupModelVal : baseModel,
+            extendedThinking: customizeStageModelsVal ? dedupExtendedVal : baseExtendedThinking
         };
 
         logger.info(`[AI Deduplicate Job] Incoming body: ${JSON.stringify({

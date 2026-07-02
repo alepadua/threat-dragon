@@ -131,6 +131,94 @@
                         </b-col>
                     </b-form-row>
 
+                    <b-form-row v-if="form.aiProvider === 'bedrock-mantle'">
+                        <b-col md="12">
+                            <b-form-checkbox
+                                id="customizeStageModels"
+                                v-model="form.customizeStageModels"
+                                class="mb-3 font-weight-bold"
+                            >
+                                Personalizar modelo por etapa (Configurações Avançadas)
+                            </b-form-checkbox>
+                        </b-col>
+                    </b-form-row>
+
+                    <div v-if="form.aiProvider === 'bedrock-mantle' && form.customizeStageModels" class="advanced-stage-models p-3 mb-3 border rounded bg-light">
+                        <h6 class="font-weight-bold mb-3 text-primary">Modelos por Etapa</h6>
+                        
+                        <!-- Etapa 1: Gerador de DFD/Ameaças -->
+                        <b-form-row class="align-items-center mb-2">
+                            <b-col md="3"><span class="font-weight-bold text-secondary small">1. Gerador (DFD/Ameaças)</span></b-col>
+                            <b-col md="6">
+                                <b-form-input
+                                    v-model="form.generatorModel"
+                                    type="text"
+                                    placeholder="meta.llama3-70b-instruct-v1:0 (padrão)"
+                                    class="custom-input form-control-sm"
+                                ></b-form-input>
+                            </b-col>
+                            <b-col md="3">
+                                <b-form-checkbox v-model="form.generatorExtendedThinking" class="small">
+                                    Extended Thinking
+                                </b-form-checkbox>
+                            </b-col>
+                        </b-form-row>
+
+                        <!-- Etapa 2: Auditor / Crítico -->
+                        <b-form-row class="align-items-center mb-2">
+                            <b-col md="3"><span class="font-weight-bold text-secondary small">2. Crítico / Avaliador</span></b-col>
+                            <b-col md="6">
+                                <b-form-input
+                                    v-model="form.criticModel"
+                                    type="text"
+                                    placeholder="meta.llama3-70b-instruct-v1:0 (padrão)"
+                                    class="custom-input form-control-sm"
+                                ></b-form-input>
+                            </b-col>
+                            <b-col md="3">
+                                <b-form-checkbox v-model="form.criticExtendedThinking" class="small">
+                                    Extended Thinking
+                                </b-form-checkbox>
+                            </b-col>
+                        </b-form-row>
+
+                        <!-- Etapa 3: Autocorreção / Revisão -->
+                        <b-form-row class="align-items-center mb-2">
+                            <b-col md="3"><span class="font-weight-bold text-secondary small">3. Autocorreção (Revisão)</span></b-col>
+                            <b-col md="6">
+                                <b-form-input
+                                    v-model="form.revisionModel"
+                                    type="text"
+                                    placeholder="meta.llama3-70b-instruct-v1:0 (padrão)"
+                                    class="custom-input form-control-sm"
+                                ></b-form-input>
+                            </b-col>
+                            <b-col md="3">
+                                <b-form-checkbox v-model="form.revisionExtendedThinking" class="small">
+                                    Extended Thinking
+                                </b-form-checkbox>
+                            </b-col>
+                        </b-form-row>
+
+                        <!-- Etapa 4: Dedup (Otimização) -->
+                        <b-form-row class="align-items-center">
+                            <b-col md="3"><span class="font-weight-bold text-secondary small">4. Dedup (Otimização)</span></b-col>
+                            <b-col md="6">
+                                <b-form-input
+                                    v-model="form.deduplicatorModel"
+                                    type="text"
+                                    placeholder="meta.llama3-70b-instruct-v1:0 (padrão)"
+                                    class="custom-input form-control-sm"
+                                ></b-form-input>
+                            </b-col>
+                            <b-col md="3">
+                                <b-form-checkbox v-model="form.deduplicatorExtendedThinking" class="small">
+                                    Extended Thinking
+                                </b-form-checkbox>
+                            </b-col>
+                        </b-form-row>
+                    </div>
+
                     <b-form-row>
                         <b-col md="12">
                             <b-form-group
@@ -1278,7 +1366,16 @@ export default {
                 aiProvider: 'gemini',
                 customBaseUrl: '',
                 customModel: '',
-                extendedThinking: false
+                extendedThinking: false,
+                customizeStageModels: false,
+                generatorModel: '',
+                generatorExtendedThinking: false,
+                criticModel: '',
+                criticExtendedThinking: false,
+                revisionModel: '',
+                revisionExtendedThinking: false,
+                deduplicatorModel: '',
+                deduplicatorExtendedThinking: false
             },
             sessionId: null,
             evaluation: null,
@@ -1580,7 +1677,16 @@ export default {
                     customBaseUrl: this.form.customBaseUrl,
                     customModel: this.form.customModel,
                     currentModel: this.generatedModel,
-                    extendedThinking: this.form.extendedThinking
+                    extendedThinking: this.form.extendedThinking,
+                    customizeStageModels: this.form.customizeStageModels,
+                    generatorModel: this.form.generatorModel,
+                    generatorExtendedThinking: this.form.generatorExtendedThinking,
+                    criticModel: this.form.criticModel,
+                    criticExtendedThinking: this.form.criticExtendedThinking,
+                    revisionModel: this.form.revisionModel,
+                    revisionExtendedThinking: this.form.revisionExtendedThinking,
+                    deduplicatorModel: this.form.deduplicatorModel,
+                    deduplicatorExtendedThinking: this.form.deduplicatorExtendedThinking
                 };
 
                 const response = await axios.post('/api/ai/threatmodel', payload);
@@ -1636,7 +1742,16 @@ export default {
                     customModel: this.form.customModel,
                     dfdApproved: this.dfdApproved,
                     threatModelApproved: this.threatModelApproved,
-                    extendedThinking: this.form.extendedThinking
+                    extendedThinking: this.form.extendedThinking,
+                    customizeStageModels: this.form.customizeStageModels,
+                    generatorModel: this.form.generatorModel,
+                    generatorExtendedThinking: this.form.generatorExtendedThinking,
+                    criticModel: this.form.criticModel,
+                    criticExtendedThinking: this.form.criticExtendedThinking,
+                    revisionModel: this.form.revisionModel,
+                    revisionExtendedThinking: this.form.revisionExtendedThinking,
+                    deduplicatorModel: this.form.deduplicatorModel,
+                    deduplicatorExtendedThinking: this.form.deduplicatorExtendedThinking
                 };
 
                 const response = await axios.post('/api/ai/threatmodel', payload);
@@ -1860,6 +1975,15 @@ export default {
                 this.form.customModel = result.customModel || '';
                 this.form.apiKey = result.apiKey || '';
                 this.form.extendedThinking = result.extendedThinking === true || result.extendedThinking === 'true';
+                this.form.customizeStageModels = result.customizeStageModels === true || result.customizeStageModels === 'true';
+                this.form.generatorModel = result.generatorModel || '';
+                this.form.generatorExtendedThinking = result.generatorExtendedThinking === true || result.generatorExtendedThinking === 'true';
+                this.form.criticModel = result.criticModel || '';
+                this.form.criticExtendedThinking = result.criticExtendedThinking === true || result.criticExtendedThinking === 'true';
+                this.form.revisionModel = result.revisionModel || '';
+                this.form.revisionExtendedThinking = result.revisionExtendedThinking === true || result.revisionExtendedThinking === 'true';
+                this.form.deduplicatorModel = result.deduplicatorModel || '';
+                this.form.deduplicatorExtendedThinking = result.deduplicatorExtendedThinking === true || result.deduplicatorExtendedThinking === 'true';
                 
                 this.updateLocalState(result);
                 
@@ -1893,7 +2017,16 @@ export default {
                     aiProvider: this.form.aiProvider,
                     customBaseUrl: this.form.customBaseUrl,
                     customModel: this.form.customModel,
-                    apiKey: this.form.apiKey
+                    apiKey: this.form.apiKey,
+                    customizeStageModels: this.form.customizeStageModels,
+                    generatorModel: this.form.generatorModel,
+                    generatorExtendedThinking: this.form.generatorExtendedThinking,
+                    criticModel: this.form.criticModel,
+                    criticExtendedThinking: this.form.criticExtendedThinking,
+                    revisionModel: this.form.revisionModel,
+                    revisionExtendedThinking: this.form.revisionExtendedThinking,
+                    deduplicatorModel: this.form.deduplicatorModel,
+                    deduplicatorExtendedThinking: this.form.deduplicatorExtendedThinking
                 });
                 
                 const jobData = response.data.data;
