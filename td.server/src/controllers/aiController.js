@@ -1155,6 +1155,7 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
                         timeout: 10000
                     };
                     if (agent) {
+                        listAxiosConfig.httpAgent = agent;
                         listAxiosConfig.httpsAgent = agent;
                     }
                     
@@ -1205,6 +1206,7 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
                                             timeout: 5000
                                         };
                                         if (agent) {
+                                            retrieveAxiosConfig.httpAgent = agent;
                                             retrieveAxiosConfig.httpsAgent = agent;
                                         }
                                         /* eslint-disable-next-line no-await-in-loop */
