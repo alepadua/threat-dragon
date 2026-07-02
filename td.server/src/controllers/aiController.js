@@ -1108,15 +1108,50 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
                 requestPayload.reasoning_effort = 'medium';
             }
 
-            const response = await openai.chat.completions.create(
-                requestPayload,
-                {
-                    timeout: REQUEST_TIMEOUT
-                }
-            );
+            try {
+                const response = await openai.chat.completions.create(
+                    requestPayload,
+                    {
+                        timeout: REQUEST_TIMEOUT
+                    }
+                );
 
-            logger.info(`[callAIModel] Bedrock Mantle response received via OpenAI SDK.`);
-            return response.choices?.[0]?.message?.content || '';
+                logger.info(`[callAIModel] Bedrock Mantle response received via OpenAI SDK.`);
+                return response.choices?.[0]?.message?.content || '';
+            } catch (err) {
+                if (err.name === 'APITimeoutError' || err.name === 'APIConnectionTimeoutError' || err.message?.toLowerCase().includes('timeout') || err.code === 'ETIMEDOUT') {
+                    logger.warn(`[callAIModel] Bedrock Mantle request timed out. Attempting to recover response from stored state...`);
+                    try {
+                        const listUrl = `${aiConfig.baseUrl}/responses`;
+                        const listResponse = await axios.get(listUrl, {
+                            headers: {
+                                'Authorization': `Bearer ${aiConfig.apiKey}`,
+                                'Content-Type': 'application/json'
+                            },
+                            params: {
+                                limit: 5
+                            },
+                            timeout: 10000
+                        });
+                        
+                        if (listResponse.data && listResponse.data.data && listResponse.data.data.length > 0) {
+                            const latestCompleted = listResponse.data.data.find(r => r.status === 'completed');
+                            if (latestCompleted) {
+                                logger.info(`[callAIModel] Successfully recovered timed-out response from Bedrock Mantle. Response ID: ${latestCompleted.id}`);
+                                const content = latestCompleted.output?.choices?.[0]?.message?.content || 
+                                                latestCompleted.output?.output_text || 
+                                                latestCompleted.output || '';
+                                if (content) {
+                                    return content;
+                                }
+                            }
+                        }
+                    } catch (recoverErr) {
+                        logger.error(`[callAIModel] Failed to recover response from Bedrock Mantle stored state: ${recoverErr.message}`);
+                    }
+                }
+                throw err;
+            }
         } 
         
         const parts = [];

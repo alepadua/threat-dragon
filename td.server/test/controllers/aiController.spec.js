@@ -509,5 +509,46 @@ describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
             });
             expect(callArgs[0].reasoning_effort).to.equal('medium');
         });
+
+        it('should recover response from Bedrock Mantle on timeout', async () => {
+            const timeoutError = new Error('Request timed out');
+            timeoutError.name = 'APITimeoutError';
+            createStub.rejects(timeoutError);
+            
+            const getStub = sinon.stub(axios, 'get').resolves({
+                data: {
+                    data: [
+                        {
+                            id: 'resp-123',
+                            status: 'completed',
+                            output: {
+                                choices: [{ message: { content: 'Recovered threat response' } }]
+                            }
+                        }
+                    ]
+                }
+            });
+
+            const aiConfig = {
+                provider: 'bedrock-mantle',
+                apiKey: 'test-key',
+                baseUrl: 'http://localhost:3000',
+                model: 'meta.llama3'
+            };
+
+            const response = await aiController._callAIModel('Hello', [], aiConfig);
+            expect(response).to.equal('Recovered threat response');
+            
+            expect(getClientStub).to.have.been.calledOnceWith(aiConfig);
+            expect(createStub).to.have.been.calledOnce;
+            expect(getStub).to.have.been.calledOnce;
+            
+            const getCallArgs = getStub.firstCall.args;
+            expect(getCallArgs[0]).to.equal('http://localhost:3000/responses');
+            expect(getCallArgs[1].headers.Authorization).to.equal('Bearer test-key');
+            expect(getCallArgs[1].params.limit).to.equal(5);
+
+            getStub.restore();
+        });
     });
 });
