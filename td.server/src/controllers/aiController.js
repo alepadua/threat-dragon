@@ -1145,8 +1145,10 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
                         
                         if (listResponse?.data && Array.isArray(listResponse.data.data) && listResponse.data.data.length > 0) {
                             const matchingResponse = listResponse.data.data.find(r => {
-                                const serialized = JSON.stringify(r);
-                                return serialized.includes((promptText || '').slice(0, 200));
+                                const serializedNormalized = (JSON.stringify(r) || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                                const targetSlice = (promptText || '');
+                                const promptNormalized = targetSlice.slice(0, Math.min(targetSlice.length, 200)).toLowerCase().replace(/[^a-z0-9]/g, '');
+                                return serializedNormalized.includes(promptNormalized);
                             });
                             
                             if (matchingResponse) {
