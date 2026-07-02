@@ -3,6 +3,7 @@ import { DOMMatrix } from '@napi-rs/canvas';
 import { PDFParse } from 'pdf-parse';
 import aiContextStore from '../helpers/aiContextStore.js';
 import axios from 'axios';
+import OpenAI from 'openai';
 import { badRequest, serverError } from './errors.js';
 import env from '../env/Env.js';
 import loggerHelper from '../helpers/logger.helper.js';
@@ -1052,15 +1053,12 @@ const splitTextIntoChunks = (text, chunkSize = 1000, overlap = 150) => {
 };
 
 
-const processStreamLine = (line) => {
-    if (!line.startsWith('data: ')) { return null; }
-    const dataStr = line.slice(6).trim();
-    if (dataStr === '[DONE]') { return null; }
-    try {
-        const parsed = JSON.parse(dataStr);
-        return parsed.choices?.[0]?.delta?.content || '';
-    } catch (err) {
-        return null;
+const clientFactory = {
+    getOpenAIClient(aiConfig) {
+        return new OpenAI({
+            apiKey: aiConfig.apiKey,
+            baseURL: aiConfig.baseUrl
+        });
     }
 };
 
@@ -1093,8 +1091,8 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
 
             messages.push({ role: 'user', content: userContent });
 
-            const url = `${aiConfig.baseUrl}/chat/completions`;
-            logger.info(`[callAIModel] Bedrock Mantle sending POST request to URL: ${url}`);
+            const openai = clientFactory.getOpenAIClient(aiConfig);
+            logger.info(`[callAIModel] Bedrock Mantle sending chat completion request via OpenAI SDK to base URL: ${aiConfig.baseUrl}`);
 
             const requestPayload = {
                 model: aiConfig.model || 'meta.llama3-70b-instruct-v1:0',
@@ -1110,68 +1108,15 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
                 requestPayload.reasoning_effort = 'medium';
             }
 
-            const response = await axios.post(
-                url,
-                { ...requestPayload, stream: true },
+            const response = await openai.chat.completions.create(
+                requestPayload,
                 {
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${aiConfig.apiKey}` },
-                    timeout: REQUEST_TIMEOUT,
-                    responseType: 'stream'
+                    timeout: REQUEST_TIMEOUT
                 }
             );
 
-            logger.info(`[callAIModel] Bedrock Mantle response status: ${response.status}`);
-
-            // Check if the response is a stream (e.g. has 'on' method)
-            if (response.data && typeof response.data.on === 'function') {
-                let fullContent = '';
-                let buffer = '';
-
-                await new Promise((resolve, reject) => {
-                    response.data.on('data', (chunk) => {
-                        const str = chunk.toString();
-                        buffer += str;
-                        let lineIndex;
-                        while ((lineIndex = buffer.indexOf('\n')) !== -1) {
-                            const line = buffer.slice(0, lineIndex).trim();
-                            buffer = buffer.slice(lineIndex + 1);
-                            const content = processStreamLine(line);
-                            if (content !== null) {
-                                fullContent += content;
-                                if (job) {
-                                    job.streamText = (job.streamText || '') + content;
-                                    activeJobs.set(job.jobId, { ...job });
-                                }
-                            }
-                        }
-                    });
-
-                    response.data.on('end', () => {
-                        // Process any remaining data in the buffer
-                        const remainingLine = buffer.trim();
-                        const content = processStreamLine(remainingLine);
-                        if (content !== null) {
-                            fullContent += content;
-                            if (job) {
-                                job.streamText = (job.streamText || '') + content;
-                                activeJobs.set(job.jobId, { ...job });
-                            }
-                        }
-                        resolve();
-                    });
-
-                    response.data.on('error', (err) => {
-                        reject(err);
-                    });
-                });
-
-                logger.info(`[callAIModel] Bedrock Mantle stream read complete. Content length: ${fullContent.length}`);
-                return fullContent;
-            } 
-                // Fallback for non-streamed responses (e.g. in test mock environments)
-                logger.info('[callAIModel] Bedrock Mantle response is not a stream, falling back to standard parsing');
-                return response.data?.choices?.[0]?.message?.content || '';
-            
+            logger.info(`[callAIModel] Bedrock Mantle response received via OpenAI SDK.`);
+            return response.choices?.[0]?.message?.content || '';
         } 
         
         const parts = [];
@@ -1243,20 +1188,16 @@ const getEmbeddingsBatch = async (chunks, aiConfig) => {
     for (let i = 0; i < chunks.length; i += batchSize) {
         const slice = chunks.slice(i, i + batchSize);
         if (aiConfig.provider === 'bedrock-mantle') {
+            const openai = clientFactory.getOpenAIClient(aiConfig);
             /* eslint-disable-next-line no-await-in-loop */
-            const response = await axios.post(
-                `${aiConfig.baseUrl}/embeddings`,
-                {
-                    model: aiConfig.embeddingModel || 'amazon.titan-embed-text-v1',
-                    input: slice
-                },
-                {
-                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${aiConfig.apiKey}` },
-                    timeout: 30000
-                }
-            );
-            if (response.data && response.data.data) {
-                response.data.data.forEach((emb) => {
+            const response = await openai.embeddings.create({
+                model: aiConfig.embeddingModel || 'amazon.titan-embed-text-v1',
+                input: slice
+            }, {
+                timeout: 30000
+            });
+            if (response && response.data) {
+                response.data.forEach((emb) => {
                     allEmbeddings.push(emb.embedding);
                 });
             }
@@ -1290,19 +1231,15 @@ const getEmbeddingsBatch = async (chunks, aiConfig) => {
 
 const getEmbedding = async (text, aiConfig) => {
     if (aiConfig.provider === 'bedrock-mantle') {
-        const response = await axios.post(
-            `${aiConfig.baseUrl}/embeddings`,
-            {
-                model: aiConfig.embeddingModel || 'amazon.titan-embed-text-v1',
-                input: text
-            },
-            {
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${aiConfig.apiKey}` },
-                timeout: 20000
-            }
-        );
-        if (response.data && response.data.data && response.data.data[0]) {
-            return response.data.data[0].embedding;
+        const openai = clientFactory.getOpenAIClient(aiConfig);
+        const response = await openai.embeddings.create({
+            model: aiConfig.embeddingModel || 'amazon.titan-embed-text-v1',
+            input: text
+        }, {
+            timeout: 20000
+        });
+        if (response && response.data && response.data[0]) {
+            return response.data[0].embedding;
         }
     } else {
         const response = await axios.post(
@@ -3011,5 +2948,6 @@ export default {
     _mergeControlsAssessment: mergeControlsAssessment,
     _applyDeduplicationChanges: applyDeduplicationChanges,
     _extractJson: extractJson,
-    _callAIModel: callAIModel
+    _callAIModel: callAIModel,
+    _clientFactory: clientFactory
 };

@@ -447,18 +447,27 @@ describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
     });
 
     describe('_callAIModel', () => {
-        let postStub;
+        let getClientStub;
+        let createStub;
 
         beforeEach(() => {
-            postStub = sinon.stub(axios, 'post');
+            createStub = sinon.stub();
+            const mockOpenAI = {
+                chat: {
+                    completions: {
+                        create: createStub
+                    }
+                }
+            };
+            getClientStub = sinon.stub(aiController._clientFactory, 'getOpenAIClient').returns(mockOpenAI);
         });
 
         afterEach(() => {
-            postStub.restore();
+            getClientStub.restore();
         });
 
         it('should call Bedrock Mantle without thinking block if extendedThinking is false/undefined', async () => {
-            postStub.resolves({ status: 200, data: { choices: [{ message: { content: 'Threat response' } }] } });
+            createStub.resolves({ choices: [{ message: { content: 'Threat response' } }] });
             
             const aiConfig = {
                 provider: 'bedrock-mantle',
@@ -470,15 +479,15 @@ describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
             const response = await aiController._callAIModel('Hello', [], aiConfig);
             expect(response).to.equal('Threat response');
             
-            expect(postStub).to.have.been.calledOnce;
-            const callArgs = postStub.firstCall.args;
-            expect(callArgs[0]).to.equal('http://localhost:3000/chat/completions');
-            expect(callArgs[1].thinking).to.be.undefined;
-            expect(callArgs[1].reasoning_effort).to.be.undefined;
+            expect(getClientStub).to.have.been.calledOnceWith(aiConfig);
+            expect(createStub).to.have.been.calledOnce;
+            const callArgs = createStub.firstCall.args;
+            expect(callArgs[0].thinking).to.be.undefined;
+            expect(callArgs[0].reasoning_effort).to.be.undefined;
         });
 
         it('should inject thinking and reasoning_effort blocks into Bedrock Mantle payload if extendedThinking is true', async () => {
-            postStub.resolves({ status: 200, data: { choices: [{ message: { content: 'Threat response' } }] } });
+            createStub.resolves({ choices: [{ message: { content: 'Threat response' } }] });
             
             const aiConfig = {
                 provider: 'bedrock-mantle',
@@ -491,13 +500,14 @@ describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
             const response = await aiController._callAIModel('Hello', [], aiConfig);
             expect(response).to.equal('Threat response');
             
-            expect(postStub).to.have.been.calledOnce;
-            const callArgs = postStub.firstCall.args;
-            expect(callArgs[1].thinking).to.deep.equal({
+            expect(getClientStub).to.have.been.calledOnceWith(aiConfig);
+            expect(createStub).to.have.been.calledOnce;
+            const callArgs = createStub.firstCall.args;
+            expect(callArgs[0].thinking).to.deep.equal({
                 type: 'enabled',
                 budget_tokens: 2048
             });
-            expect(callArgs[1].reasoning_effort).to.equal('medium');
+            expect(callArgs[0].reasoning_effort).to.equal('medium');
         });
     });
 });

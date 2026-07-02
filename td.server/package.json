@@ -50,6 +50,7 @@
     "jsonwebtoken": "^9.0.3",
     "mammoth": "^1.12.0",
     "octonode": "^0.10.2",
+    "openai": "^6.45.0",
     "pdf-parse": "^2.4.5",
     "serve-favicon": "^2.5.0",
     "winston": "^3.8.2"
