@@ -1156,7 +1156,23 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
                         listAxiosConfig.httpsAgent = agent;
                     }
                     
-                    const listResponse = await axios.get(listUrl, listAxiosConfig);
+                    let listResponse = null;
+                    for (let attempt = 1; attempt <= 3; attempt++) {
+                        try {
+                            listResponse = await axios.get(listUrl, listAxiosConfig);
+                            break;
+                        } catch (listErr) {
+                            const listErrMessage = listErr?.message || String(listErr);
+                            logger.warn(`[callAIModel] Attempt ${attempt} to list responses from URL ${listUrl} failed: ${listErrMessage}`);
+                            if (attempt < 3) {
+                                logger.info(`[callAIModel] Waiting 2 seconds before retrying list responses...`);
+                                /* eslint-disable-next-line no-await-in-loop */
+                                await new Promise(resolve => setTimeout(resolve, 2000));
+                            } else {
+                                throw listErr;
+                            }
+                        }
+                    }
                     
                     if (listResponse?.data && Array.isArray(listResponse.data.data) && listResponse.data.data.length > 0) {
                         const matchingResponse = listResponse.data.data.find(r => {
