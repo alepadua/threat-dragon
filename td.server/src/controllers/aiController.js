@@ -1213,10 +1213,23 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
         logger.error(`[callAIModel] HTTP/API Request Failed: ${err.message}`);
         if (err.response) {
             logger.error(`[callAIModel] Error Response Status: ${err.response.status}`);
-            logger.error(`[callAIModel] Error Response Headers: ${JSON.stringify(err.response.headers)}`);
-            logger.error(`[callAIModel] Error Response Data: ${JSON.stringify(err.response.data)}`);
+            try {
+                logger.error(`[callAIModel] Error Response Headers: ${JSON.stringify(err.response.headers)}`);
+            } catch (e) {
+                logger.error(`[callAIModel] Error Response Headers: [Could not serialize]`);
+            }
+            try {
+                // err.response.data may be a stream (circular) when responseType is 'stream'
+                const data = typeof err.response.data === 'object' && typeof err.response.data?.on === 'function'
+                    ? '[Stream - not serializable]'
+                    : JSON.stringify(err.response.data);
+                logger.error(`[callAIModel] Error Response Data: ${data}`);
+            } catch (e) {
+                logger.error(`[callAIModel] Error Response Data: [Could not serialize]`);
+            }
         } else if (err.request) {
-            logger.error(`[callAIModel] Request was sent but no response was received: ${JSON.stringify(err.request)}`);
+            // err.request is an http.ClientRequest with circular references (socket -> parser -> socket)
+            logger.error(`[callAIModel] Request was sent but no response was received (possible timeout or network error).`);
         }
         throw err;
     }
