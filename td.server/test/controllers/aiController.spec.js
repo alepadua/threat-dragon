@@ -288,6 +288,16 @@ describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
             expect(parsed.threatModel.detail.diagrams[0].cells[0].data.cell).to.equal('b20f4d68');
         });
 
+        it('should successfully repair truncated JSON cut off mid-key name at the end of generation', () => {
+            const json = '{"threatModel":{"version":"2.0.0","summary":{"title":"Teste"},"detail":{"reviewer":"AI Threat Modeler","diagrams":[{"id":0,"cells":[{"id":"a1","shape":"actor","data":{"cell":"b20f4d68","hasOpenThreat';
+            const parsed = aiController._extractJson(json);
+            expect(parsed).to.have.property('threatModel');
+            expect(parsed.threatModel.version).to.equal('2.0.0');
+            expect(parsed.threatModel.detail.diagrams[0].cells[0].data.cell).to.equal('b20f4d68');
+            expect(parsed.threatModel.detail.diagrams[0].cells[0].data).not.to.have.property('hasOpenThreat');
+        });
+
+
         it('should heal cell references in diagram edges/flows when source/target IDs are mismatched or invalid', () => {
             const jsonObj = {
                 threatModel: {
@@ -338,6 +348,101 @@ describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
             
             const discarded = cells.find(c => c.id === 'edge-2');
             expect(discarded).not.to.exist;
+        });
+
+        it('should preserve trust boundary curves and not discard them during cell healing', () => {
+            const jsonObj = {
+                threatModel: {
+                    version: "2.0.0",
+                    detail: {
+                        diagrams: [
+                            {
+                                cells: [
+                                    {
+                                        id: "boundary-1",
+                                        shape: "trust-boundary-curve",
+                                        source: { x: 80, y: 220 },
+                                        target: { x: 295, y: 51 },
+                                        data: { name: "Boundary" }
+                                    },
+                                    {
+                                        id: "node-1",
+                                        shape: "process",
+                                        data: { name: "Some Process" }
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            };
+            const json = JSON.stringify(jsonObj);
+            const parsed = aiController._extractJson(json);
+            
+            const cells = parsed.threatModel.detail.diagrams[0].cells;
+            expect(cells).to.have.lengthOf(2);
+            
+            const boundary = cells.find(c => c.id === 'boundary-1');
+            expect(boundary).to.exist;
+            expect(boundary.source.x).to.equal(80);
+            expect(boundary.target.x).to.equal(295);
+        });
+
+        it('should fix bracket transpositions where LLM produces }}]} instead of }}}] in labels', () => {
+            const jsonStr = '```json\n' + JSON.stringify({
+                threatModel: {
+                    version: "2.0.0",
+                    detail: {
+                        diagrams: [{
+                            cells: [
+                                {
+                                    id: "node-1",
+                                    shape: "process",
+                                    data: { name: "Service A" }
+                                },
+                                {
+                                    id: "node-2",
+                                    shape: "process",
+                                    data: { name: "Service B" }
+                                }
+                            ]
+                        }]
+                    }
+                }
+            }).replace(
+                // Simulate the LLM's bracket error in the raw string
+                '"cells":[',
+                '"cells":['
+            ) + '\n```';
+
+            // Now create a version with the broken labels pattern injected
+            const brokenJson = `\`\`\`json
+{
+  "threatModel": {
+    "version": "2.0.0",
+    "detail": {
+      "diagrams": [{
+        "cells": [
+          {"id": "n1", "shape": "process", "data": {"name": "Svc A"}},
+          {"id": "n2", "shape": "process", "data": {"name": "Svc B"}},
+          {
+            "id": "f1", "shape": "flow",
+            "source": {"cell": "n1"}, "target": {"cell": "n2"},
+            "labels": [{"attrs": {"labelText": {"text": "Metrics"}}]},
+            "data": {"type": "tm.Flow"}
+          }
+        ]
+      }]
+    }
+  }
+}
+\`\`\``;
+            const parsed = aiController._extractJson(brokenJson);
+            expect(parsed).to.have.property('threatModel');
+            const cells = parsed.threatModel.detail.diagrams[0].cells;
+            const flow = cells.find(c => c.id === 'f1');
+            expect(flow).to.exist;
+            expect(flow.data.type).to.equal('tm.Flow');
         });
     });
 

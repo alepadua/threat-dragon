@@ -182,17 +182,21 @@ const healDiagramCells = (cells) => {
         const sourceCellId = edge.source?.cell;
         const targetCellId = edge.target?.cell;
 
-        if (sourceCellId && targetCellId) {
-            const finalSourceId = resolveReference(sourceCellId);
-            const finalTargetId = resolveReference(targetCellId);
+        if (sourceCellId || targetCellId) {
+            const finalSourceId = sourceCellId ? resolveReference(sourceCellId) : null;
+            const finalTargetId = targetCellId ? resolveReference(targetCellId) : null;
 
-            if (finalSourceId && finalTargetId) {
-                edge.source.cell = finalSourceId;
-                edge.target.cell = finalTargetId;
+            if ((!sourceCellId || finalSourceId) && (!targetCellId || finalTargetId)) {
+                if (sourceCellId) { edge.source.cell = finalSourceId; }
+                if (targetCellId) { edge.target.cell = finalTargetId; }
                 healedEdges.push(edge);
             } else {
                 logger.warn(`[healDiagramCells] Discarding edge "${edge.id || 'unnamed'}" because source (${sourceCellId} -> ${finalSourceId}) or target (${targetCellId} -> ${finalTargetId}) does not exist.`);
             }
+        } else {
+            // It's a trust boundary curve (points to coordinates) or similar.
+            // Just preserve it!
+            healedEdges.push(edge);
         }
     });
 
@@ -312,6 +316,48 @@ const escapeInternalQuotes = (str) => {
     return result;
 };
 
+const fixBracketTranspositions = (str) => {
+    // Fix a common LLM bracket error: `]}` outside strings should be `}]`.
+    // The LLM sometimes produces `"text"}}]}` instead of `"text"}}}]`,
+    // transposing the `]` and `}` closers for deeply nested label objects.
+    let result = '';
+    let inString = false;
+    let escaped = false;
+    let i = 0;
+
+    while (i < str.length) {
+        const c = str[i];
+
+        if (inString) {
+            result += c;
+            if (c === '\\') {
+                escaped = !escaped;
+            } else if (c === '"' && !escaped) {
+                inString = false;
+            } else {
+                escaped = false;
+            }
+            i++;
+        } else if (c === '"') {
+            inString = true;
+            escaped = false;
+            result += c;
+            i++;
+        } else if (c === '}' && i + 2 < str.length && str[i + 1] === ']' && str[i + 2] === '}') {
+            // Swap `]}` to `}]`: emit `}}]` instead of `]}`
+            result += '}';
+            result += '}';
+            result += ']';
+            i += 3;
+        } else {
+            result += c;
+            i++;
+        }
+    }
+
+    return result;
+};
+
 const getErrorPosition = (err) => {
     const match = err.message.match(/position\s+(?<position>\d+)/iu);
     if (match && match.groups && match.groups.position) {
@@ -332,11 +378,7 @@ const tryParse = (text) => {
     }
 };
 
-/**
- * Attempt to repair truncated JSON by closing open strings, arrays, and objects.
- * This handles LLM responses cut off mid-output due to max_tokens limits.
- */
-const repairTruncatedJson = (text) => {
+const _rawRepairTruncatedJson = (text) => {
     let repaired = text.trimEnd();
     // If the JSON ends mid-string, close the string
     let inString = false;
@@ -379,11 +421,42 @@ const repairTruncatedJson = (text) => {
     }
 
     // Close all remaining open structures
-    while (stack.length > 0) {
-        repaired += stack.pop();
+    let closed = repaired;
+    const revStack = [...stack];
+    while (revStack.length > 0) {
+        closed += revStack.pop();
     }
-    return repaired;
+    return closed;
 };
+
+const repairTruncatedJson = (text) => {
+    // Try without backtracking first
+    try {
+        const firstTry = _rawRepairTruncatedJson(text);
+        JSON.parse(escapeControlCharsInStrings(escapeInternalQuotes(firstTry)));
+        return firstTry;
+    } catch (e) {
+        // Fall back to backtracking
+    }
+
+    // Backtrack character-by-character from the end
+    // We only need to backtrack up to a reasonable limit (e.g. 2000 chars)
+    const maxBacktrack = Math.min(text.length, 2000);
+    for (let offset = 1; offset <= maxBacktrack; offset++) {
+        const candidate = text.slice(0, text.length - offset);
+        try {
+            const repaired = _rawRepairTruncatedJson(candidate);
+            JSON.parse(escapeControlCharsInStrings(escapeInternalQuotes(repaired)));
+            return repaired;
+        } catch (e) {
+            // Keep backtracking
+        }
+    }
+
+    // If all else fails, return the original repair attempt (which will throw)
+    return _rawRepairTruncatedJson(text);
+};
+
 
 const _rawExtractJson = (str) => {
     const cleaned = cleanJson(str);
@@ -392,7 +465,13 @@ const _rawExtractJson = (str) => {
         return parsedCleaned;
     }
 
-    const parsedMismatched = tryParse(repairMismatchedBrackets(cleaned));
+    const transpositionFixed = fixBracketTranspositions(cleaned);
+    const parsedTransposed = tryParse(transpositionFixed);
+    if (parsedTransposed) {
+        return parsedTransposed;
+    }
+
+    const parsedMismatched = tryParse(repairMismatchedBrackets(transpositionFixed));
     if (parsedMismatched) {
         return parsedMismatched;
     }
