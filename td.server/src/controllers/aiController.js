@@ -9,12 +9,21 @@ import env from '../env/Env.js';
 import loggerHelper from '../helpers/logger.helper.js';
 import mammoth from 'mammoth';
 import questionPlanningEngine from '../helpers/questionPlanningEngine.js';
+import { HttpsProxyAgent } from 'https-proxy-agent';
 
 // Polyfill DOMMatrix for pdfjs-dist used by pdf-parse
 global.DOMMatrix = DOMMatrix;
 
 const logger = loggerHelper.get('controllers/aiController.js');
 const REQUEST_TIMEOUT = parseInt(process.env.AI_REQUEST_TIMEOUT, 10) || 300000;
+
+const getProxyAgent = () => {
+    const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy || process.env.HTTP_PROXY || process.env.http_proxy;
+    if (proxyUrl) {
+        return new HttpsProxyAgent(proxyUrl);
+    }
+    return null;
+};
 
 const parseBase64Image = (dataUri) => {
     const matches = dataUri.match(/^data:(?<mime>[a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(?<data>.+)$/u);
@@ -1055,10 +1064,15 @@ const splitTextIntoChunks = (text, chunkSize = 1000, overlap = 150) => {
 
 const clientFactory = {
     getOpenAIClient(aiConfig) {
-        return new OpenAI({
+        const agent = getProxyAgent();
+        const options = {
             apiKey: aiConfig.apiKey,
             baseURL: aiConfig.baseUrl
-        });
+        };
+        if (agent) {
+            options.httpAgent = agent;
+        }
+        return new OpenAI(options);
     }
 };
 
@@ -1126,7 +1140,9 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
                 try {
                     const listUrl = `${aiConfig.baseUrl}/responses`;
                     logger.info(`[callAIModel] Attempting to list responses from URL: ${listUrl}`);
-                    const listResponse = await axios.get(listUrl, {
+                    
+                    const agent = getProxyAgent();
+                    const listAxiosConfig = {
                         headers: {
                             'Authorization': `Bearer ${aiConfig.apiKey}`,
                             'Content-Type': 'application/json'
@@ -1135,7 +1151,12 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
                             limit: 5
                         },
                         timeout: 10000
-                    });
+                    };
+                    if (agent) {
+                        listAxiosConfig.httpsAgent = agent;
+                    }
+                    
+                    const listResponse = await axios.get(listUrl, listAxiosConfig);
                     
                     if (listResponse?.data && Array.isArray(listResponse.data.data) && listResponse.data.data.length > 0) {
                         const matchingResponse = listResponse.data.data.find(r => {
@@ -1158,14 +1179,18 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
                                     await new Promise(resolve => setTimeout(resolve, 5000));
                                     
                                     try {
-                                        /* eslint-disable-next-line no-await-in-loop */
-                                        const pollResponse = await axios.get(retrieveUrl, {
+                                        const retrieveAxiosConfig = {
                                             headers: {
                                                 'Authorization': `Bearer ${aiConfig.apiKey}`,
                                                 'Content-Type': 'application/json'
                                             },
                                             timeout: 5000
-                                        });
+                                        };
+                                        if (agent) {
+                                            retrieveAxiosConfig.httpsAgent = agent;
+                                        }
+                                        /* eslint-disable-next-line no-await-in-loop */
+                                        const pollResponse = await axios.get(retrieveUrl, retrieveAxiosConfig);
                                         if (pollResponse?.data) {
                                             targetResponse = pollResponse.data;
                                             logger.info(`[callAIModel] Polling attempt ${attempt} for URL ${retrieveUrl}: status is ${targetResponse.status}`);
