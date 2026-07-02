@@ -1152,7 +1152,8 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
                         params: {
                             limit: 5
                         },
-                        timeout: 10000
+                        timeout: 10000,
+                        proxy: false
                     };
                     if (agent) {
                         listAxiosConfig.httpAgent = agent;
@@ -1203,7 +1204,8 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
                                                 'Authorization': `Bearer ${aiConfig.apiKey}`,
                                                 'Content-Type': 'application/json'
                                             },
-                                            timeout: 5000
+                                            timeout: 5000,
+                                            proxy: false
                                         };
                                         if (agent) {
                                             retrieveAxiosConfig.httpAgent = agent;
