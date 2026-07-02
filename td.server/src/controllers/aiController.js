@@ -1121,94 +1121,86 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
             } catch (err) {
                 const errName = err?.name;
                 const errMessage = err?.message;
-                const errCode = err?.code;
                 
-                if (
-                    errName === 'APITimeoutError' || 
-                    errName === 'APIConnectionTimeoutError' || 
-                    errMessage?.toLowerCase().includes('timeout') || 
-                    errCode === 'ETIMEDOUT'
-                ) {
-                    logger.warn(`[callAIModel] Bedrock Mantle request timed out calling ${aiConfig.baseUrl}/chat/completions. Attempting to recover response from stored state...`);
-                    try {
-                        const listUrl = `${aiConfig.baseUrl}/responses`;
-                        logger.info(`[callAIModel] Attempting to list responses from URL: ${listUrl}`);
-                        const listResponse = await axios.get(listUrl, {
-                            headers: {
-                                'Authorization': `Bearer ${aiConfig.apiKey}`,
-                                'Content-Type': 'application/json'
-                            },
-                            params: {
-                                limit: 5
-                            },
-                            timeout: 10000
+                logger.warn(`[callAIModel] Bedrock Mantle request to ${aiConfig.baseUrl}/chat/completions failed with error: ${errMessage} (${errName}). Attempting to recover response from stored state...`);
+                try {
+                    const listUrl = `${aiConfig.baseUrl}/responses`;
+                    logger.info(`[callAIModel] Attempting to list responses from URL: ${listUrl}`);
+                    const listResponse = await axios.get(listUrl, {
+                        headers: {
+                            'Authorization': `Bearer ${aiConfig.apiKey}`,
+                            'Content-Type': 'application/json'
+                        },
+                        params: {
+                            limit: 5
+                        },
+                        timeout: 10000
+                    });
+                    
+                    if (listResponse?.data && Array.isArray(listResponse.data.data) && listResponse.data.data.length > 0) {
+                        const matchingResponse = listResponse.data.data.find(r => {
+                            const serializedNormalized = (JSON.stringify(r) || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                            const targetSlice = (promptText || '');
+                            const promptNormalized = targetSlice.slice(0, Math.min(targetSlice.length, 200)).toLowerCase().replace(/[^a-z0-9]/g, '');
+                            return serializedNormalized.includes(promptNormalized);
                         });
                         
-                        if (listResponse?.data && Array.isArray(listResponse.data.data) && listResponse.data.data.length > 0) {
-                            const matchingResponse = listResponse.data.data.find(r => {
-                                const serializedNormalized = (JSON.stringify(r) || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-                                const targetSlice = (promptText || '');
-                                const promptNormalized = targetSlice.slice(0, Math.min(targetSlice.length, 200)).toLowerCase().replace(/[^a-z0-9]/g, '');
-                                return serializedNormalized.includes(promptNormalized);
-                            });
+                        if (matchingResponse) {
+                            let targetResponse = matchingResponse;
                             
-                            if (matchingResponse) {
-                                let targetResponse = matchingResponse;
+                            if (targetResponse.status === 'in_progress' || targetResponse.status === 'pending') {
+                                logger.info(`[callAIModel] Found matching response ${targetResponse.id} with status ${targetResponse.status}. Polling for completion...`);
+                                const retrieveUrl = `${aiConfig.baseUrl}/responses/${targetResponse.id}`;
+                                logger.info(`[callAIModel] Attempting to retrieve individual response from URL: ${retrieveUrl}`);
                                 
-                                if (targetResponse.status === 'in_progress' || targetResponse.status === 'pending') {
-                                    logger.info(`[callAIModel] Found matching response ${targetResponse.id} with status ${targetResponse.status}. Polling for completion...`);
-                                    const retrieveUrl = `${aiConfig.baseUrl}/responses/${targetResponse.id}`;
-                                    logger.info(`[callAIModel] Attempting to retrieve individual response from URL: ${retrieveUrl}`);
+                                for (let attempt = 1; attempt <= 20; attempt++) {
+                                    /* eslint-disable-next-line no-await-in-loop */
+                                    await new Promise(resolve => setTimeout(resolve, 5000));
                                     
-                                    for (let attempt = 1; attempt <= 20; attempt++) {
+                                    try {
                                         /* eslint-disable-next-line no-await-in-loop */
-                                        await new Promise(resolve => setTimeout(resolve, 5000));
-                                        
-                                        try {
-                                            /* eslint-disable-next-line no-await-in-loop */
-                                            const pollResponse = await axios.get(retrieveUrl, {
-                                                headers: {
-                                                    'Authorization': `Bearer ${aiConfig.apiKey}`,
-                                                    'Content-Type': 'application/json'
-                                                },
-                                                timeout: 5000
-                                            });
-                                            if (pollResponse?.data) {
-                                                targetResponse = pollResponse.data;
-                                                logger.info(`[callAIModel] Polling attempt ${attempt} for URL ${retrieveUrl}: status is ${targetResponse.status}`);
-                                                if (targetResponse.status === 'completed') {
-                                                    break;
-                                                }
-                                                if (targetResponse.status === 'failed') {
-                                                    break;
-                                                }
+                                        const pollResponse = await axios.get(retrieveUrl, {
+                                            headers: {
+                                                'Authorization': `Bearer ${aiConfig.apiKey}`,
+                                                'Content-Type': 'application/json'
+                                            },
+                                            timeout: 5000
+                                        });
+                                        if (pollResponse?.data) {
+                                            targetResponse = pollResponse.data;
+                                            logger.info(`[callAIModel] Polling attempt ${attempt} for URL ${retrieveUrl}: status is ${targetResponse.status}`);
+                                            if (targetResponse.status === 'completed') {
+                                                break;
                                             }
-                                        } catch (pollErr) {
-                                            const pollErrMessage = pollErr?.message || String(pollErr);
-                                            logger.error(`[callAIModel] Polling attempt ${attempt} failed for URL ${retrieveUrl}: ${pollErrMessage}`);
+                                            if (targetResponse.status === 'failed') {
+                                                break;
+                                            }
                                         }
+                                    } catch (pollErr) {
+                                        const pollErrMessage = pollErr?.message || String(pollErr);
+                                        logger.error(`[callAIModel] Polling attempt ${attempt} failed for URL ${retrieveUrl}: ${pollErrMessage}`);
                                     }
                                 }
-                                
-                                if (targetResponse.status === 'completed') {
-                                    logger.info(`[callAIModel] Successfully recovered timed-out response from Bedrock Mantle. Response ID: ${targetResponse.id}`);
-                                    const content = targetResponse.output?.choices?.[0]?.message?.content || 
-                                                    targetResponse.output?.output_text || 
-                                                    targetResponse.output || '';
-                                    if (content) {
-                                        return content;
-                                    }
-                                } else {
-                                    logger.warn(`[callAIModel] Recovered response ${targetResponse.id} status is ${targetResponse.status}, not completed.`);
+                            }
+                            
+                            if (targetResponse.status === 'completed') {
+                                logger.info(`[callAIModel] Successfully recovered timed-out response from Bedrock Mantle. Response ID: ${targetResponse.id}`);
+                                const content = targetResponse.output?.choices?.[0]?.message?.content || 
+                                                targetResponse.output?.output_text || 
+                                                targetResponse.output || '';
+                                if (content) {
+                                    return content;
                                 }
                             } else {
-                                logger.warn(`[callAIModel] No matching response found in the recent list for the current prompt.`);
+                                logger.warn(`[callAIModel] Recovered response ${targetResponse.id} status is ${targetResponse.status}, not completed.`);
                             }
+                        } else {
+                            logger.warn(`[callAIModel] No matching response found in the recent list for the current prompt.`);
                         }
-                    } catch (recoverErr) {
-                        const recoverErrMessage = recoverErr?.message || String(recoverErr);
-                        logger.error(`[callAIModel] Failed to recover response from Bedrock Mantle stored state at URL ${aiConfig.baseUrl}/responses: ${recoverErrMessage}`);
                     }
+                } catch (recoverErr) {
+                    const recoverErrMessage = recoverErr?.message || String(recoverErr);
+                    logger.error(`[callAIModel] Failed to recover response from Bedrock Mantle stored state at URL ${aiConfig.baseUrl}/responses: ${recoverErrMessage}`);
                 }
                 throw err;
             }
