@@ -1147,9 +1147,9 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
                                     logger.info(`[callAIModel] Found matching response ${targetResponse.id} with status ${targetResponse.status}. Polling for completion...`);
                                     const retrieveUrl = `${aiConfig.baseUrl}/responses/${targetResponse.id}`;
                                     
-                                    for (let attempt = 1; attempt <= 5; attempt++) {
+                                    for (let attempt = 1; attempt <= 20; attempt++) {
                                         /* eslint-disable-next-line no-await-in-loop */
-                                        await new Promise(resolve => setTimeout(resolve, 2000));
+                                        await new Promise(resolve => setTimeout(resolve, 5000));
                                         
                                         try {
                                             /* eslint-disable-next-line no-await-in-loop */

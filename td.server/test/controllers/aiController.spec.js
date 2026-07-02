@@ -596,7 +596,7 @@ describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
             const promise = aiController._callAIModel('Hello', [], aiConfig);
             
             // Advance the fake timers so the setTimeout completes
-            await clock.tickAsync(2000);
+            await clock.tickAsync(5000);
             
             const response = await promise;
             expect(response).to.equal('Polled threat response');
