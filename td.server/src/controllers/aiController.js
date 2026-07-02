@@ -1092,7 +1092,7 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
             messages.push({ role: 'user', content: userContent });
 
             const openai = clientFactory.getOpenAIClient(aiConfig);
-            logger.info(`[callAIModel] Bedrock Mantle sending chat completion request via OpenAI SDK to base URL: ${aiConfig.baseUrl}`);
+            logger.info(`[callAIModel] Bedrock Mantle sending chat completion request via OpenAI SDK to URL: ${aiConfig.baseUrl}/chat/completions`);
 
             const requestPayload = {
                 model: aiConfig.model || 'meta.llama3-70b-instruct-v1:0',
@@ -1129,9 +1129,10 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
                     errMessage?.toLowerCase().includes('timeout') || 
                     errCode === 'ETIMEDOUT'
                 ) {
-                    logger.warn(`[callAIModel] Bedrock Mantle request timed out. Attempting to recover response from stored state...`);
+                    logger.warn(`[callAIModel] Bedrock Mantle request timed out calling ${aiConfig.baseUrl}/chat/completions. Attempting to recover response from stored state...`);
                     try {
                         const listUrl = `${aiConfig.baseUrl}/responses`;
+                        logger.info(`[callAIModel] Attempting to list responses from URL: ${listUrl}`);
                         const listResponse = await axios.get(listUrl, {
                             headers: {
                                 'Authorization': `Bearer ${aiConfig.apiKey}`,
@@ -1157,6 +1158,7 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
                                 if (targetResponse.status === 'in_progress' || targetResponse.status === 'pending') {
                                     logger.info(`[callAIModel] Found matching response ${targetResponse.id} with status ${targetResponse.status}. Polling for completion...`);
                                     const retrieveUrl = `${aiConfig.baseUrl}/responses/${targetResponse.id}`;
+                                    logger.info(`[callAIModel] Attempting to retrieve individual response from URL: ${retrieveUrl}`);
                                     
                                     for (let attempt = 1; attempt <= 20; attempt++) {
                                         /* eslint-disable-next-line no-await-in-loop */
@@ -1173,7 +1175,7 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
                                             });
                                             if (pollResponse?.data) {
                                                 targetResponse = pollResponse.data;
-                                                logger.info(`[callAIModel] Polling attempt ${attempt}: status is ${targetResponse.status}`);
+                                                logger.info(`[callAIModel] Polling attempt ${attempt} for URL ${retrieveUrl}: status is ${targetResponse.status}`);
                                                 if (targetResponse.status === 'completed') {
                                                     break;
                                                 }
@@ -1183,7 +1185,7 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
                                             }
                                         } catch (pollErr) {
                                             const pollErrMessage = pollErr?.message || String(pollErr);
-                                            logger.error(`[callAIModel] Polling attempt ${attempt} failed: ${pollErrMessage}`);
+                                            logger.error(`[callAIModel] Polling attempt ${attempt} failed for URL ${retrieveUrl}: ${pollErrMessage}`);
                                         }
                                     }
                                 }
@@ -1205,7 +1207,7 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
                         }
                     } catch (recoverErr) {
                         const recoverErrMessage = recoverErr?.message || String(recoverErr);
-                        logger.error(`[callAIModel] Failed to recover response from Bedrock Mantle stored state: ${recoverErrMessage}`);
+                        logger.error(`[callAIModel] Failed to recover response from Bedrock Mantle stored state at URL ${aiConfig.baseUrl}/responses: ${recoverErrMessage}`);
                     }
                 }
                 throw err;
