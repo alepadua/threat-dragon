@@ -17,11 +17,13 @@ global.DOMMatrix = DOMMatrix;
 const logger = loggerHelper.get('controllers/aiController.js');
 const REQUEST_TIMEOUT = parseInt(process.env.AI_REQUEST_TIMEOUT, 10) || 300000;
 
-const getProxyAgent = () => {
+const getProxyAgent = (context = 'general') => {
     const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy || process.env.HTTP_PROXY || process.env.http_proxy;
     if (proxyUrl) {
+        logger.info(`[getProxyAgent] [${context}] Using proxy server configured from environment: ${proxyUrl}`);
         return new HttpsProxyAgent(proxyUrl);
     }
+    logger.info(`[getProxyAgent] [${context}] Connecting directly (no proxy detected in environment)`);
     return null;
 };
 
@@ -1064,7 +1066,7 @@ const splitTextIntoChunks = (text, chunkSize = 1000, overlap = 150) => {
 
 const clientFactory = {
     getOpenAIClient(aiConfig) {
-        const agent = getProxyAgent();
+        const agent = getProxyAgent('OpenAI SDK');
         const options = {
             apiKey: aiConfig.apiKey,
             baseURL: aiConfig.baseUrl
@@ -1141,7 +1143,7 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
                     const listUrl = `${aiConfig.baseUrl}/responses`;
                     logger.info(`[callAIModel] Attempting to list responses from URL: ${listUrl}`);
                     
-                    const agent = getProxyAgent();
+                    const agent = getProxyAgent('Axios Recovery');
                     const listAxiosConfig = {
                         headers: {
                             'Authorization': `Bearer ${aiConfig.apiKey}`,
