@@ -45,7 +45,9 @@ import {
     faArrowLeft,
     faArrowRight,
     faCommentDots,
-    faTasks
+    faTasks,
+    faHistory,
+    faSync
 } from '@fortawesome/free-solid-svg-icons';
 
 import {faBitbucket, faGithub, faGitlab, faVuejs, faGoogle, faGoogleDrive} from '@fortawesome/free-brands-svg-icons';
@@ -99,7 +101,9 @@ library.add(
     faArrowLeft,
     faArrowRight,
     faCommentDots,
-    faTasks
+    faTasks,
+    faHistory,
+    faSync
 );
 
 export { FontAwesomeIcon };

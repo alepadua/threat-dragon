@@ -858,18 +858,32 @@
                         <!-- Q&A Refinement Loop if NOT Approved -->
                         <div v-else class="d-flex flex-column flex-grow-1">
                             <!-- Agent Questions Box -->
-                            <div v-if="questions.length > 0" class="agent-questions-box bg-light border border-warning rounded p-3 mb-3">
-                                <h6 class="font-weight-bold text-warning-dark mb-2">
+                            <div v-if="questions.length > 0" class="agent-questions-box mb-3">
+                                <h6 class="font-weight-bold text-warning-dark mb-3">
                                     <font-awesome-icon icon="question-circle" class="mr-1" />
-                                    Agent's Clarifying Questions:
+                                    Perguntas de Esclarecimento do Agente:
                                 </h6>
-                                <ul class="pl-3 mb-0 font-size-sm">
-                                    <li v-for="(q, idx) in questions" :key="idx" class="mb-2">{{ q.text || q }}</li>
-                                </ul>
+                                <div v-for="(q, idx) in questions" :key="q.id || idx" class="mb-3 p-3 bg-white border rounded shadow-sm">
+                                    <div class="font-weight-bold text-dark font-size-sm mb-2 d-flex justify-content-between">
+                                        <span>
+                                            <span class="badge badge-warning text-dark mr-2">Q{{ idx + 1 }}</span>
+                                            <strong>{{ q.elementName || 'Componente' }}</strong> ({{ q.category || 'Geral' }})
+                                        </span>
+                                    </div>
+                                    <div class="text-muted font-size-sm mb-2" style="font-style: italic;">
+                                        {{ q.text || q }}
+                                    </div>
+                                    <b-form-textarea
+                                        v-model="questionAnswers[q.id]"
+                                        rows="2"
+                                        placeholder="Digite sua resposta para esta pergunta específica..."
+                                        class="custom-input font-size-sm"
+                                    ></b-form-textarea>
+                                </div>
                             </div>
                             <div v-else class="alert alert-success py-2 font-size-sm mb-3">
                                 <font-awesome-icon icon="check" class="mr-1" />
-                                No further clarifying questions! The agent has all required info, but you can still request manual changes.
+                                Nenhuma pergunta pendente nesta rodada! O agente tem as informações necessárias, mas você ainda pode solicitar ajustes manuais abaixo.
                             </div>
 
                             <!-- Chat refinement thread -->
@@ -890,12 +904,11 @@
 
                             <!-- Answering field -->
                             <b-form @submit.prevent="submitRefinement">
-                                <b-form-group label="Your Answers / Feedback:" label-class="font-weight-bold font-size-sm">
+                                <b-form-group label="Outros Comentários ou Solicitações Manuais (Opcional):" label-class="font-weight-bold font-size-sm">
                                     <b-form-textarea
                                         v-model="userResponse"
                                         rows="3"
-                                        required
-                                        placeholder="Answer the questions above or request modifications (e.g. 'Add a Redis cache storage connected to the Backend worker')..."
+                                        placeholder="Solicite modificações manuais adicionais (ex: 'Adicione um banco de dados Redis conectado ao componente Backend')..."
                                         class="custom-input font-size-sm"
                                     ></b-form-textarea>
                                 </b-form-group>
@@ -971,127 +984,349 @@
                     <div class="d-flex justify-content-between align-items-center py-2">
                         <div class="text-left">
                             <h4 class="mb-0 font-weight-bold text-success">
-                                <font-awesome-icon icon="compress-arrows-alt" class="mr-2" />
-                                Revisão e Deduplicação Manual
+                                <font-awesome-icon icon="clipboard-check" class="mr-2" />
+                                Revisão, Auditoria e Deduplicação Final
                             </h4>
-                            <small class="text-muted">Selecione quais unificações deseja aprovar antes de concluir o modelo de ameaças.</small>
+                            <small class="text-muted">Analise a auditoria de segurança da IA e selecione quais unificações deseja aprovar antes de concluir.</small>
                         </div>
                         <b-badge variant="success" class="px-3 py-2 font-size-sm">Human-in-the-Loop</b-badge>
                     </div>
                 </template>
 
-                <b-row class="text-left">
-                    <!-- Controls Deduplication Card -->
-                    <b-col md="6" class="mb-3">
-                        <b-card class="border-0 shadow-sm h-100 bg-light" header-class="bg-info text-white py-2">
-                            <template #header>
-                                <h5 class="mb-0 font-weight-bold font-size-md">
-                                    <font-awesome-icon icon="shield-alt" class="mr-2" />
-                                    Relatório de Eficácia de Controles ({{ deduplicateProposals && deduplicateProposals.controlDeduplications ? deduplicateProposals.controlDeduplications.length : 0 }})
-                                </h5>
-                            </template>
+                <b-tabs content-class="mt-4" nav-wrapper-class="mb-3" pill card>
+                    <!-- Tab 1: Deduplication -->
+                    <b-tab title="Deduplicação de Ameaças & Controles" active>
+                        <b-row class="text-left">
+                            <!-- Controls Deduplication Card -->
+                            <b-col md="6" class="mb-3">
+                                <b-card class="border-0 shadow-sm h-100 bg-light" header-class="bg-info text-white py-2">
+                                    <template #header>
+                                        <h5 class="mb-0 font-weight-bold font-size-md">
+                                            <font-awesome-icon icon="shield-alt" class="mr-2" />
+                                            Relatório de Eficácia de Controles ({{ deduplicateProposals && deduplicateProposals.controlDeduplications ? deduplicateProposals.controlDeduplications.length : 0 }})
+                                        </h5>
+                                    </template>
 
-                            <div v-if="!deduplicateProposals || !deduplicateProposals.controlDeduplications || deduplicateProposals.controlDeduplications.length === 0" class="text-center py-5">
+                                    <div v-if="!deduplicateProposals || !deduplicateProposals.controlDeduplications || deduplicateProposals.controlDeduplications.length === 0" class="text-center py-5">
+                                        <font-awesome-icon icon="check-circle" size="3x" class="text-success mb-3" />
+                                        <p class="text-muted font-weight-bold">Nenhuma redundância encontrada nos controles.</p>
+                                    </div>
+
+                                    <div v-else>
+                                        <div
+                                            v-for="proposal in deduplicateProposals.controlDeduplications"
+                                            :key="proposal.id"
+                                            class="bg-white border rounded p-3 mb-3 shadow-sm"
+                                        >
+                                            <div class="d-flex justify-content-between align-items-start border-bottom pb-2 mb-2">
+                                                <b-form-checkbox
+                                                    v-model="selectedControlDups"
+                                                    :value="proposal.id"
+                                                    class="font-weight-bold text-info"
+                                                >
+                                                    Unificar Controles em: <b-badge variant="info">{{ proposal.controlCategory }}</b-badge>
+                                                </b-form-checkbox>
+                                            </div>
+
+                                            <div class="font-size-xs text-muted mb-2">
+                                                <strong>Itens a serem mesclados:</strong>
+                                                <ul class="pl-3 mt-1 mb-2">
+                                                    <li v-for="(item, iIdx) in proposal.itemsToMerge" :key="iIdx">
+                                                        <em>Resposta:</em> "{{ item.userAnswer }}"
+                                                    </li>
+                                                </ul>
+                                            </div>
+
+                                            <div class="border rounded p-2 bg-light font-size-xs">
+                                                <strong class="text-success"><font-awesome-icon icon="arrow-right" class="mr-1"/> Resposta Unificada Proposta:</strong>
+                                                <p class="mb-1 mt-1 font-weight-medium text-dark">"{{ proposal.proposedMergedItem.userAnswer }}"</p>
+                                                <strong class="text-success"><font-awesome-icon icon="comment-dots" class="mr-1"/> Recomendações Unificadas:</strong>
+                                                <p class="mb-0 text-muted">"{{ proposal.proposedMergedItem.details }}"</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </b-card>
+                            </b-col>
+
+                            <!-- Threats Deduplication Card -->
+                            <b-col md="6" class="mb-3">
+                                <b-card class="border-0 shadow-sm h-100 bg-light" header-class="bg-danger text-white py-2">
+                                    <template #header>
+                                        <h5 class="mb-0 font-weight-bold font-size-md">
+                                            <font-awesome-icon icon="bug" class="mr-2" />
+                                            Ameaças no Modelo ({{ deduplicateProposals && deduplicateProposals.threatDeduplications ? deduplicateProposals.threatDeduplications.length : 0 }})
+                                        </h5>
+                                    </template>
+
+                                    <div v-if="!deduplicateProposals || !deduplicateProposals.threatDeduplications || deduplicateProposals.threatDeduplications.length === 0" class="text-center py-5">
+                                        <font-awesome-icon icon="check-circle" size="3x" class="text-success mb-3" />
+                                        <p class="text-muted font-weight-bold">Nenhuma redundância encontrada nas ameaças.</p>
+                                    </div>
+
+                                    <div v-else>
+                                        <div
+                                            v-for="proposal in deduplicateProposals.threatDeduplications"
+                                            :key="proposal.id"
+                                            class="bg-white border rounded p-3 mb-3 shadow-sm"
+                                        >
+                                            <div class="d-flex justify-content-between align-items-start border-bottom pb-2 mb-2">
+                                                <b-form-checkbox
+                                                    v-model="selectedThreatDups"
+                                                    :value="proposal.id"
+                                                    class="font-weight-bold text-danger"
+                                                >
+                                                    Unificar Ameaças em: <b-badge variant="danger">{{ proposal.cellName }}</b-badge>
+                                                </b-form-checkbox>
+                                            </div>
+
+                                            <div class="font-size-xs text-muted mb-2">
+                                                <strong>Ameaças a serem mescladas:</strong>
+                                                <ul class="pl-3 mt-1 mb-2">
+                                                    <li v-for="(item, tIdx) in proposal.itemsToMerge" :key="tIdx">
+                                                        <strong>{{ item.title }}</strong>: "{{ item.description.substring(0, 80) }}..."
+                                                    </li>
+                                                </ul>
+                                            </div>
+
+                                            <div class="border rounded p-2 bg-light font-size-xs">
+                                                <strong class="text-danger"><font-awesome-icon icon="arrow-right" class="mr-1"/> Ameaça Unificada Proposta:</strong>
+                                                <p class="mb-1 mt-1 font-weight-bold text-dark">{{ proposal.proposedMergedThreat.title }}</p>
+                                                <strong class="text-danger"><font-awesome-icon icon="info-circle" class="mr-1"/> Descrição Unificada:</strong>
+                                                <p class="mb-1 text-muted">"{{ proposal.proposedMergedThreat.description }}"</p>
+                                                <strong class="text-danger"><font-awesome-icon icon="shield-alt" class="mr-1"/> Mitigação Unificada:</strong>
+                                                <p class="mb-0 text-muted">"{{ proposal.proposedMergedThreat.mitigation }}"</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </b-card>
+                            </b-col>
+                        </b-row>
+                    </b-tab>
+
+                    <!-- Tab 2: Anti-Hallucination Audit -->
+                    <b-tab title="Auditoria de Alucinações">
+                        <div class="text-left">
+                            <div v-if="!deduplicateProposals || !deduplicateProposals.hallucinationAlerts || deduplicateProposals.hallucinationAlerts.length === 0" class="text-center py-5 bg-light rounded border">
                                 <font-awesome-icon icon="check-circle" size="3x" class="text-success mb-3" />
-                                <p class="text-muted font-weight-bold">Nenhuma redundância encontrada nos controles.</p>
+                                <h5 class="text-success font-weight-bold">Nenhuma Inconsistência Encontrada</h5>
+                                <p class="text-muted mb-0">O auditor de segurança da IA não encontrou componentes, tecnologias ou permissões alucinadas/não confirmadas.</p>
+                            </div>
+
+                            <div v-else>
+                                <b-alert variant="warning" show class="d-flex align-items-center mb-3">
+                                    <font-awesome-icon icon="exclamation-triangle" size="lg" class="mr-3" />
+                                    <div>
+                                        <strong>Alerta de Consistência de Arquitetura:</strong> A IA identificou possíveis discrepâncias entre a documentação de referência (ou respostas fornecidas) e o modelo gerado. Por favor, revise os alertas abaixo.
+                                    </div>
+                                </b-alert>
+
+                                <div
+                                    v-for="alert in deduplicateProposals.hallucinationAlerts"
+                                    :key="alert.id"
+                                    class="border rounded p-3 mb-3 bg-white shadow-sm d-flex"
+                                >
+                                    <div class="mr-3 mt-1">
+                                        <font-awesome-icon
+                                            icon="exclamation-circle"
+                                            size="lg"
+                                            :class="alert.severity === 'High' ? 'text-danger' : alert.severity === 'Medium' ? 'text-warning' : 'text-info'"
+                                        />
+                                    </div>
+                                    <div class="w-100">
+                                        <div class="d-flex justify-content-between align-items-start mb-2">
+                                            <h6 class="font-weight-bold mb-0 text-dark">
+                                                {{ alert.targetName }}
+                                                <b-badge variant="light" class="ml-2 font-weight-normal border text-muted">
+                                                    {{ alert.targetType }}
+                                                </b-badge>
+                                            </h6>
+                                            <b-badge
+                                                :variant="alert.severity === 'High' ? 'danger' : alert.severity === 'Medium' ? 'warning' : 'info'"
+                                            >
+                                                Prioridade: {{ alert.severity }}
+                                            </b-badge>
+                                        </div>
+                                        <p class="mb-0 text-muted font-size-sm">{{ alert.issue }}</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </b-tab>
+
+                    <!-- Tab 3: Threat Mitigation Status -->
+                    <b-tab title="Status de Mitigação de Ameaças">
+                        <div class="text-left">
+                            <div v-if="!deduplicateProposals || !deduplicateProposals.mitigationStatus || deduplicateProposals.mitigationStatus.length === 0" class="text-center py-5 bg-light rounded border">
+                                <font-awesome-icon icon="info-circle" size="3x" class="text-secondary mb-3" />
+                                <h5 class="text-secondary font-weight-bold">Sem Dados de Mitigação</h5>
+                                <p class="text-muted mb-0">Nenhuma ameaça foi mapeada ou avaliada para este modelo ainda.</p>
+                            </div>
+
+                            <div v-else>
+                                <!-- Stats Cards -->
+                                <b-row class="mb-4">
+                                    <b-col sm="3" class="mb-2">
+                                        <b-card bg-variant="light" class="text-center border-0 shadow-sm py-2">
+                                            <h3 class="mb-0 font-weight-bold text-dark">{{ deduplicateProposals.mitigationStatus.length }}</h3>
+                                            <small class="text-muted font-weight-bold">Total Avaliadas</small>
+                                        </b-card>
+                                    </b-col>
+                                    <b-col sm="3" class="mb-2">
+                                        <b-card bg-variant="success" text-variant="white" class="text-center border-0 shadow-sm py-2">
+                                            <h3 class="mb-0 font-weight-bold">{{ deduplicateProposals.mitigationStatus.filter(t => t.status === 'Mitigada').length }}</h3>
+                                            <small class="font-weight-bold text-white-50">Mitigadas</small>
+                                        </b-card>
+                                    </b-col>
+                                    <b-col sm="3" class="mb-2">
+                                        <b-card bg-variant="warning" class="text-center border-0 shadow-sm py-2">
+                                            <h3 class="mb-0 font-weight-bold text-dark">{{ deduplicateProposals.mitigationStatus.filter(t => t.status === 'Parcialmente Mitigada').length }}</h3>
+                                            <small class="text-muted font-weight-bold">Parciais</small>
+                                        </b-card>
+                                    </b-col>
+                                    <b-col sm="3" class="mb-2">
+                                        <b-card bg-variant="danger" text-variant="white" class="text-center border-0 shadow-sm py-2">
+                                            <h3 class="mb-0 font-weight-bold">{{ deduplicateProposals.mitigationStatus.filter(t => t.status === 'Não Mitigada').length }}</h3>
+                                            <small class="font-weight-bold text-white-50">Não Mitigadas</small>
+                                        </b-card>
+                                    </b-col>
+                                </b-row>
+
+                                <!-- Filters -->
+                                <div class="mb-3 d-flex justify-content-between align-items-center">
+                                    <b-button-group size="sm">
+                                        <b-button
+                                            :variant="mitigationFilter === 'All' ? 'secondary' : 'outline-secondary'"
+                                            @click="mitigationFilter = 'All'"
+                                        >
+                                            Ver Todas ({{ deduplicateProposals.mitigationStatus.length }})
+                                        </b-button>
+                                        <b-button
+                                            :variant="mitigationFilter === 'Mitigada' ? 'success' : 'outline-success'"
+                                            @click="mitigationFilter = 'Mitigada'"
+                                        >
+                                            Mitigada ({{ deduplicateProposals.mitigationStatus.filter(t => t.status === 'Mitigada').length }})
+                                        </b-button>
+                                        <b-button
+                                            :variant="mitigationFilter === 'Parcialmente Mitigada' ? 'warning' : 'outline-warning'"
+                                            @click="mitigationFilter = 'Parcialmente Mitigada'"
+                                        >
+                                            Parcialmente ({{ deduplicateProposals.mitigationStatus.filter(t => t.status === 'Parcialmente Mitigada').length }})
+                                        </b-button>
+                                        <b-button
+                                            :variant="mitigationFilter === 'Não Mitigada' ? 'danger' : 'outline-danger'"
+                                            @click="mitigationFilter = 'Não Mitigada'"
+                                        >
+                                            Não Mitigada ({{ deduplicateProposals.mitigationStatus.filter(t => t.status === 'Não Mitigada').length }})
+                                        </b-button>
+                                    </b-button-group>
+                                </div>
+
+                                <!-- Table or List -->
+                                <div class="table-responsive bg-white border rounded shadow-sm">
+                                    <table class="table table-hover table-striped mb-0 font-size-sm">
+                                        <thead class="thead-dark">
+                                            <tr>
+                                                <th style="width: 25%">Ameaça / Componente</th>
+                                                <th style="width: 15%" class="text-center">Status</th>
+                                                <th style="width: 35%">Motivo</th>
+                                                <th style="width: 25%">Recomendações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr
+                                                v-for="threat in deduplicateProposals.mitigationStatus.filter(t => mitigationFilter === 'All' || t.status === mitigationFilter)"
+                                                :key="threat.threatId"
+                                            >
+                                                <td>
+                                                    <div class="font-weight-bold text-dark">{{ threat.threatTitle }}</div>
+                                                    <small class="text-muted">Componente: {{ threat.elementName }}</small>
+                                                </td>
+                                                <td class="text-center align-middle">
+                                                    <b-badge
+                                                        :variant="threat.status === 'Mitigada' ? 'success' : threat.status === 'Parcialmente Mitigada' ? 'warning' : 'danger'"
+                                                        class="px-3 py-1 font-size-xs"
+                                                    >
+                                                        {{ threat.status }}
+                                                    </b-badge>
+                                                </td>
+                                                <td>{{ threat.reason }}</td>
+                                                <td>
+                                                    <span v-if="threat.recommendations && threat.recommendations.trim() !== ''">
+                                                        {{ threat.recommendations }}
+                                                    </span>
+                                                    <span v-else class="text-muted italic font-size-xs">Nenhuma recomendação adicional</span>
+                                                </td>
+                                            </tr>
+                                            <tr v-if="deduplicateProposals.mitigationStatus.filter(t => mitigationFilter === 'All' || t.status === mitigationFilter).length === 0">
+                                                <td colspan="4" class="text-center text-muted py-4">
+                                                    Nenhuma ameaça correspondente ao filtro selecionado.
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </b-tab>
+
+                    <!-- Tab 4: Question & Answer Review & Edit (Phase 3) -->
+                    <b-tab title="Revisão de Perguntas e Respostas">
+                        <div class="text-left">
+                            <h5 class="font-weight-bold text-dark border-bottom pb-2 mb-3">
+                                <font-awesome-icon icon="history" class="mr-2 text-warning" />
+                                Histórico de Perguntas Respondidas
+                            </h5>
+                            <p class="text-muted font-size-sm">
+                                Aqui você pode revisar as perguntas que a inteligência artificial fez durante o processo e as respostas que você forneceu. Caso identifique alguma má interpretação por parte do modelo, você pode modificar suas respostas e reiniciar o processamento.
+                            </p>
+
+                            <div v-if="!answeredQuestions || answeredQuestions.length === 0" class="text-center py-5">
+                                <font-awesome-icon icon="info-circle" size="3x" class="text-muted mb-3" />
+                                <p class="text-muted font-weight-bold">Nenhuma pergunta respondida nesta sessão ainda.</p>
                             </div>
 
                             <div v-else>
                                 <div
-                                    v-for="proposal in deduplicateProposals.controlDeduplications"
-                                    :key="proposal.id"
-                                    class="bg-white border rounded p-3 mb-3 shadow-sm"
+                                    v-for="(aq, idx) in answeredQuestions"
+                                    :key="aq.id || idx"
+                                    class="bg-light border rounded p-3 mb-3 shadow-sm"
                                 >
-                                    <div class="d-flex justify-content-between align-items-start border-bottom pb-2 mb-2">
-                                        <b-form-checkbox
-                                            v-model="selectedControlDups"
-                                            :value="proposal.id"
-                                            class="font-weight-bold text-info"
-                                        >
-                                            Unificar Controles em: <b-badge variant="info">{{ proposal.controlCategory }}</b-badge>
-                                        </b-form-checkbox>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <div>
+                                            <span class="badge badge-info mr-2">Q{{ idx + 1 }}</span>
+                                            <strong>{{ aq.elementName || 'Componente' }}</strong> ({{ aq.category || 'Geral' }})
+                                        </div>
+                                        <small class="text-muted">{{ new Date(aq.timestamp).toLocaleString() }}</small>
                                     </div>
+                                    <div class="text-muted font-size-sm mb-2" style="font-style: italic;">
+                                        {{ aq.text }}
+                                    </div>
+                                    <b-form-group label="Sua Resposta:" label-class="font-weight-bold font-size-xs mb-1">
+                                        <b-form-textarea
+                                            v-model="aq.answer"
+                                            rows="2"
+                                            class="custom-input bg-white font-size-sm"
+                                        ></b-form-textarea>
+                                    </b-form-group>
+                                </div>
 
-                                    <div class="font-size-xs text-muted mb-2">
-                                        <strong>Itens a serem mesclados:</strong>
-                                        <ul class="pl-3 mt-1 mb-2">
-                                            <li v-for="(item, iIdx) in proposal.itemsToMerge" :key="iIdx">
-                                                <em>Resposta:</em> "{{ item.userAnswer }}"
-                                            </li>
-                                        </ul>
-                                    </div>
-
-                                    <div class="border rounded p-2 bg-light font-size-xs">
-                                        <strong class="text-success"><font-awesome-icon icon="arrow-right" class="mr-1"/> Resposta Unificada Proposta:</strong>
-                                        <p class="mb-1 mt-1 font-weight-medium text-dark">"{{ proposal.proposedMergedItem.userAnswer }}"</p>
-                                        <strong class="text-success"><font-awesome-icon icon="comment-dots" class="mr-1"/> Recomendações Unificadas:</strong>
-                                        <p class="mb-0 text-muted">"{{ proposal.proposedMergedItem.details }}"</p>
-                                    </div>
+                                <div class="mt-4 text-right">
+                                    <b-button variant="warning" class="font-weight-bold text-dark px-4 py-2" @click="saveAndReprocess">
+                                        <font-awesome-icon icon="sync" class="mr-2" />
+                                        Salvar Alterações e Reprocessar Modelo
+                                    </b-button>
                                 </div>
                             </div>
-                        </b-card>
-                    </b-col>
-
-                    <!-- Threats Deduplication Card -->
-                    <b-col md="6" class="mb-3">
-                        <b-card class="border-0 shadow-sm h-100 bg-light" header-class="bg-danger text-white py-2">
-                            <template #header>
-                                <h5 class="mb-0 font-weight-bold font-size-md">
-                                    <font-awesome-icon icon="bug" class="mr-2" />
-                                    Ameaças no Modelo ({{ deduplicateProposals && deduplicateProposals.threatDeduplications ? deduplicateProposals.threatDeduplications.length : 0 }})
-                                </h5>
-                            </template>
-
-                            <div v-if="!deduplicateProposals || !deduplicateProposals.threatDeduplications || deduplicateProposals.threatDeduplications.length === 0" class="text-center py-5">
-                                <font-awesome-icon icon="check-circle" size="3x" class="text-success mb-3" />
-                                <p class="text-muted font-weight-bold">Nenhuma redundância encontrada nas ameaças.</p>
-                            </div>
-
-                            <div v-else>
-                                <div
-                                    v-for="proposal in deduplicateProposals.threatDeduplications"
-                                    :key="proposal.id"
-                                    class="bg-white border rounded p-3 mb-3 shadow-sm"
-                                >
-                                    <div class="d-flex justify-content-between align-items-start border-bottom pb-2 mb-2">
-                                        <b-form-checkbox
-                                            v-model="selectedThreatDups"
-                                            :value="proposal.id"
-                                            class="font-weight-bold text-danger"
-                                        >
-                                            Unificar Ameaças em: <b-badge variant="danger">{{ proposal.cellName }}</b-badge>
-                                        </b-form-checkbox>
-                                    </div>
-
-                                    <div class="font-size-xs text-muted mb-2">
-                                        <strong>Ameaças a serem mescladas:</strong>
-                                        <ul class="pl-3 mt-1 mb-2">
-                                            <li v-for="(item, tIdx) in proposal.itemsToMerge" :key="tIdx">
-                                                <strong>{{ item.title }}</strong>: "{{ item.description.substring(0, 80) }}..."
-                                            </li>
-                                        </ul>
-                                    </div>
-
-                                    <div class="border rounded p-2 bg-light font-size-xs">
-                                        <strong class="text-danger"><font-awesome-icon icon="arrow-right" class="mr-1"/> Ameaça Unificada Proposta:</strong>
-                                        <p class="mb-1 mt-1 font-weight-bold text-dark">{{ proposal.proposedMergedThreat.title }}</p>
-                                        <strong class="text-danger"><font-awesome-icon icon="info-circle" class="mr-1"/> Descrição Unificada:</strong>
-                                        <p class="mb-1 text-muted">"{{ proposal.proposedMergedThreat.description }}"</p>
-                                        <strong class="text-danger"><font-awesome-icon icon="shield-alt" class="mr-1"/> Mitigação Unificada:</strong>
-                                        <p class="mb-0 text-muted">"{{ proposal.proposedMergedThreat.mitigation }}"</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </b-card>
-                    </b-col>
-                </b-row>
+                        </div>
+                    </b-tab>
+                </b-tabs>
 
                 <div class="d-flex justify-content-between align-items-center border-top pt-3 mt-3">
                     <b-button variant="outline-secondary" class="font-weight-bold" @click="cancelDeduplication">
                         <font-awesome-icon icon="arrow-left" class="mr-2" />
                         Voltar ao Refinamento
                     </b-button>
-                    
+
                     <b-button variant="success" class="font-weight-bold text-white px-5 py-2 shadow-sm" @click="confirmDeduplicationAndApprove">
                         <font-awesome-icon icon="check-double" class="mr-2" />
                         Confirmar e Concluir Modelo
@@ -1343,6 +1578,78 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Anti-Hallucination Page -->
+                <div class="pdf-page" style="width: 100%; page-break-before: always; padding: 40px 30px 0 30px; box-sizing: border-box;" v-if="evaluation && evaluation.hallucinationAlerts && evaluation.hallucinationAlerts.length > 0">
+                    <h2 style="font-size: 24px; font-weight: 800; color: #0f172a; margin-bottom: 25px; border-bottom: 2px solid #0ea5e9; padding-bottom: 10px;">
+                        7. Architectural Consistency Audit (Anti-Hallucination)
+                    </h2>
+                    <p style="font-size: 14px; color: #64748b; margin-bottom: 20px;">
+                        Potential inconsistencies identified between the system diagram/answers and the threat model definitions:
+                    </p>
+
+                    <div v-for="alert in evaluation.hallucinationAlerts" :key="alert.id" style="margin-bottom: 15px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; page-break-inside: avoid;">
+                        <div :style="{
+                            backgroundColor: alert.severity === 'High' ? '#fee2e2' : alert.severity === 'Medium' ? '#fef3c7' : '#e0f2fe',
+                            color: alert.severity === 'High' ? '#991b1b' : alert.severity === 'Medium' ? '#92400e' : '#0369a1',
+                            padding: '10px 15px',
+                            fontWeight: '700',
+                            fontSize: '13px',
+                            display: 'flex',
+                            justifyContent: 'space-between'
+                        }">
+                            <span>Target: {{ alert.targetName }} ({{ alert.targetType }})</span>
+                            <span>Severity: {{ alert.severity }}</span>
+                        </div>
+                        <div style="padding: 12px 15px; font-size: 12px; color: #334155; background-color: #ffffff;">
+                            {{ alert.issue }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Threat Mitigation Status Page -->
+                <div class="pdf-page" style="width: 100%; page-break-before: always; padding: 40px 30px 0 30px; box-sizing: border-box;" v-if="evaluation && evaluation.mitigationStatus && evaluation.mitigationStatus.length > 0">
+                    <h2 style="font-size: 24px; font-weight: 800; color: #0f172a; margin-bottom: 25px; border-bottom: 2px solid #0ea5e9; padding-bottom: 10px;">
+                        8. Threat Mitigation Status Assessment
+                    </h2>
+                    <p style="font-size: 14px; color: #64748b; margin-bottom: 20px;">
+                        Assessment of whether the generated threats have been mitigated based on your feedback:
+                    </p>
+
+                    <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; margin-bottom: 30px;">
+                        <thead>
+                            <tr style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                                <th style="padding: 10px; font-weight: 700; color: #475569; width: 25%;">Threat / Element</th>
+                                <th style="padding: 10px; font-weight: 700; color: #475569; width: 15%; text-align: center;">Status</th>
+                                <th style="padding: 10px; font-weight: 700; color: #475569; width: 35%;">Reason</th>
+                                <th style="padding: 10px; font-weight: 700; color: #475569; width: 25%;">Recommendations</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-for="threat in evaluation.mitigationStatus" :key="threat.threatId" style="border-bottom: 1px solid #f1f5f9; page-break-inside: avoid;">
+                                <td style="padding: 10px;">
+                                    <div style="font-weight: 700; color: #334155;">{{ threat.threatTitle }}</div>
+                                    <small style="color: #64748b;">Element: {{ threat.elementName }}</small>
+                                </td>
+                                <td style="padding: 10px; text-align: center; vertical-align: middle;">
+                                    <span :style="{
+                                        backgroundColor: threat.status === 'Mitigada' ? '#dcfce7' : threat.status === 'Parcialmente Mitigada' ? '#fef3c7' : '#fee2e2',
+                                        color: threat.status === 'Mitigada' ? '#166534' : threat.status === 'Parcialmente Mitigada' ? '#92400e' : '#991b1b',
+                                        padding: '4px 8px',
+                                        borderRadius: '4px',
+                                        fontWeight: '700',
+                                        fontSize: '10px',
+                                        display: 'inline-block'
+                                    }">
+                                        {{ threat.status }}
+                                    </span>
+                                </td>
+                                <td style="padding: 10px; color: #475569;">{{ threat.reason }}</td>
+                                <td style="padding: 10px; color: #475569;">{{ threat.recommendations || 'N/A' }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </b-col>
     </b-row>
@@ -1415,6 +1722,7 @@ export default {
             deduplicateProposals: null,
             selectedControlDups: [],
             selectedThreatDups: [],
+            mitigationFilter: 'All',
             stats: {
                 elements: 0,
                 flows: 0,
@@ -1424,7 +1732,9 @@ export default {
             errorMessage: '',
             questionPlan: null,
             questionProgress: { answered: 0, total: 0, percentage: 0 },
-            showModelConfig: false
+            showModelConfig: false,
+            answeredQuestions: [],
+            questionAnswers: {}
         };
     },
     computed: {
@@ -1723,16 +2033,29 @@ export default {
                 this.step = 'error';
             }
         },
-        // Refinement Round Submission
         async submitRefinement() {
-            if (!this.userResponse.trim()) return;
+            const answeredList = [];
+            this.questions.forEach((q) => {
+                const answerVal = this.questionAnswers[q.id];
+                if (answerVal && answerVal.trim()) {
+                    answeredList.push({
+                        id: q.id,
+                        text: q.text,
+                        answer: answerVal.trim(),
+                        elementId: q.elementId,
+                        elementName: q.elementName,
+                        category: q.category
+                    });
+                }
+            });
+
+            if (answeredList.length === 0 && !this.userResponse.trim()) {
+                return;
+            }
 
             const responseText = this.userResponse;
-            this.refinementHistory.push({
-                role: 'user',
-                text: responseText
-            });
             this.userResponse = '';
+            this.questionAnswers = {};
 
             this.step = 'generating';
             this.progressSteps.forEach(step => step.state = 'pending');
@@ -1749,6 +2072,8 @@ export default {
                     apiKey: this.form.apiKey,
                     currentModel: this.generatedModel,
                     refinementHistory: this.refinementHistory,
+                    answeredQuestions: answeredList,
+                    userResponse: responseText,
                     sessionId: this.sessionId,
                     methodology: this.form.methodology,
                     aiProvider: this.form.aiProvider,
@@ -1774,7 +2099,9 @@ export default {
                     const result = response.data.data;
                     this.updateLocalState(result);
                     this.refinementRound++;
-                    if (this.dfdApproved) {
+                    if (this.threatModelApproved) {
+                        await this.approveThreatModel();
+                    } else if (this.dfdApproved) {
                         this.step = 'interactive';
                     } else {
                         this.step = 'validate-dfd';
@@ -1785,11 +2112,13 @@ export default {
                 const jobData = response.data.data;
                 this.jobId = jobData.jobId;
 
-                this.pollJobStatus(jobData.jobId, (result) => {
+                this.pollJobStatus(jobData.jobId, async (result) => {
                     this.progressIndex = 5;
                     this.updateLocalState(result);
                     this.refinementRound++;
-                    if (this.dfdApproved) {
+                    if (this.threatModelApproved) {
+                        await this.approveThreatModel();
+                    } else if (this.dfdApproved) {
                         this.step = 'interactive';
                     } else {
                         this.step = 'validate-dfd';
@@ -1805,14 +2134,76 @@ export default {
                 this.step = 'error';
             }
         },
+        async saveAndReprocess() {
+            this.step = 'generating';
+            this.progressSteps.forEach(step => step.state = 'pending');
+            this.progressIndex = 1;
+            this.jobProgress = 0;
+            this.jobStatus = 'queued';
+            this.jobError = null;
+            this.jobStreamText = '';
+
+            try {
+                const response = await axios.post(`/api/ai/session/${this.sessionId}/edit-answers`, {
+                    answeredQuestions: this.answeredQuestions
+                });
+
+                const jobData = response.data.data;
+                this.jobId = jobData.jobId;
+
+                this.pollJobStatus(jobData.jobId, async (result) => {
+                    this.progressIndex = 5;
+                    this.updateLocalState(result);
+                    this.refinementRound++;
+                    if (this.threatModelApproved) {
+                        await this.approveThreatModel();
+                    } else if (this.dfdApproved) {
+                        this.step = 'interactive';
+                    } else {
+                        this.step = 'validate-dfd';
+                    }
+                }, (err) => {
+                    this.errorMessage = err.message || 'Ocorreu um erro durante o reprocessamento do modelo.';
+                    this.step = 'error';
+                });
+
+            } catch (err) {
+                console.error(err);
+                this.errorMessage = err.response?.data?.message || err.message || 'Ocorreu um erro ao salvar as respostas alteradas.';
+                this.step = 'error';
+            }
+        },
         updateLocalState(result) {
             const model = result.threatModel;
             if (model) {
                 model.version = this.version;
                 this.generatedModel = model;
             }
-            this.questions = result.questions || [];
+            this.questions = (result.questions || []).map((q, idx) => {
+                if (typeof q === 'string') {
+                    return {
+                        id: `q-fallback-${idx}-${Date.now()}`,
+                        text: q,
+                        elementName: 'Sistema',
+                        category: 'Geral'
+                    };
+                }
+                if (!q.id) {
+                    return {
+                        ...q,
+                        id: `q-fallback-${idx}-${Date.now()}`
+                    };
+                }
+                return q;
+            });
+            this.questionAnswers = {};
+            this.questions.forEach((q) => {
+                this.$set(this.questionAnswers, q.id, '');
+            });
             this.sessionId = result.sessionId || null;
+            if (result.answeredQuestions !== undefined) {
+                this.answeredQuestions = result.answeredQuestions || [];
+            }
             if (result.refinementHistory !== undefined) {
                 this.refinementHistory = result.refinementHistory || [];
             }
@@ -2048,17 +2439,14 @@ export default {
                 this.jobId = jobData.jobId;
 
                 this.pollJobStatus(jobData.jobId, async (proposals) => {
-                    const hasControls = proposals.controlDeduplications && proposals.controlDeduplications.length > 0;
-                    const hasThreats = proposals.threatDeduplications && proposals.threatDeduplications.length > 0;
-                    
-                    if (!hasControls && !hasThreats) {
-                        await this.confirmDeduplicationAndApprove([], []);
-                        return;
-                    }
-                    
                     this.deduplicateProposals = proposals;
                     this.selectedControlDups = (proposals.controlDeduplications || []).map(p => p.id);
                     this.selectedThreatDups = (proposals.threatDeduplications || []).map(p => p.id);
+                    
+                    if (this.evaluation) {
+                        this.$set(this.evaluation, 'hallucinationAlerts', proposals.hallucinationAlerts || []);
+                        this.$set(this.evaluation, 'mitigationStatus', proposals.mitigationStatus || []);
+                    }
                     
                     this.step = 'deduplicate-review';
                 }, async (err) => {
@@ -2131,6 +2519,33 @@ export default {
                 const speaker = msg.role === 'user' ? 'User' : 'AI Modeler';
                 markdown += `### Round ${idx + 1} - ${speaker}\n${msg.text}\n\n`;
             });
+            
+            // Anti-Hallucination Section
+            markdown += `## Auditoria de Alucinações (Anti-Hallucination Audit)\n`;
+            if (this.evaluation.hallucinationAlerts && this.evaluation.hallucinationAlerts.length > 0) {
+                markdown += `| Alvo | Tipo | Severidade | Descrição / Alerta |\n`;
+                markdown += `| --- | --- | --- | --- |\n`;
+                this.evaluation.hallucinationAlerts.forEach((item) => {
+                    markdown += `| ${item.targetName} | ${item.targetType} | ${item.severity} | ${item.issue.replace(/\n/g, ' ')} |\n`;
+                });
+                markdown += `\n`;
+            } else {
+                markdown += `*Nenhuma alucinação ou inconsistência de arquitetura identificada pelo auditor de IA.*\n\n`;
+            }
+
+            // Threat Mitigation Assessment Section
+            markdown += `## Avaliação de Mitigação de Ameaças (Threat Mitigation Assessment)\n`;
+            if (this.evaluation.mitigationStatus && this.evaluation.mitigationStatus.length > 0) {
+                markdown += `| Ameaça | Componente | Status | Justificativa | Recomendações |\n`;
+                markdown += `| --- | --- | --- | --- | --- |\n`;
+                this.evaluation.mitigationStatus.forEach((item) => {
+                    const badge = item.status === 'Mitigada' ? '✅ Mitigada' : item.status === 'Parcialmente Mitigada' ? '⚠️ Parcial' : '❌ Não Mitigada';
+                    markdown += `| ${item.threatTitle} | ${item.elementName} | ${badge} | ${item.reason.replace(/\n/g, ' ')} | ${item.recommendations ? item.recommendations.replace(/\n/g, ' ') : 'N/A'} |\n`;
+                });
+                markdown += `\n`;
+            } else {
+                markdown += `*Nenhuma mitigação foi avaliada ainda.*\n\n`;
+            }
             
             const dataStr = 'data:text/markdown;charset=utf-8,' + encodeURIComponent(markdown);
             const downloadAnchor = document.createElement('a');

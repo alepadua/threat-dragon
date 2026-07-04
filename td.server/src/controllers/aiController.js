@@ -10,6 +10,7 @@ import loggerHelper from '../helpers/logger.helper.js';
 import mammoth from 'mammoth';
 import questionPlanningEngine from '../helpers/questionPlanningEngine.js';
 import { HttpsProxyAgent } from 'https-proxy-agent';
+import crypto from 'crypto';
 
 // Polyfill DOMMatrix for pdfjs-dist used by pdf-parse
 global.DOMMatrix = DOMMatrix;
@@ -213,6 +214,102 @@ const healDiagramCells = (cells) => {
     });
 
     return [...nodes, ...healedEdges];
+};
+
+const healParsedQuestions = (parsedQuestions, roundQuestions) => {
+    if (!Array.isArray(parsedQuestions) || parsedQuestions.length === 0) {
+        return [];
+    }
+    if (!Array.isArray(roundQuestions) || roundQuestions.length === 0) {
+        // Fallback: If no round questions were assigned, we assign new random IDs to make them answerable,
+        // though they won't match the plan (since there was no plan or it was empty).
+        return parsedQuestions.map((q) => {
+            if (typeof q === 'string') {
+                return {
+                    id: `q-healed-${crypto.randomUUID().slice(0, 8)}`,
+                    text: q,
+                    elementId: 'global',
+                    elementName: 'Sistema',
+                    category: 'Geral'
+                };
+            }
+            return {
+                id: q.id || `q-healed-${crypto.randomUUID().slice(0, 8)}`,
+                text: q.text || q.question || '',
+                elementId: q.elementId || 'global',
+                elementName: q.elementName || 'Sistema',
+                category: q.category || 'Geral'
+            };
+        });
+    }
+
+    const healedQuestions = [];
+    const usedRoundIndices = new Set();
+
+    parsedQuestions.forEach((q, idx) => {
+        let text = '';
+        let elementId = '';
+        let category = '';
+        let id = '';
+
+        if (typeof q === 'string') {
+            text = q;
+        } else if (q && typeof q === 'object') {
+            text = q.text || q.question || '';
+            elementId = q.elementId || '';
+            category = q.category || '';
+            id = q.id || '';
+        }
+
+        // Try to find a matching assigned question in roundQuestions
+        let matchedRq = null;
+
+        // 1. Try to match by ID
+        if (id) {
+            matchedRq = roundQuestions.find((rq) => rq.id === id);
+        }
+
+        // 2. Try to match by elementId and category (case-insensitive)
+        if (!matchedRq && elementId && category) {
+            matchedRq = roundQuestions.find((rq, rIdx) => !usedRoundIndices.has(rIdx) &&
+                rq.elementId === elementId &&
+                rq.category?.toLowerCase() === category.toLowerCase()
+            );
+        }
+
+        // 3. Fallback: match by index
+        if (!matchedRq && idx < roundQuestions.length) {
+            const fallbackRq = roundQuestions[idx];
+            matchedRq = fallbackRq;
+        }
+
+        if (matchedRq) {
+            const rqIdx = roundQuestions.indexOf(matchedRq);
+            usedRoundIndices.add(rqIdx);
+
+            healedQuestions.push({
+                id: matchedRq.id,
+                elementId: matchedRq.elementId,
+                elementName: matchedRq.elementName,
+                category: matchedRq.category,
+                elementType: matchedRq.elementType,
+                type: matchedRq.type,
+                text: text || matchedRq.text, // use LLM's text if present, otherwise plan's text
+                answered: matchedRq.answered || false
+            });
+        } else {
+            // If we couldn't match it but it is a question, keep it with a generated ID
+            healedQuestions.push({
+                id: id || `q-healed-${crypto.randomUUID().slice(0, 8)}`,
+                elementId: elementId || 'global',
+                elementName: 'Sistema',
+                category: category || 'Geral',
+                text: text
+            });
+        }
+    });
+
+    return healedQuestions;
 };
 
 const cleanJson = (str) => {
@@ -1066,217 +1163,345 @@ const splitTextIntoChunks = (text, chunkSize = 1000, overlap = 150) => {
 
 const clientFactory = {
     getOpenAIClient(aiConfig) {
-        const agent = getProxyAgent('OpenAI SDK');
+        const agent = getProxyAgent('OpenAI SDK Fetch');
         const options = {
             apiKey: aiConfig.apiKey,
-            baseURL: aiConfig.baseUrl
+            baseURL: aiConfig.baseUrl,
+            fetch: async (url, init) => {
+                const headers = {};
+                if (init.headers) {
+                    if (typeof init.headers.forEach === 'function') {
+                        init.headers.forEach((value, key) => {
+                            headers[key] = value;
+                        });
+                    } else {
+                        Object.assign(headers, init.headers);
+                    }
+                }
+
+                const config = {
+                    method: init.method || 'GET',
+                    url: url,
+                    headers: headers,
+                    data: init.body,
+                    timeout: init.timeout || 180000,
+                    responseType: 'stream',
+                    proxy: false
+                };
+
+                if (agent) {
+                    config.httpAgent = agent;
+                    config.httpsAgent = agent;
+                }
+
+                try {
+                    const res = await axios(config);
+
+                    const readStream = () => new Promise((resolve, reject) => {
+                        let data = '';
+                        res.data.on('data', (chunk) => {
+                            data += chunk.toString('utf8');
+                        });
+                        res.data.on('end', () => resolve(data));
+                        res.data.on('error', (err) => reject(err));
+                    });
+
+                    return {
+                        ok: res.status >= 200 && res.status < 300,
+                        status: res.status,
+                        statusText: res.statusText,
+                        headers: {
+                            get(name) {
+                                return res.headers[name.toLowerCase()];
+                            },
+                            entries() {
+                                return Object.entries(res.headers);
+                            },
+                            [Symbol.iterator]() {
+                                return Object.entries(res.headers)[Symbol.iterator]();
+                            }
+                        },
+                        text: readStream,
+                        json: async () => {
+                            const txt = await readStream();
+                            return JSON.parse(txt);
+                        },
+                        body: res.data
+                    };
+                } catch (err) {
+                    if (err.response) {
+                        const readErrStream = () => new Promise((resolve) => {
+                            if (typeof err.response.data?.on !== 'function') {
+                                resolve(JSON.stringify(err.response.data || ''));
+                                return;
+                            }
+                            let data = '';
+                            err.response.data.on('data', (chunk) => {
+                                data += chunk.toString('utf8');
+                            });
+                            err.response.data.on('end', () => resolve(data));
+                            err.response.data.on('error', () => resolve(JSON.stringify(err.response.data || '')));
+                        });
+
+                        return {
+                            ok: false,
+                            status: err.response.status,
+                            statusText: err.response.statusText,
+                            headers: {
+                                get(name) {
+                                    return err.response.headers[name.toLowerCase()];
+                                },
+                                entries() {
+                                    return Object.entries(err.response.headers);
+                                },
+                                [Symbol.iterator]() {
+                                    return Object.entries(err.response.headers)[Symbol.iterator]();
+                                }
+                            },
+                            text: readErrStream,
+                            json: async () => {
+                                const txt = await readErrStream();
+                                try {
+                                    return JSON.parse(txt);
+                                } catch {
+                                    return txt;
+                                }
+                            },
+                            body: err.response.data
+                        };
+                    }
+                    throw err;
+                }
+            }
         };
-        if (agent) {
-            options.httpAgent = agent;
-        }
         return new OpenAI(options);
     }
 };
 
 
-const callAIModel = async (promptText, images, aiConfig, job = null) => {
-    if (job) {
-        job.streamText = '';
-        activeJobs.set(job.jobId, { ...job });
+const recoverBedrockMantleResponse = async (promptText, aiConfig) => {
+    /* eslint-disable max-depth, no-await-in-loop */
+    const listUrl = `${aiConfig.baseUrl}/responses`;
+    logger.info(`[recoverBedrockMantleResponse] Attempting to list responses from URL: ${listUrl}`);
+    
+    const agent = getProxyAgent('Axios Recovery');
+    const listAxiosConfig = {
+        headers: {
+            'Authorization': `Bearer ${aiConfig.apiKey}`,
+            'Content-Type': 'application/json'
+        },
+        params: {
+            limit: 5
+        },
+        timeout: 10000,
+        proxy: false
+    };
+    if (agent) {
+        listAxiosConfig.httpAgent = agent;
+        listAxiosConfig.httpsAgent = agent;
     }
-    try {
-        if (aiConfig.provider === 'bedrock-mantle') {
-            const messages = [];
-            let userContent = [];
-            if (promptText) {
-                userContent.push({ type: 'text', text: promptText });
+    
+    let listResponse = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+            listResponse = await axios.get(listUrl, listAxiosConfig);
+            break;
+        } catch (listErr) {
+            const listErrMessage = listErr?.message || String(listErr);
+            logger.warn(`[recoverBedrockMantleResponse] Attempt ${attempt} to list responses from URL ${listUrl} failed: ${listErrMessage}`);
+            if (attempt < 3) {
+                logger.info(`[recoverBedrockMantleResponse] Waiting 2 seconds before retrying list responses...`);
+                await new Promise((resolve) => { setTimeout(resolve, 2000); });
+            } else {
+                throw listErr;
             }
-            if (images && images.length > 0) {
-                images.forEach((img) => {
-                    const parsed = parseBase64Image(img.data || img);
-                    userContent.push({
-                        type: 'image_url',
-                        image_url: { url: `data:${parsed.mimeType};base64,${parsed.data}` }
-                    });
-                });
-            }
-            
-            if (userContent.length === 1 && userContent[0].type === 'text') {
-                userContent = userContent[0].text;
-            }
+        }
+    }
+    
+    if (!listResponse?.data || !Array.isArray(listResponse.data.data) || listResponse.data.data.length === 0) {
+        logger.warn(`[recoverBedrockMantleResponse] No recent responses found at URL ${listUrl}`);
+        return null;
+    }
 
-            messages.push({ role: 'user', content: userContent });
-
-            const openai = clientFactory.getOpenAIClient(aiConfig);
-            logger.info(`[callAIModel] Bedrock Mantle sending chat completion request via OpenAI SDK to URL: ${aiConfig.baseUrl}/chat/completions`);
-
-            const requestPayload = {
-                model: aiConfig.model || 'meta.llama3-70b-instruct-v1:0',
-                messages: messages,
-                max_tokens: 16384
-            };
-
-            if (aiConfig.extendedThinking) {
-                requestPayload.thinking = {
-                    type: 'enabled',
-                    budget_tokens: 2048
-                };
-                requestPayload.reasoning_effort = 'medium';
-            }
-
-            try {
-                const response = await openai.chat.completions.create(
-                    requestPayload,
-                    {
-                        timeout: REQUEST_TIMEOUT
-                    }
-                );
-
-                logger.info(`[callAIModel] Bedrock Mantle response received via OpenAI SDK.`);
-                return response.choices?.[0]?.message?.content || '';
-            } catch (err) {
-                const errName = err?.name;
-                const errMessage = err?.message;
-                
-                logger.warn(`[callAIModel] Bedrock Mantle request to ${aiConfig.baseUrl}/chat/completions failed with error: ${errMessage} (${errName}). Attempting to recover response from stored state...`);
-                try {
-                    const listUrl = `${aiConfig.baseUrl}/responses`;
-                    logger.info(`[callAIModel] Attempting to list responses from URL: ${listUrl}`);
-                    
-                    const agent = getProxyAgent('Axios Recovery');
-                    const listAxiosConfig = {
-                        headers: {
-                            'Authorization': `Bearer ${aiConfig.apiKey}`,
-                            'Content-Type': 'application/json'
-                        },
-                        params: {
-                            limit: 5
-                        },
-                        timeout: 10000,
-                        proxy: false
-                    };
-                    if (agent) {
-                        listAxiosConfig.httpAgent = agent;
-                        listAxiosConfig.httpsAgent = agent;
-                    }
-                    
-                    let listResponse = null;
-                    for (let attempt = 1; attempt <= 3; attempt++) {
-                        try {
-                            listResponse = await axios.get(listUrl, listAxiosConfig);
-                            break;
-                        } catch (listErr) {
-                            const listErrMessage = listErr?.message || String(listErr);
-                            logger.warn(`[callAIModel] Attempt ${attempt} to list responses from URL ${listUrl} failed: ${listErrMessage}`);
-                            if (attempt < 3) {
-                                logger.info(`[callAIModel] Waiting 2 seconds before retrying list responses...`);
-                                /* eslint-disable-next-line no-await-in-loop */
-                                await new Promise(resolve => setTimeout(resolve, 2000));
-                            } else {
-                                throw listErr;
-                            }
-                        }
-                    }
-                    
-                    if (listResponse?.data && Array.isArray(listResponse.data.data) && listResponse.data.data.length > 0) {
-                        const matchingResponse = listResponse.data.data.find(r => {
-                            const serializedNormalized = (JSON.stringify(r) || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-                            const targetSlice = (promptText || '');
-                            const promptNormalized = targetSlice.slice(0, Math.min(targetSlice.length, 200)).toLowerCase().replace(/[^a-z0-9]/g, '');
-                            return serializedNormalized.includes(promptNormalized);
-                        });
-                        
-                        if (matchingResponse) {
-                            let targetResponse = matchingResponse;
-                            
-                            if (targetResponse.status === 'in_progress' || targetResponse.status === 'pending') {
-                                logger.info(`[callAIModel] Found matching response ${targetResponse.id} with status ${targetResponse.status}. Polling for completion...`);
-                                const retrieveUrl = `${aiConfig.baseUrl}/responses/${targetResponse.id}`;
-                                logger.info(`[callAIModel] Attempting to retrieve individual response from URL: ${retrieveUrl}`);
-                                
-                                for (let attempt = 1; attempt <= 20; attempt++) {
-                                    /* eslint-disable-next-line no-await-in-loop */
-                                    await new Promise(resolve => setTimeout(resolve, 5000));
-                                    
-                                    try {
-                                        const retrieveAxiosConfig = {
-                                            headers: {
-                                                'Authorization': `Bearer ${aiConfig.apiKey}`,
-                                                'Content-Type': 'application/json'
-                                            },
-                                            timeout: 5000,
-                                            proxy: false
-                                        };
-                                        if (agent) {
-                                            retrieveAxiosConfig.httpAgent = agent;
-                                            retrieveAxiosConfig.httpsAgent = agent;
-                                        }
-                                        /* eslint-disable-next-line no-await-in-loop */
-                                        const pollResponse = await axios.get(retrieveUrl, retrieveAxiosConfig);
-                                        if (pollResponse?.data) {
-                                            targetResponse = pollResponse.data;
-                                            logger.info(`[callAIModel] Polling attempt ${attempt} for URL ${retrieveUrl}: status is ${targetResponse.status}`);
-                                            if (targetResponse.status === 'completed') {
-                                                break;
-                                            }
-                                            if (targetResponse.status === 'failed') {
-                                                break;
-                                            }
-                                        }
-                                    } catch (pollErr) {
-                                        const pollErrMessage = pollErr?.message || String(pollErr);
-                                        logger.error(`[callAIModel] Polling attempt ${attempt} failed for URL ${retrieveUrl}: ${pollErrMessage}`);
-                                    }
-                                }
-                            }
-                            
-                            if (targetResponse.status === 'completed') {
-                                logger.info(`[callAIModel] Successfully recovered timed-out response from Bedrock Mantle. Response ID: ${targetResponse.id}`);
-                                const content = targetResponse.output?.choices?.[0]?.message?.content || 
-                                                targetResponse.output?.output_text || 
-                                                targetResponse.output || '';
-                                if (content) {
-                                    return content;
-                                }
-                            } else {
-                                logger.warn(`[callAIModel] Recovered response ${targetResponse.id} status is ${targetResponse.status}, not completed.`);
-                            }
-                        } else {
-                            logger.warn(`[callAIModel] No matching response found in the recent list for the current prompt.`);
-                        }
-                    }
-                } catch (recoverErr) {
-                    const recoverErrMessage = recoverErr?.message || String(recoverErr);
-                    logger.error(`[callAIModel] Failed to recover response from Bedrock Mantle stored state at URL ${aiConfig.baseUrl}/responses: ${recoverErrMessage}`);
-                }
-                throw err;
-            }
-        } 
+    const matchingResponse = listResponse.data.data.find((r) => {
+        const serializedNormalized = (JSON.stringify(r) || '').toLowerCase().replace(/[^a-z0-9]/gu, '');
+        const targetSlice = (promptText || '');
+        const promptNormalized = targetSlice.slice(0, Math.min(targetSlice.length, 200)).toLowerCase().
+replace(/[^a-z0-9]/gu, '');
+        return serializedNormalized.includes(promptNormalized);
+    });
+    
+    if (!matchingResponse) {
+        logger.warn(`[recoverBedrockMantleResponse] No matching response found in the recent list for the current prompt.`);
+        return null;
+    }
+    
+    let targetResponse = matchingResponse;
+    
+    if (targetResponse.status === 'in_progress' || targetResponse.status === 'pending') {
+        logger.info(`[recoverBedrockMantleResponse] Found matching response ${targetResponse.id} with status ${targetResponse.status}. Polling for completion...`);
+        const retrieveUrl = `${aiConfig.baseUrl}/responses/${targetResponse.id}`;
+        logger.info(`[recoverBedrockMantleResponse] Attempting to retrieve individual response from URL: ${retrieveUrl}`);
         
-        const parts = [];
-        if (promptText) {
-            parts.push({ text: promptText });
-        }
-        if (images && images.length > 0) {
-            images.forEach((img) => {
-                const parsed = parseBase64Image(img.data || img);
-                parts.push({
-                    inlineData: { mimeType: parsed.mimeType, data: parsed.data }
-                });
-            });
-        }
-
-        const payload = {
-            contents: [{ parts }],
-            generationConfig: {
-                maxOutputTokens: 16384,
-                responseMimeType: 'application/json'
+        for (let attempt = 1; attempt <= 20; attempt++) {
+            await new Promise((resolve) => { setTimeout(resolve, 5000); });
+            
+            try {
+                const retrieveAxiosConfig = {
+                    headers: {
+                        'Authorization': `Bearer ${aiConfig.apiKey}`,
+                        'Content-Type': 'application/json'
+                    },
+                    timeout: 5000,
+                    proxy: false
+                };
+                if (agent) {
+                    retrieveAxiosConfig.httpAgent = agent;
+                    retrieveAxiosConfig.httpsAgent = agent;
+                }
+                const pollResponse = await axios.get(retrieveUrl, retrieveAxiosConfig);
+                if (pollResponse?.data) {
+                    targetResponse = pollResponse.data;
+                    logger.info(`[recoverBedrockMantleResponse] Polling attempt ${attempt} for URL ${retrieveUrl}: status is ${targetResponse.status}`);
+                    if (targetResponse.status === 'completed' || targetResponse.status === 'failed') {
+                        break;
+                    }
+                }
+            } catch (pollErr) {
+                const pollErrMessage = pollErr?.message || String(pollErr);
+                logger.error(`[recoverBedrockMantleResponse] Polling attempt ${attempt} failed for URL ${retrieveUrl}: ${pollErrMessage}`);
             }
+        }
+    }
+    
+    if (targetResponse.status === 'completed') {
+        logger.info(`[recoverBedrockMantleResponse] Successfully recovered timed-out response from Bedrock Mantle. Response ID: ${targetResponse.id}`);
+        const content = targetResponse.output?.choices?.[0]?.message?.content || 
+                        targetResponse.output?.output_text || 
+                        targetResponse.output || '';
+        if (content) {
+            return content;
+        }
+    } else {
+        logger.warn(`[recoverBedrockMantleResponse] Recovered response ${targetResponse.id} status is ${targetResponse.status}, not completed.`);
+    }
+
+    return null;
+    /* eslint-enable max-depth, no-await-in-loop */
+};
+
+
+const callBedrockMantle = async (promptText, images, aiConfig, job = null) => {
+    const messages = [];
+    let userContent = [];
+    if (promptText) {
+        userContent.push({ type: 'text', text: promptText });
+    }
+    if (images && images.length > 0) {
+        images.forEach((img) => {
+            const parsed = parseBase64Image(img.data || img);
+            userContent.push({
+                type: 'image_url',
+                image_url: { url: `data:${parsed.mimeType};base64,${parsed.data}` }
+            });
+        });
+    }
+    
+    if (userContent.length === 1 && userContent[0].type === 'text') {
+        userContent = userContent[0].text;
+    }
+
+    messages.push({ role: 'user', content: userContent });
+
+    const openai = clientFactory.getOpenAIClient(aiConfig);
+    logger.info(`[callBedrockMantle] Bedrock Mantle sending chat completion request via OpenAI SDK to URL: ${aiConfig.baseUrl}/chat/completions`);
+
+    const requestPayload = {
+        model: aiConfig.model || 'meta.llama3-70b-instruct-v1:0',
+        messages: messages,
+        max_tokens: 16384,
+        stream: true
+    };
+
+    if (aiConfig.extendedThinking) {
+        requestPayload.thinking = {
+            type: 'enabled',
+            budget_tokens: 2048
         };
+        requestPayload.reasoning_effort = 'medium';
+    }
 
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${aiConfig.apiKey}`;
-        logger.info(`[callAIModel] Gemini sending POST request to API. Payload size: ${JSON.stringify(payload).length} characters`);
+    try {
+        const stream = await openai.chat.completions.create(
+            requestPayload,
+            {
+                timeout: REQUEST_TIMEOUT
+            }
+        );
 
+        if (stream && typeof stream[Symbol.asyncIterator] === 'function') {
+            logger.info(`[callBedrockMantle] Bedrock Mantle stream response initiated. Reading chunks...`);
+            let fullContent = '';
+            for await (const chunk of stream) {
+                const content = chunk.choices?.[0]?.delta?.content || '';
+                fullContent += content;
+                if (job) {
+                    job.streamText = fullContent;
+                    activeJobs.set(job.jobId, { ...job });
+                }
+            }
+
+            logger.info(`[callBedrockMantle] Bedrock Mantle stream response fully received via OpenAI SDK.`);
+            return fullContent;
+        } 
+            logger.info(`[callBedrockMantle] Bedrock Mantle response received (non-stream / test stub).`);
+            return stream?.choices?.[0]?.message?.content || '';
+        
+    } catch (err) {
+        const errName = err?.name;
+        const errMessage = err?.message;
+        
+        logger.warn(`[callBedrockMantle] Bedrock Mantle request to ${aiConfig.baseUrl}/chat/completions failed with error: ${errMessage} (${errName}). Attempting to recover response...`);
+        try {
+            const content = await recoverBedrockMantleResponse(promptText, aiConfig);
+            if (content) {
+                return content;
+            }
+        } catch (recoverErr) {
+            const recoverErrMessage = recoverErr?.message || String(recoverErr);
+            logger.error(`[callBedrockMantle] Failed to recover response: ${recoverErrMessage}`);
+        }
+        throw err;
+    }
+};
+
+
+const callGemini = async (promptText, images, aiConfig) => {
+    const parts = [];
+    if (promptText) {
+        parts.push({ text: promptText });
+    }
+    if (images && images.length > 0) {
+        images.forEach((img) => {
+            const parsed = parseBase64Image(img.data || img);
+            parts.push({
+                inlineData: { mimeType: parsed.mimeType, data: parsed.data }
+            });
+        });
+    }
+
+    const payload = {
+        contents: [{ parts }],
+        generationConfig: {
+            maxOutputTokens: 16384,
+            responseMimeType: 'application/json'
+        }
+    };
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${aiConfig.apiKey}`;
+    logger.info(`[callGemini] Gemini sending POST request to API. Payload size: ${JSON.stringify(payload).length} characters`);
+
+    try {
         const response = await axios.post(
             url,
             payload,
@@ -1286,32 +1511,44 @@ const callAIModel = async (promptText, images, aiConfig, job = null) => {
             }
         );
 
-        logger.info(`[callAIModel] Gemini response status: ${response.status}`);
+        logger.info(`[callGemini] Gemini response status: ${response.status}`);
         return response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
     } catch (err) {
-        logger.error(`[callAIModel] HTTP/API Request Failed: ${err.message}`);
+        logger.error(`[callGemini] HTTP/API Request Failed: ${err.message}`);
         if (err.response) {
-            logger.error(`[callAIModel] Error Response Status: ${err.response.status}`);
+            logger.error(`[callGemini] Error Response Status: ${err.response.status}`);
             try {
-                logger.error(`[callAIModel] Error Response Headers: ${JSON.stringify(err.response.headers)}`);
+                logger.error(`[callGemini] Error Response Headers: ${JSON.stringify(err.response.headers)}`);
             } catch (e) {
-                logger.error(`[callAIModel] Error Response Headers: [Could not serialize]`);
+                logger.error(`[callGemini] Error Response Headers: [Could not serialize]`);
             }
             try {
                 // err.response.data may be a stream (circular) when responseType is 'stream'
                 const data = typeof err.response.data === 'object' && typeof err.response.data?.on === 'function'
                     ? '[Stream - not serializable]'
                     : JSON.stringify(err.response.data);
-                logger.error(`[callAIModel] Error Response Data: ${data}`);
+                logger.error(`[callGemini] Error Response Data: ${data}`);
             } catch (e) {
-                logger.error(`[callAIModel] Error Response Data: [Could not serialize]`);
+                logger.error(`[callGemini] Error Response Data: [Could not serialize]`);
             }
         } else if (err.request) {
             // err.request is an http.ClientRequest with circular references (socket -> parser -> socket)
-            logger.error(`[callAIModel] Request was sent but no response was received (possible timeout or network error).`);
+            logger.error(`[callGemini] Request was sent but no response was received (possible timeout or network error).`);
         }
         throw err;
     }
+};
+
+
+const callAIModel = async (promptText, images, aiConfig, job = null) => {
+    if (job) {
+        job.streamText = '';
+        activeJobs.set(job.jobId, { ...job });
+    }
+    if (aiConfig.provider === 'bedrock-mantle') {
+        return callBedrockMantle(promptText, images, aiConfig, job);
+    }
+    return callGemini(promptText, images, aiConfig);
 };
 
 const getEmbeddingsBatch = async (chunks, aiConfig) => {
@@ -1551,15 +1788,80 @@ const getJobStatus = (req, res) => {
     });
 };
 
+const getMaxContextChars = (aiConfig) => {
+    if (aiConfig?.maxContextTokens) {
+        const tokens = Number(aiConfig.maxContextTokens);
+        if (!isNaN(tokens) && tokens > 0) {
+            const actualTokens = tokens <= 2048 ? tokens * 1000 : tokens;
+            return actualTokens * 3;
+        }
+    }
+
+    const provider = aiConfig?.provider;
+    const model = (aiConfig?.model || '').toLowerCase();
+
+    // Default conservative limit (15k chars, ~5k tokens)
+    let maxChars = 15000;
+
+    if (provider === 'gemini') {
+        // Gemini 1.5 Flash/Pro supports 1M+ tokens, let's allow up to 600k characters (~200k tokens)
+        maxChars = 600000;
+    } else if (provider === 'bedrock-mantle') {
+        if (model.includes('llama3.1') || model.includes('llama-3.1')) {
+            // Llama 3.1 has a 128k token context. Let's allow up to 250k characters (~80k tokens)
+            maxChars = 250000;
+        } else if (model.includes('claude-3') || model.includes('claude-v3') || model.includes('sonnet') || model.includes('haiku')) {
+            // Claude 3 has 200k token context. Let's allow up to 400k characters (~130k tokens)
+            maxChars = 400000;
+        } else if (model.includes('meta.llama3') || model.includes('llama3')) {
+            // Llama 3 has 8k token context (very small). Let's keep it to 15k characters (~5k tokens)
+            maxChars = 15000;
+        } else {
+            // Default Bedrock Mantle model or custom model: assume at least 128k context if it is newer
+            // Let's be moderately generous: 100k characters (~30k tokens)
+            maxChars = 100000;
+        }
+    }
+
+    return maxChars;
+};
+
+const getQuestionBatchSize = (aiConfig) => {
+    if (aiConfig?.questionBatchSize) {
+        const size = Number(aiConfig.questionBatchSize);
+        if (!isNaN(size) && size > 0) {
+            return Math.min(size, 15);
+        }
+    }
+
+    const maxChars = getMaxContextChars(aiConfig);
+    let batchSize = 3;
+
+    if (maxChars >= 600000) {
+        batchSize = 8;
+    } else if (maxChars >= 250000) {
+        batchSize = 5;
+    } else if (maxChars >= 100000) {
+        batchSize = 4;
+    } else {
+        batchSize = 3;
+    }
+
+    return batchSize;
+};
+
+
 const runGenerateJob = async (job, body, activeSession, finalDocs, finalImages, finalMethodology, dfdApprovedBool, aiConfig) => {
     try {
         const {
             title,
             description,
             currentModel,
-            refinementHistory,
+            refinementHistory: bodyRefinementHistory,
             threatModelApproved
         } = body;
+
+        const refinementHistory = (activeSession && activeSession.refinementHistory) || bodyRefinementHistory || [];
 
         const agentName = !dfdApprovedBool ? 'DFDAgent' : 'ThreatAgent';
         let threatModelApprovedBool = (threatModelApproved === true || threatModelApproved === 'true');
@@ -1588,7 +1890,11 @@ const runGenerateJob = async (job, body, activeSession, finalDocs, finalImages, 
             docsTexts = await extractTextFromDocs(finalDocs);
         }
 
-        if (docsTexts.length > 0 && (!activeSession || !activeSession.embeddingsGenerated)) {
+        const fullDocText = docsTexts.map((d) => d.text).join('');
+        const maxContextChars = getMaxContextChars(aiConfig);
+        const skipRag = fullDocText.length <= maxContextChars;
+
+        if (docsTexts.length > 0 && !skipRag && (!activeSession || !activeSession.embeddingsGenerated)) {
             // Stage 1: Local RAG Chunking and Embedding Generation
             await generateAndSaveEmbeddings(activeSession.sessionId, docsTexts, aiConfig);
             aiContextStore.updateSession(activeSession.sessionId, { embeddingsGenerated: true });
@@ -1600,9 +1906,8 @@ const runGenerateJob = async (job, body, activeSession, finalDocs, finalImages, 
         // Process / Retrieve context from RAG
         let docsContext = '';
         if (docsTexts.length > 0) {
-            const fullDocText = docsTexts.map((d) => d.text).join('');
-            if (fullDocText.length <= 15000) {
-                logger.info(`Documentation length (${fullDocText.length} chars) is within limits. Sending full documentation.`);
+            if (skipRag) {
+                logger.info(`[runGenerateJob] Documentation length (${fullDocText.length} chars) is within context limit (${maxContextChars} chars) for ${aiConfig.provider}/${aiConfig.model}. Skipping RAG and sending full documentation.`);
                 docsContext = fullDocText;
             } else {
                 // Otherwise, use RAG retrieval
@@ -1630,8 +1935,17 @@ const runGenerateJob = async (job, body, activeSession, finalDocs, finalImages, 
         let methodologyPrompt = '';
         if (finalMethodology === 'MITRE_F3') {
             methodologyPrompt = `
-You must perform Threat Modeling focusing on the MITRE Fight Fraud Framework (F3).
-Strictly map threats to elements using these MITRE F3 tactics:
+You must perform Threat Modeling focusing on the MITRE Fight Fraud Framework (F3) for financial fraud prevention.
+Strictly map threats to elements using these MITRE F3 tactics, and ensure your generated threats and clarifying questions focus specifically on fraud scenarios (not standard IT/network security):
+- "Reconnaissance": Fraudsters gathering information on target users, routing numbers, API structures, transaction flows, or fraud system limits.
+- "Resource Development": Fraudsters acquiring/preparing assets for fraud, such as mule accounts, stolen credentials, synthetic identities, or spoofed devices.
+- "Initial Access": Fraudsters gaining entry to legitimate user accounts or system interfaces (e.g. credential stuffing, phishing, account takeover).
+- "Defense Evasion": Fraudsters bypassing or evading fraud detection controls (e.g. bypassing KYC verification, spoofing device fingerprinting, mimicking normal user behavior, keeping transaction velocity low).
+- "Positioning": Fraudsters preparing for monetization within the system (e.g. linking external bank accounts, changing transaction limits, adding new payees/beneficiaries).
+- "Execution": Fraudsters carrying out unauthorized or fraudulent actions/transactions (e.g. initiating fraudulent bank transfers, executing illicit checkout payments, submitting fake invoices).
+- "Monetization": Fraudsters converting the fraudulent action into cash or liquid value (e.g. cashing out via money mules, gift card conversion, moving funds to unregulated cryptocurrency accounts).
+
+Strictly map these tactics to element types:
 - "actor" (External Entity / Fraudster): Applicable threat categories are "Reconnaissance", "Resource Development", and "Initial Access".
 - "process" (Internal System / Financial Engine): Applicable threat categories are "Defense Evasion", "Execution", and "Positioning".
 - "store" (Data Store / Credentials Cache): Applicable threat categories are "Initial Access" and "Monetization".
@@ -1724,7 +2038,7 @@ CURRENT REFINEMENT PHASE: DFD TOPOLOGY REFINEMENT (Phase 1)
                 const answeredIds = activeSession.answeredQuestionIds || [];
                 const currentQuestionIds = (activeSession.questions || []).map((q) => q.id || q);
                 const combinedIds = Array.from(new Set([...answeredIds, ...currentQuestionIds]));
-                const batchSize = 3;
+                const batchSize = getQuestionBatchSize(aiConfig);
                 const { questions: roundQuestions } = questionPlanningEngine.getQuestionsByRound(
                     activeSession.questionPlan,
                     1,
@@ -2135,6 +2449,9 @@ Here is the generated Threat Dragon V2 JSON DFD model to review:
 ${JSON.stringify(threatModel, null, 2)}
 `;
             } else {
+                const sessionAnswered = activeSession?.answeredQuestions || [];
+                const realAnswers = sessionAnswered.filter((q) => q.id && !q.id.startsWith('manual-req-'));
+
                 critiquePromptText += `
 LANGUAGE REQUIREMENT:
 You MUST write all evaluation texts, feedback/critique paragraphs, security control categories, and assessment details in Portuguese.
@@ -2146,6 +2463,17 @@ ${docsContext}
 
 Here is the generated Threat Dragon V2 JSON DFD model to review:
 ${JSON.stringify(threatModel, null, 2)}
+
+--- USER'S SECURITY QUESTION ANSWERS ---
+Here are the actual answers provided by the user for various elements and categories in this session:
+${realAnswers.length > 0
+  ? realAnswers.map((q) => `- Elemento: "${q.elementName}" | Categoria: "${q.category}"\n  Pergunta: ${q.text}\n  Resposta do Usuário: "${q.answer}"`).join('\n\n')
+  : 'Nenhuma pergunta foi respondida pelo usuário ainda.'}
+
+ANTI-HALLUCINATION / ONLY REAL ANSWERS RULE:
+1. You MUST ONLY evaluate the security controls/categories for which the user has explicitly provided answers in the list above.
+2. Under "userAnswer" in the "controlsAssessment" array, you MUST use the EXACT user response/answer from the list above. Do NOT invent, assume, or hallucinate any user answers.
+3. If the user has not answered any questions yet (or if the list above is empty), the "controlsAssessment" array MUST be empty []. Do NOT generate or critique any hypothetical controls or hallucinated answers.
 `;
             }
 
@@ -2245,7 +2573,11 @@ Return ONLY a JSON object containing the keys "threatModel" and "questions" (as 
 
                 const parsedRevision = revResponseText ? extractJson(revResponseText) : null;
                 if (parsedRevision && parsedRevision.threatModel) {
+                    const originalResolved = parsedOutput.resolvedQuestionIds;
                     parsedOutput = parsedRevision;
+                    if (!parsedOutput.resolvedQuestionIds && originalResolved) {
+                        parsedOutput.resolvedQuestionIds = originalResolved;
+                    }
                     parsedOutput.threatModel = mergeDiagramCells(currentModel, parsedOutput.threatModel, refinementHistory, dfdApprovedBool);
                     logger.info(`[Job ${job.jobId}] Successfully received revised threat model from self-correction loop. Re-evaluating revised model...`);
                     // Re-run the critic once on the revised model to get the updated evaluation score
@@ -2262,6 +2594,24 @@ Return ONLY a JSON object containing the keys "threatModel" and "questions" (as 
                 activeSession.evaluation.controlsAssessment,
                 evaluation.controlsAssessment
             );
+        }
+
+        // Filter controlsAssessment to ensure no hallucinated/unanswered items are retained
+        if (evaluation.controlsAssessment && Array.isArray(evaluation.controlsAssessment)) {
+            const realAnswers = (activeSession.answeredQuestions || []).filter((q) => q.id && !q.id.startsWith('manual-req-'));
+            if (realAnswers.length === 0) {
+                evaluation.controlsAssessment = [];
+            } else {
+                // Keep only assessments that correspond to a real user answer
+                evaluation.controlsAssessment = evaluation.controlsAssessment.filter((assessment) => {
+                    if (!assessment.userAnswer) { return false; }
+                    const cleanUserAnswer = assessment.userAnswer.toLowerCase().trim();
+                    return realAnswers.some((q) => {
+                        const cleanActual = q.answer.toLowerCase().trim();
+                        return cleanActual.includes(cleanUserAnswer) || cleanUserAnswer.includes(cleanActual);
+                    });
+                });
+            }
         }
 
         // Cache the latest model, questions, and evaluation in the session context store
@@ -2288,6 +2638,25 @@ Return ONLY a JSON object containing the keys "threatModel" and "questions" (as 
                 questionPlan = questionPlanningEngine.computeQuestionPlan(diagramCells, finalMethodology);
                 logger.info(`[Job ${job.jobId}] Question plan computed: ${questionPlan.totalQuestions} questions for ${finalMethodology} across ${diagramCells.length} cells`);
             }
+
+            // Extract what questions were assigned to the LLM in this round to heal the returned ones
+            let roundQuestions = [];
+            if (questionPlan) {
+                const previousAnsweredIds = activeSession.answeredQuestionIds || [];
+                const currentQuestionIds = (activeSession.questions || []).map((q) => q.id || q);
+                const combinedIds = Array.from(new Set([...previousAnsweredIds, ...currentQuestionIds]));
+                const batchSize = getQuestionBatchSize(aiConfig);
+                const { questions } = questionPlanningEngine.getQuestionsByRound(
+                    questionPlan,
+                    1,
+                    combinedIds,
+                    batchSize
+                );
+                roundQuestions = questions || [];
+            }
+
+            // Heal the returned questions using roundQuestions
+            parsedOutput.questions = healParsedQuestions(parsedOutput.questions, roundQuestions);
 
             // Extract resolved question IDs from LLM response
             if (parsedOutput.resolvedQuestionIds && Array.isArray(parsedOutput.resolvedQuestionIds)) {
@@ -2372,6 +2741,29 @@ Return ONLY a JSON object containing the keys "threatModel" and "questions" (as 
     }
 };
 
+const rebuildHistoryFromAnswered = (answeredQuestions) => {
+    const history = [];
+    if (!answeredQuestions || !Array.isArray(answeredQuestions)) { return history; }
+    answeredQuestions.forEach((q) => {
+        if (q.id && q.id.startsWith('manual-req-')) {
+            history.push({
+                role: 'user',
+                text: q.answer
+            });
+        } else {
+            history.push({
+                role: 'assistant',
+                text: `Sobre o componente "${q.elementName || 'Desconhecido'}" (${q.category || ''}):\nPergunta: ${q.text}`
+            });
+            history.push({
+                role: 'user',
+                text: q.answer
+            });
+        }
+    });
+    return history;
+};
+
 const generate = async (req, res) => {
     const {
         title,
@@ -2398,7 +2790,9 @@ const generate = async (req, res) => {
         revisionModel,
         revisionExtendedThinking,
         deduplicatorModel,
-        deduplicatorExtendedThinking
+        deduplicatorExtendedThinking,
+        maxContextTokens,
+        questionBatchSize
     } = req.body;
 
     logger.info(`[AI Generate Request] Incoming payload: ${JSON.stringify({
@@ -2422,6 +2816,8 @@ const generate = async (req, res) => {
         revisionExtendedThinking,
         deduplicatorModel,
         deduplicatorExtendedThinking,
+        maxContextTokens,
+        questionBatchSize,
         hasApiKey: Boolean(clientApiKey),
         apiKeyLength: clientApiKey ? clientApiKey.length : 0
     })}`);
@@ -2444,7 +2840,9 @@ const generate = async (req, res) => {
         baseUrl: customBaseUrl || (activeSession && activeSession.customBaseUrl) || env.get().config.BEDROCK_MANTLE_BASE_URL,
         model: customModel || (activeSession && activeSession.customModel) || env.get().config.BEDROCK_MANTLE_MODEL,
         embeddingModel: customEmbeddingModel || (activeSession && activeSession.customEmbeddingModel) || env.get().config.BEDROCK_MANTLE_EMBEDDING_MODEL || 'amazon.titan-embed-text-v1',
-        extendedThinking: extendedThinkingVal
+        extendedThinking: extendedThinkingVal,
+        maxContextTokens: maxContextTokens || (activeSession && activeSession.maxContextTokens) || null,
+        questionBatchSize: questionBatchSize || (activeSession && activeSession.questionBatchSize) || null
     };
 
     logger.info(`[AI Generate Request] Resolved aiConfig: ${JSON.stringify({
@@ -2453,6 +2851,8 @@ const generate = async (req, res) => {
         model: aiConfig.model,
         embeddingModel: aiConfig.embeddingModel,
         extendedThinking: aiConfig.extendedThinking,
+        maxContextTokens: aiConfig.maxContextTokens,
+        questionBatchSize: aiConfig.questionBatchSize,
         hasApiKey: Boolean(aiConfig.apiKey),
         apiKeyLength: aiConfig.apiKey ? aiConfig.apiKey.length : 0
     })}`);
@@ -2483,15 +2883,74 @@ const generate = async (req, res) => {
                 }
                 finalMethodology = activeSession.methodology || methodology;
                 
+                let questionPlan = activeSession.questionPlan || null;
+                if (dfdApprovedBool && !questionPlan) {
+                    const diagramCells = (currentModel && currentModel.detail && currentModel.detail.diagrams && currentModel.detail.diagrams[0])
+                        ? (currentModel.detail.diagrams[0].cells || [])
+                        : [];
+                    if (diagramCells.length > 0) {
+                        questionPlan = questionPlanningEngine.computeQuestionPlan(diagramCells, finalMethodology);
+                        logger.info(`[Session ${sessionId}] Pre-computed question plan on DFD approval: ${questionPlan.totalQuestions} questions for ${finalMethodology}`);
+                    }
+                }
+
+                // Process structured question answers if provided
+                const sessionAnswered = activeSession.answeredQuestions || [];
+                if (req.body.answeredQuestions && Array.isArray(req.body.answeredQuestions)) {
+                    const existingIds = new Set(sessionAnswered.map((q) => q.id));
+                    req.body.answeredQuestions.forEach((q) => {
+                        if (q.id && !existingIds.has(q.id)) {
+                            sessionAnswered.push({
+                                id: q.id,
+                                text: q.text,
+                                answer: q.answer,
+                                elementId: q.elementId,
+                                elementName: q.elementName,
+                                category: q.category,
+                                timestamp: new Date().toISOString()
+                            });
+                        }
+                    });
+                }
+
+                // If userResponse (general feedback) is provided, append it as a manual request
+                if (req.body.userResponse && req.body.userResponse.trim()) {
+                    const manualId = `manual-req-${Date.now()}-${Math.random().toString(36).
+substr(2, 5)}`;
+                    sessionAnswered.push({
+                        id: manualId,
+                        text: 'Solicitação Manual de Ajuste',
+                        answer: req.body.userResponse.trim(),
+                        elementId: 'global',
+                        elementName: 'Sistema',
+                        category: 'Ajuste Manual',
+                        timestamp: new Date().toISOString()
+                    });
+                }
+
+                // Rebuild refinementHistory based on ALL answered questions
+                const rebuiltHistory = rebuildHistoryFromAnswered(sessionAnswered);
+
+                // Update answeredQuestionIds automatically
+                const answeredQuestionIds = Array.from(new Set([
+                    ...(activeSession.answeredQuestionIds || []),
+                    ...sessionAnswered.filter((q) => q.id && !q.id.startsWith('manual-req-')).map((q) => q.id)
+                ]));
+
                 // Update history and model in session store
-                aiContextStore.updateSession(sessionId, {
-                    refinementHistory: refinementHistory || [],
+                activeSession = aiContextStore.updateSession(sessionId, {
+                    answeredQuestions: sessionAnswered,
+                    answeredQuestionIds: answeredQuestionIds,
+                    refinementHistory: rebuiltHistory,
                     currentModel: currentModel || null,
+                    questionPlan: questionPlan,
                     aiProvider: provider,
                     customBaseUrl: aiConfig.baseUrl,
                     customModel: aiConfig.model,
                     apiKey: aiConfig.apiKey,
                     extendedThinking: aiConfig.extendedThinking,
+                    maxContextTokens: aiConfig.maxContextTokens,
+                    questionBatchSize: aiConfig.questionBatchSize,
                     customizeStageModels: customizeStageModels === true || customizeStageModels === 'true',
                     generatorModel: generatorModel || '',
                     generatorExtendedThinking: generatorExtendedThinking === true || generatorExtendedThinking === 'true',
@@ -2621,6 +3080,7 @@ const getSessionState = (req, res) => {
             refinementHistory: ensureModelMessageInHistory(session.refinementHistory || [], session.questions || [], session.dfdApproved || false),
             dfdApproved: session.dfdApproved || false,
             threatModelApproved: session.threatModelApproved || false,
+            answeredQuestions: session.answeredQuestions || [],
             extendedThinking: session.extendedThinking === true || session.extendedThinking === 'true',
             customizeStageModels: session.customizeStageModels === true || session.customizeStageModels === 'true',
             generatorModel: session.generatorModel || '',
@@ -2700,6 +3160,120 @@ const undoRefinement = (req, res) => {
     }
 };
 
+const editAnswers = async (req, res) => {
+    const { sessionId } = req.params;
+    const { answeredQuestions } = req.body;
+    
+    logger.info(`[Edit Answers] Editing answers for session ${sessionId}`);
+    
+    try {
+        const session = aiContextStore.getSession(sessionId);
+        if (!session) {
+            return res.status(404).json({
+                status: 404,
+                message: 'Session not found'
+            });
+        }
+        
+        if (!answeredQuestions || !Array.isArray(answeredQuestions)) {
+            return res.status(400).json({
+                status: 400,
+                message: 'answeredQuestions array is required'
+            });
+        }
+        
+        // Update the answers in session.answeredQuestions
+        const sessionAnswered = session.answeredQuestions || [];
+        answeredQuestions.forEach((update) => {
+            const item = sessionAnswered.find((q) => q.id === update.id);
+            if (item) {
+                item.answer = update.answer;
+                item.timestamp = new Date().toISOString();
+            }
+        });
+        
+        // Rebuild history
+        const rebuiltHistory = rebuildHistoryFromAnswered(sessionAnswered);
+        
+        // Recompute plan progress
+        if (session.questionPlan) {
+            const answeredIds = sessionAnswered.filter((q) => q.id && !q.id.startsWith('manual-req-')).map((q) => q.id);
+            session.questionPlan.progress = questionPlanningEngine.computeProgress(session.questionPlan, answeredIds);
+            if (session.questionPlan.progress && session.questionPlan.progress.byCategory) {
+                session.questionPlan.byCategory = session.questionPlan.progress.byCategory;
+            }
+            session.answeredQuestionIds = answeredIds;
+        }
+
+        const previousHistory = session.history || [];
+        if (session.currentModel) {
+            previousHistory.push({
+                currentModel: session.currentModel,
+                questions: session.questions || [],
+                evaluation: session.evaluation || null,
+                refinementHistory: session.refinementHistory || [],
+                dfdApproved: session.dfdApproved || false,
+                threatModelApproved: session.threatModelApproved || false
+            });
+        }
+        
+        // Save back to session store
+        const activeSession = aiContextStore.updateSession(sessionId, {
+            answeredQuestions: sessionAnswered,
+            refinementHistory: rebuiltHistory,
+            answeredQuestionIds: session.answeredQuestionIds || [],
+            history: previousHistory
+        });
+        
+        // Trigger generation job asynchronously
+        const job = createJob();
+        job.sessionId = sessionId;
+        
+        // We retrieve the needed parameters for generation
+        const aiConfig = {
+            provider: activeSession.aiProvider || 'gemini',
+            apiKey: activeSession.apiKey || (activeSession.aiProvider === 'bedrock-mantle' ? env.get().config.BEDROCK_MANTLE_API_KEY : env.get().config.GEMINI_API_KEY),
+            baseUrl: activeSession.customBaseUrl || env.get().config.BEDROCK_MANTLE_BASE_URL,
+            model: activeSession.customModel || env.get().config.BEDROCK_MANTLE_MODEL,
+            embeddingModel: env.get().config.BEDROCK_MANTLE_EMBEDDING_MODEL || 'amazon.titan-embed-text-v1',
+            extendedThinking: activeSession.extendedThinking === true || activeSession.extendedThinking === 'true',
+            maxContextTokens: activeSession.maxContextTokens || null,
+            questionBatchSize: activeSession.questionBatchSize || null
+        };
+        
+        runGenerateJob(
+            job,
+            {
+                title: activeSession.title,
+                description: activeSession.description,
+                currentModel: activeSession.currentModel,
+                dfdApproved: activeSession.dfdApproved
+            },
+            activeSession,
+            activeSession.docs || [],
+            activeSession.images || [],
+            activeSession.methodology || 'STRIDE',
+            activeSession.dfdApproved || false,
+            aiConfig
+        );
+        
+        return res.status(202).json({
+            status: 202,
+            message: 'Threat model re-generation started asynchronously.',
+            data: {
+                jobId: job.jobId,
+                sessionId: sessionId,
+                status: job.status,
+                progress: job.progress
+            }
+        });
+        
+    } catch (err) {
+        logger.error(`Error in edit-answers setup: ${err.message}`);
+        return serverError(err.message, res, logger);
+    }
+};
+
 const runDeduplicateJob = async (job, body, session) => {
     try {
         const {
@@ -2755,8 +3329,34 @@ const runDeduplicateJob = async (job, body, session) => {
         const currentModel = session.currentModel;
         const controlsAssessment = session.evaluation?.controlsAssessment || [];
 
+        // Build docsContext using the same logic as runGenerateJob
+        const docs = session.docs || [];
+        let docsContext = '';
+        if (docs && docs.length > 0) {
+            const fullDocText = docs.map((d) => `--- DOCUMENT: ${d.name} ---\n${d.content}`).join('\n\n');
+            const maxChars = getMaxContextChars(aiConfig);
+            if (fullDocText.length > maxChars) {
+                docsContext = fullDocText.slice(0, maxChars) + '\n... [Conteúdo restante omitido por limite de contexto] ...\n';
+            } else {
+                docsContext = fullDocText;
+            }
+        } else {
+            docsContext = '\nNo documentation files provided.\n';
+        }
+
+        // Build historyContext
+        const refinementHistory = session.refinementHistory || [];
+        let historyContext = '';
+        if (refinementHistory && refinementHistory.length > 0) {
+            refinementHistory.forEach((msg) => {
+                historyContext += `${msg.role.toUpperCase()}: ${msg.text}\n`;
+            });
+        } else {
+            historyContext = '\nNo refinement conversation history.\n';
+        }
+
         const promptText = `
-You are a Security Model Refinement Expert. Your task is to analyze the following threat model and its security controls assessment report, identify any redundant or duplicate elements, and propose high-quality merges to simplify the model WITHOUT losing any important technical context or user feedback details.
+You are a Security Model Auditing and Refinement Expert. Your task is to analyze the following threat model, its security controls assessment report, the original system architecture documentation, and the conversation history of user answers.
 
 Here is the current Threat Dragon V2 model (JSON):
 ${JSON.stringify(currentModel, null, 2)}
@@ -2764,11 +3364,34 @@ ${JSON.stringify(currentModel, null, 2)}
 Here is the current Security Control Efficacy Report (JSON):
 ${JSON.stringify(controlsAssessment, null, 2)}
 
-Please perform the following two analyses:
+Here is the system architecture documentation:
+${docsContext}
+
+Here is the conversation history of user answers and feedback:
+${historyContext}
+
+Please perform the following four analyses:
+
 1. SECURITY CONTROL DEDUPLICATION:
 Find any controls in the Security Control Efficacy Report that cover the same category or target the same core security issue. Group them. If they can be unified, provide a single "proposedMergedItem" where "userAnswer" combines all key points from the merged items' userAnswers, and "details" merges all recommendations. Do NOT merge controls that address different issues.
+
 2. THREAT DEDUPLICATION:
 Check the threats listed inside the data.threats array of each DFD element (process, store, actor, flow) in the threat model. Identify threats that represent the same technical attack vector, cause, or risk on that specific component. Group them. If they can be unified, provide a "proposedMergedThreat" that combines their title, description, and mitigation details into a single high-quality threat. Ensure you preserve original threat properties like severity, status (must remain "Open"), type, and modelType.
+
+3. ANTI-HALLUCINATION AUDIT (INCLUDING SECURITY CONTROLS AND EFFICACY):
+Compare the threat model components, trust boundaries, data flows, technologies, and security controls against the system architecture documentation and the user's conversation answers.
+- Audit if any security control has been hallucinated (i.e., the model assumes a control exists, is active, or is effective when it is not supported by the documentation or is contradicted by user answers).
+- Audit whether the discussed security controls are actually effective or if their effectiveness is hallucinated/overstated, explaining clearly "why" (the rationale).
+- Identify any element, technology, protocol, or trust boundary that has been hallucinated by the model (i.e. it is NOT mentioned anywhere in the documentation and was NOT confirmed by the user in the answers).
+- For each discrepancy, hallucinated control, or overstated efficacy found, generate a detailed hallucination alert.
+
+4. THREAT MITIGATION STATUS EVALUATION:
+For EVERY threat mapped to every element/flow in the threat model, evaluate whether it is mitigated based on its current description/mitigation field and the user answers.
+Classify each threat's mitigation status into one of:
+- "Mitigada" (if a complete, confirmed technical mitigation exists or has been verified by user answers).
+- "Parcialmente Mitigada" (if there is a partial mitigation, but some aspects are missing or require improvement).
+- "Não Mitigada" (if no mitigation exists, or the user answers explicitly state that the mitigation/control is missing or not implemented).
+Provide a detailed technical reason for the classification, and technical recommendations to achieve full mitigation.
 
 Return a JSON object structured EXACTLY as follows:
 {
@@ -2814,16 +3437,35 @@ Return a JSON object structured EXACTLY as follows:
         "modelType": "..."
       }
     }
+  ],
+  "hallucinationAlerts": [
+    {
+      "id": "string (unique identifier like hall-1)",
+      "targetType": "Component" or "Data Flow" or "Security Control" or "Threat",
+      "targetName": "string (name of the element, flow, or control)",
+      "issue": "string (clear explanation in Portuguese of the hallucinated detail or discrepancy. If it targets a Security Control, explain if the control is effective and why)",
+      "severity": "High" or "Medium" or "Low"
+    }
+  ],
+  "mitigationStatus": [
+    {
+      "threatId": "string (the threat id from the model)",
+      "threatTitle": "string",
+      "elementName": "string (the name of the element/flow containing this threat)",
+      "status": "Mitigada" or "Parcialmente Mitigada" or "Não Mitigada",
+      "reason": "string (detailed justification in Portuguese based on user responses and mitigation field)",
+      "recommendations": "string (technical recommendations in Portuguese on how to fully mitigate this threat)"
+    }
   ]
 }
 
 LANGUAGE REQUIREMENT:
-All proposed titles, userAnswers, descriptions, mitigations, and details MUST be written in Portuguese.
+All proposed titles, userAnswers, descriptions, mitigations, details, issues, reasons, and recommendations MUST be written in Portuguese.
 
 Return ONLY the raw JSON object, without any markdown code block formatting.
 `;
 
-        logger.info(`[Job ${job.jobId}] Requesting deduplication proposals from AI Provider (${aiConfig.provider})`);
+        logger.info(`[Job ${job.jobId}] Requesting deduplication and audit proposals from AI Provider (${aiConfig.provider})`);
         
         job.progress = 50;
         activeJobs.set(job.jobId, { ...job });
@@ -2831,14 +3473,26 @@ Return ONLY the raw JSON object, without any markdown code block formatting.
         const candidateText = await callAIModel(promptText, [], aiConfig, job);
         
         if (!candidateText) {
-            throw new Error('AI API returned an empty response for deduplication proposals');
+            throw new Error('AI API returned an empty response for deduplication and audit proposals');
         }
 
         const parsedProposals = extractJson(candidateText);
+
+        if (!parsedProposals.controlDeduplications) {parsedProposals.controlDeduplications = [];}
+        if (!parsedProposals.threatDeduplications) {parsedProposals.threatDeduplications = [];}
+        if (!parsedProposals.hallucinationAlerts) {parsedProposals.hallucinationAlerts = [];}
+        if (!parsedProposals.mitigationStatus) {parsedProposals.mitigationStatus = [];}
         
         // Cache the proposals in the session context
         session.deduplicateProposals = parsedProposals;
-        aiContextStore.updateSession(session.sessionId, { deduplicateProposals: parsedProposals });
+        session.hallucinationAlerts = parsedProposals.hallucinationAlerts;
+        session.mitigationStatus = parsedProposals.mitigationStatus;
+
+        aiContextStore.updateSession(session.sessionId, {
+            deduplicateProposals: parsedProposals,
+            hallucinationAlerts: parsedProposals.hallucinationAlerts,
+            mitigationStatus: parsedProposals.mitigationStatus
+        });
 
         job.status = 'completed';
         job.progress = 100;
@@ -2847,7 +3501,7 @@ Return ONLY the raw JSON object, without any markdown code block formatting.
 
     } catch (err) {
         const errMessage = err?.message || String(err);
-        logger.error(`[Job ${job.jobId}] Background deduplication job failed: ${errMessage}`);
+        logger.error(`[Job ${job.jobId}] Background deduplication and audit job failed: ${errMessage}`);
         job.status = 'failed';
         job.progress = 100;
         job.error = errMessage;
@@ -2913,10 +3567,12 @@ const applyDeduplication = (req, res) => {
             approvedThreatDeduplicationIds
         );
 
-        // Update the session's evaluation object with the new controlsAssessment list
+        // Update the session's evaluation object with the new controlsAssessment list, hallucination alerts, and mitigation status
         const updatedEvaluation = session.evaluation ? {
             ...session.evaluation,
-            controlsAssessment: updatedControls
+            controlsAssessment: updatedControls,
+            hallucinationAlerts: session.hallucinationAlerts || [],
+            mitigationStatus: session.mitigationStatus || []
         } : null;
 
         // Push to history for potential rollback
@@ -3073,6 +3729,7 @@ export default {
     getSessionState,
     updateSessionState,
     undoRefinement,
+    editAnswers,
     getDeduplicateProposals,
     applyDeduplication,
     getQuestionCount,
@@ -3085,5 +3742,7 @@ export default {
     _applyDeduplicationChanges: applyDeduplicationChanges,
     _extractJson: extractJson,
     _callAIModel: callAIModel,
-    _clientFactory: clientFactory
+    _clientFactory: clientFactory,
+    _getMaxContextChars: getMaxContextChars,
+    _getQuestionBatchSize: getQuestionBatchSize
 };

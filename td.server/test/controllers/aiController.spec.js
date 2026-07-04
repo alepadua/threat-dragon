@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import sinon from 'sinon';
 import axios from 'axios';
 import aiController from '../../src/controllers/aiController.js';
+import aiContextStore from '../../src/helpers/aiContextStore.js';
 
 describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
     describe('_areTitlesSimilar', () => {
@@ -610,6 +611,119 @@ describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
 
             getStub.restore();
             clock.restore();
+        });
+    });
+
+    describe('_getMaxContextChars', () => {
+        it('should return 600000 for Gemini provider', () => {
+            const config = { provider: 'gemini', model: 'gemini-1.5-pro' };
+            expect(aiController._getMaxContextChars(config)).to.equal(600000);
+        });
+
+        it('should return 250000 for Bedrock Mantle with Llama 3.1 model', () => {
+            const config = { provider: 'bedrock-mantle', model: 'meta.llama3.1-70b-instruct' };
+            expect(aiController._getMaxContextChars(config)).to.equal(250000);
+        });
+
+        it('should return 400000 for Bedrock Mantle with Claude 3 model', () => {
+            const config = { provider: 'bedrock-mantle', model: 'anthropic.claude-3-sonnet' };
+            expect(aiController._getMaxContextChars(config)).to.equal(400000);
+        });
+
+        it('should return 15000 for Bedrock Mantle with Llama 3 original model', () => {
+            const config = { provider: 'bedrock-mantle', model: 'meta.llama3-8b' };
+            expect(aiController._getMaxContextChars(config)).to.equal(15000);
+        });
+
+        it('should return 100000 for Bedrock Mantle default/other models', () => {
+            const config = { provider: 'bedrock-mantle', model: 'unknown-model' };
+            expect(aiController._getMaxContextChars(config)).to.equal(100000);
+        });
+
+        it('should fallback to 15000 for other/unknown config', () => {
+            expect(aiController._getMaxContextChars({})).to.equal(15000);
+        });
+
+        it('should calculate char limit from custom maxContextTokens (simplificado/k)', () => {
+            const config = { maxContextTokens: 128 };
+            expect(aiController._getMaxContextChars(config)).to.equal(128 * 1000 * 3);
+            const config2 = { maxContextTokens: 256 };
+            expect(aiController._getMaxContextChars(config2)).to.equal(256 * 1000 * 3);
+        });
+
+        it('should calculate char limit from custom maxContextTokens (completo)', () => {
+            const config = { maxContextTokens: 128000 };
+            expect(aiController._getMaxContextChars(config)).to.equal(128000 * 3);
+        });
+    });
+
+    describe('_getQuestionBatchSize', () => {
+        it('should respect custom questionBatchSize if provided and valid', () => {
+            const config = { questionBatchSize: 6 };
+            expect(aiController._getQuestionBatchSize(config)).to.equal(6);
+        });
+
+        it('should cap custom questionBatchSize at 15', () => {
+            const config = { questionBatchSize: 20 };
+            expect(aiController._getQuestionBatchSize(config)).to.equal(15);
+        });
+
+        it('should return 8 for high context limit (>= 600k chars)', () => {
+            const config = { provider: 'gemini', model: 'gemini-1.5-pro' };
+            expect(aiController._getQuestionBatchSize(config)).to.equal(8);
+        });
+
+        it('should return 5 for medium context limit (>= 250k chars)', () => {
+            const config = { provider: 'bedrock-mantle', model: 'meta.llama3.1-70b-instruct' };
+            expect(aiController._getQuestionBatchSize(config)).to.equal(5);
+        });
+
+        it('should return 4 for moderate context limit (>= 100k chars)', () => {
+            const config = { provider: 'bedrock-mantle', model: 'unknown-model' };
+            expect(aiController._getQuestionBatchSize(config)).to.equal(4);
+        });
+
+        it('should fallback to 3 for small context limit (< 100k chars)', () => {
+            const config = { provider: 'bedrock-mantle', model: 'meta.llama3-8b' };
+            expect(aiController._getQuestionBatchSize(config)).to.equal(3);
+        });
+    });
+
+    describe('editAnswers', () => {
+        let getSessionStub, updateSessionStub;
+
+        beforeEach(() => {
+            getSessionStub = sinon.stub(aiContextStore, 'getSession');
+            updateSessionStub = sinon.stub(aiContextStore, 'updateSession');
+        });
+
+        afterEach(() => {
+            getSessionStub.restore();
+            updateSessionStub.restore();
+        });
+
+        it('should return 404 if session is not found', async () => {
+            getSessionStub.returns(null);
+            const req = { params: { sessionId: 'nonexistent' }, body: { answeredQuestions: [] } };
+            const res = {
+                status: sinon.stub().returnsThis(),
+                json: sinon.stub()
+            };
+
+            await aiController.editAnswers(req, res);
+            expect(res.status).to.have.been.calledWith(404);
+        });
+
+        it('should return 400 if answeredQuestions is missing or not an array', async () => {
+            getSessionStub.returns({});
+            const req = { params: { sessionId: 'session-1' }, body: {} };
+            const res = {
+                status: sinon.stub().returnsThis(),
+                json: sinon.stub()
+            };
+
+            await aiController.editAnswers(req, res);
+            expect(res.status).to.have.been.calledWith(400);
         });
     });
 });
