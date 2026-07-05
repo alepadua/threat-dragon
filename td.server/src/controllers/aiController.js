@@ -216,100 +216,154 @@ const healDiagramCells = (cells) => {
     return [...nodes, ...healedEdges];
 };
 
-const healParsedQuestions = (parsedQuestions, roundQuestions) => {
+const groupAndConsolidateQuestions = (questionPlan, combinedIds, batchSize) => {
+    // Determine a larger window size to pull questions from the plan.
+    // Grouping allows us to consolidate more questions in one prompt.
+    // We pull up to batchSize * 4 questions, minimum 24, maximum 40.
+    const windowSize = Math.min(Math.max(batchSize * 4, 24), 40);
+
+    const { questions: rawQuestions } = questionPlanningEngine.getQuestionsByRound(
+        questionPlan,
+        1,
+        combinedIds,
+        windowSize
+    );
+
+    if (!rawQuestions || rawQuestions.length === 0) {
+        return [];
+    }
+
+    // Group the raw questions by category and elementType
+    const groupsMap = new Map();
+
+    rawQuestions.forEach((q) => {
+        const category = q.category || 'Geral';
+        const type = q.elementType || q.type || 'Processo';
+        const key = `${category.toLowerCase()}|${type.toLowerCase()}`;
+
+        if (!groupsMap.has(key)) {
+            groupsMap.set(key, {
+                category,
+                elementType: type,
+                questions: []
+            });
+        }
+        groupsMap.get(key).questions.push(q);
+    });
+
+    const consolidatedGroups = [];
+    const groups = Array.from(groupsMap.values());
+    const limitedGroups = groups.slice(0, batchSize);
+
+    limitedGroups.forEach((group) => {
+        const originalQuestionIds = group.questions.map((q) => q.id);
+        const elements = group.questions.map((q) => ({
+            id: q.elementId,
+            name: q.elementName
+        }));
+
+        const groupNames = Array.from(new Set(group.questions.map((q) => q.elementName)));
+        const elementName = groupNames.join(', ');
+
+        // Generate a stable unique ID for this group
+        const groupHash = crypto.createHash('sha256').
+            update(originalQuestionIds.join(',')).
+            digest('hex').
+            slice(0, 8);
+        const groupId = `grp-${group.category.toLowerCase().replace(/[^a-z0-9]/gu, '')}-${group.elementType.toLowerCase().replace(/[^a-z0-9]/gu, '')}-${groupHash}`;
+
+        consolidatedGroups.push({
+            id: groupId,
+            category: group.category,
+            elementType: group.elementType,
+            elementId: 'global',
+            elementName,
+            originalQuestionIds,
+            elements,
+            text: '' // to be populated by LLM
+        });
+    });
+
+    return consolidatedGroups;
+};
+
+const healParsedConsolidatedQuestions = (parsedQuestions, roundGroups) => {
     if (!Array.isArray(parsedQuestions) || parsedQuestions.length === 0) {
         return [];
     }
-    if (!Array.isArray(roundQuestions) || roundQuestions.length === 0) {
-        // Fallback: If no round questions were assigned, we assign new random IDs to make them answerable,
-        // though they won't match the plan (since there was no plan or it was empty).
+    if (!Array.isArray(roundGroups) || roundGroups.length === 0) {
         return parsedQuestions.map((q) => {
-            if (typeof q === 'string') {
-                return {
-                    id: `q-healed-${crypto.randomUUID().slice(0, 8)}`,
-                    text: q,
-                    elementId: 'global',
-                    elementName: 'Sistema',
-                    category: 'Geral'
-                };
-            }
+            const gid = q.id || `grp-healed-${crypto.randomUUID().slice(0, 8)}`;
             return {
-                id: q.id || `q-healed-${crypto.randomUUID().slice(0, 8)}`,
-                text: q.text || q.question || '',
-                elementId: q.elementId || 'global',
-                elementName: q.elementName || 'Sistema',
-                category: q.category || 'Geral'
+                id: gid,
+                originalQuestionIds: q.originalQuestionIds || [],
+                category: q.category || 'Geral',
+                text: typeof q === 'string' ? q : (q.text || q.question || '')
             };
         });
     }
 
-    const healedQuestions = [];
-    const usedRoundIndices = new Set();
+    const healedGroups = [];
+    const usedGroupIndices = new Set();
 
     parsedQuestions.forEach((q, idx) => {
         let text = '';
-        let elementId = '';
         let category = '';
         let id = '';
+        let originalQuestionIds = [];
 
         if (typeof q === 'string') {
             text = q;
         } else if (q && typeof q === 'object') {
             text = q.text || q.question || '';
-            elementId = q.elementId || '';
             category = q.category || '';
             id = q.id || '';
+            originalQuestionIds = q.originalQuestionIds || [];
         }
 
-        // Try to find a matching assigned question in roundQuestions
-        let matchedRq = null;
+        let matchedG = null;
 
-        // 1. Try to match by ID
         if (id) {
-            matchedRq = roundQuestions.find((rq) => rq.id === id);
+            matchedG = roundGroups.find((rg) => rg.id === id);
         }
 
-        // 2. Try to match by elementId and category (case-insensitive)
-        if (!matchedRq && elementId && category) {
-            matchedRq = roundQuestions.find((rq, rIdx) => !usedRoundIndices.has(rIdx) &&
-                rq.elementId === elementId &&
-                rq.category?.toLowerCase() === category.toLowerCase()
+        if (!matchedG && category) {
+            matchedG = roundGroups.find((rg, rIdx) => !usedGroupIndices.has(rIdx) &&
+                rg.category?.toLowerCase() === category.toLowerCase()
             );
         }
 
-        // 3. Fallback: match by index
-        if (!matchedRq && idx < roundQuestions.length) {
-            const fallbackRq = roundQuestions[idx];
-            matchedRq = fallbackRq;
+        if (!matchedG && idx < roundGroups.length) {
+            matchedG = roundGroups[idx];
         }
 
-        if (matchedRq) {
-            const rqIdx = roundQuestions.indexOf(matchedRq);
-            usedRoundIndices.add(rqIdx);
+        if (matchedG) {
+            const rgIdx = roundGroups.indexOf(matchedG);
+            usedGroupIndices.add(rgIdx);
 
-            healedQuestions.push({
-                id: matchedRq.id,
-                elementId: matchedRq.elementId,
-                elementName: matchedRq.elementName,
-                category: matchedRq.category,
-                elementType: matchedRq.elementType,
-                type: matchedRq.type,
-                text: text || matchedRq.text, // use LLM's text if present, otherwise plan's text
-                answered: matchedRq.answered || false
+            healedGroups.push({
+                id: matchedG.id,
+                originalQuestionIds: matchedG.originalQuestionIds,
+                category: matchedG.category,
+                elementType: matchedG.elementType,
+                elementId: 'global',
+                elementName: matchedG.elementName,
+                elements: matchedG.elements,
+                text: text || matchedG.text
             });
         } else {
-            // If we couldn't match it but it is a question, keep it with a generated ID
-            healedQuestions.push({
-                id: id || `q-healed-${crypto.randomUUID().slice(0, 8)}`,
-                elementId: elementId || 'global',
-                elementName: 'Sistema',
+            healedGroups.push({
+                id: id || `grp-healed-${crypto.randomUUID().slice(0, 8)}`,
+                originalQuestionIds: originalQuestionIds,
                 category: category || 'Geral',
+                elementId: 'global',
+                elementName: 'Sistema',
                 text: text
             });
         }
     });
 
-    return healedQuestions;
+    return healedGroups;
 };
 
 const cleanJson = (str) => {
@@ -2039,30 +2093,26 @@ CURRENT REFINEMENT PHASE: DFD TOPOLOGY REFINEMENT (Phase 1)
                 const currentQuestionIds = (activeSession.questions || []).map((q) => q.id || q);
                 const combinedIds = Array.from(new Set([...answeredIds, ...currentQuestionIds]));
                 const batchSize = getQuestionBatchSize(aiConfig);
-                const { questions: roundQuestions } = questionPlanningEngine.getQuestionsByRound(
-                    activeSession.questionPlan,
-                    1,
-                    combinedIds,
-                    batchSize
-                );
+                const roundGroups = groupAndConsolidateQuestions(activeSession.questionPlan, combinedIds, batchSize);
                 
-                if (roundQuestions && roundQuestions.length > 0) {
-                    activeQuestionsPrompt = '\n--- ASSIGNED QUESTIONS FOR THIS ROUND ---\n';
-                    activeQuestionsPrompt += 'You MUST generate exactly the following questions for the elements and categories below. Do NOT generate questions for other categories or elements. Write a specific, technical, direct question in Portuguese for each assigned category:\n';
-                    roundQuestions.forEach((q) => {
-                        activeQuestionsPrompt += `- Question ID: "${q.id}" | Element ID: "${q.elementId}" | Element Name: "${q.elementName}" | Category: "${q.category}" | Type: "${q.type}"\n`;
+                if (roundGroups && roundGroups.length > 0) {
+                    activeQuestionsPrompt = '\n--- ASSIGNED CONSOLIDATED QUESTION GROUPS FOR THIS ROUND ---\n';
+                    activeQuestionsPrompt += 'You MUST generate exactly one consolidated, direct, and technical question in Portuguese for each group below. This question should address the specified category across all listed elements in that group. Do NOT generate questions for other elements or categories:\n';
+                    roundGroups.forEach((g) => {
+                        const elemNames = g.elements.map((e) => e.name).join(', ');
+                        activeQuestionsPrompt += `- Group ID: "${g.id}" | Category: "${g.category}" | Element Type: "${g.elementType}" | Elements: [${elemNames}]\n`;
                     });
                     activeQuestionsPrompt += '\n';
                 }
             }
 
-            questionsInstruction = `An array of objects matching the ASSIGNED QUESTIONS FOR THIS ROUND list. Each object MUST have:
-- "id": The exact "Question ID" string from the assigned list.
-- "elementId": The exact "Element ID" string.
-- "category": The exact "Category" string.
-- "text": A technical, specific question in Portuguese related to the assigned element and category.
+            questionsInstruction = `An array of objects matching the ASSIGNED CONSOLIDATED QUESTION GROUPS list. Each object MUST have:
+- "id": The exact "Group ID" string from the assigned list.
+- "originalQuestionIds": The array of original Question IDs mapped to this group (must match the originalQuestionIds from the group definition).
+- "category": The exact "Category" string from the group definition.
+- "text": A single consolidated, technical, specific question in Portuguese addressing all the elements in the group for that category.
 
-If no questions are assigned, return an empty array [].`;
+If no groups are assigned, return an empty array [].`;
 
             if (activeQuestionsPrompt) {
                 questionsInstruction += '\n' + activeQuestionsPrompt;
@@ -2639,24 +2689,18 @@ Return ONLY a JSON object containing the keys "threatModel" and "questions" (as 
                 logger.info(`[Job ${job.jobId}] Question plan computed: ${questionPlan.totalQuestions} questions for ${finalMethodology} across ${diagramCells.length} cells`);
             }
 
-            // Extract what questions were assigned to the LLM in this round to heal the returned ones
-            let roundQuestions = [];
+            // Extract what question groups were assigned to the LLM in this round to heal the returned ones
+            let roundGroups = [];
             if (questionPlan) {
                 const previousAnsweredIds = activeSession.answeredQuestionIds || [];
                 const currentQuestionIds = (activeSession.questions || []).map((q) => q.id || q);
                 const combinedIds = Array.from(new Set([...previousAnsweredIds, ...currentQuestionIds]));
                 const batchSize = getQuestionBatchSize(aiConfig);
-                const { questions } = questionPlanningEngine.getQuestionsByRound(
-                    questionPlan,
-                    1,
-                    combinedIds,
-                    batchSize
-                );
-                roundQuestions = questions || [];
+                roundGroups = groupAndConsolidateQuestions(questionPlan, combinedIds, batchSize);
             }
 
-            // Heal the returned questions using roundQuestions
-            parsedOutput.questions = healParsedQuestions(parsedOutput.questions, roundQuestions);
+            // Heal the returned questions using roundGroups
+            parsedOutput.questions = healParsedConsolidatedQuestions(parsedOutput.questions, roundGroups);
 
             // Extract resolved question IDs from LLM response
             if (parsedOutput.resolvedQuestionIds && Array.isArray(parsedOutput.resolvedQuestionIds)) {
@@ -2894,12 +2938,61 @@ const generate = async (req, res) => {
                     }
                 }
 
+                // Build a quick lookup map for original question IDs from the question plan to avoid deep nesting
+                const planQuestionsMap = new Map();
+                if (activeSession.questionPlan && activeSession.questionPlan.elementQuestions) {
+                    activeSession.questionPlan.elementQuestions.forEach((elem) => {
+                        elem.categories.forEach((catGroup) => {
+                            catGroup.questions.forEach((pq) => {
+                                planQuestionsMap.set(pq.id, {
+                                    elementId: elem.elementId,
+                                    elementName: elem.elementName
+                                });
+                            });
+                        });
+                    });
+                }
+
                 // Process structured question answers if provided
                 const sessionAnswered = activeSession.answeredQuestions || [];
                 if (req.body.answeredQuestions && Array.isArray(req.body.answeredQuestions)) {
                     const existingIds = new Set(sessionAnswered.map((q) => q.id));
                     req.body.answeredQuestions.forEach((q) => {
-                        if (q.id && !existingIds.has(q.id)) {
+                        const activeQ = (activeSession.questions || []).find((aq) => aq.id === q.id);
+                        if (activeQ && Array.isArray(activeQ.originalQuestionIds) && activeQ.originalQuestionIds.length > 0) {
+                            activeQ.originalQuestionIds.forEach((origId) => {
+                                if (existingIds.has(origId)) {
+                                    return;
+                                }
+                                const planMeta = planQuestionsMap.get(origId) || {};
+                                const elementId = planMeta.elementId || q.elementId || 'global';
+                                const elementName = planMeta.elementName || q.elementName || 'Sistema';
+
+                                sessionAnswered.push({
+                                    id: origId,
+                                    text: activeQ.text || q.text,
+                                    answer: q.answer,
+                                    elementId: elementId,
+                                    elementName: elementName,
+                                    category: q.category || activeQ.category,
+                                    timestamp: new Date().toISOString()
+                                });
+                                existingIds.add(origId);
+                            });
+
+                            if (q.id && !existingIds.has(q.id)) {
+                                sessionAnswered.push({
+                                    id: q.id,
+                                    text: q.text,
+                                    answer: q.answer,
+                                    elementId: q.elementId || 'global',
+                                    elementName: q.elementName || 'Sistema',
+                                    category: q.category,
+                                    timestamp: new Date().toISOString()
+                                });
+                                existingIds.add(q.id);
+                            }
+                        } else if (q.id && !existingIds.has(q.id)) {
                             sessionAnswered.push({
                                 id: q.id,
                                 text: q.text,
@@ -2909,6 +3002,7 @@ const generate = async (req, res) => {
                                 category: q.category,
                                 timestamp: new Date().toISOString()
                             });
+                            existingIds.add(q.id);
                         }
                     });
                 }
@@ -3189,6 +3283,18 @@ const editAnswers = async (req, res) => {
             if (item) {
                 item.answer = update.answer;
                 item.timestamp = new Date().toISOString();
+
+                // If this is a group question, also update all associated original questions
+                const activeQ = (session.questions || []).find((aq) => aq.id === update.id);
+                if (activeQ && Array.isArray(activeQ.originalQuestionIds)) {
+                    activeQ.originalQuestionIds.forEach((origId) => {
+                        const origItem = sessionAnswered.find((q) => q.id === origId);
+                        if (origItem) {
+                            origItem.answer = update.answer;
+                            origItem.timestamp = new Date().toISOString();
+                        }
+                    });
+                }
             }
         });
         
