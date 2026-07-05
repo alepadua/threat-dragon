@@ -2135,7 +2135,7 @@ CURRENT REFINEMENT PHASE: THREAT ANALYSIS & SECURITY CONTROLS REFINEMENT (Phase 
   2. Actionable technical 'mitigation' details.
   3. A 'severity' level matching the risk impact.
   4. A risk 'score' value.
-- Your clarifying questions in the "questions" array MUST target discovering new threats or gathering necessary context to refine and evaluate existing threats (assessing severity, score, description, and mitigations).
+- Your clarifying questions in the "questions" array target probing the user about secure configuration details, deployment parameters, authentication practices, and specific network boundaries for the assigned groups. Even if you feel you have enough context to generate initial threats, you MUST formulate these questions to validate your assumptions and help refine the severity scores and mitigations. Generating a question for each assigned group is mandatory for the framework's completeness, and you are strictly forbidden from returning an empty array in the 'questions' property if groups are assigned below.
 `;
             let previousQuestionsPrompt = '';
             if (activeSession && activeSession.questions && activeSession.questions.length > 0) {
@@ -2374,10 +2374,13 @@ Every object inside the "threats" array of any cell must have:
   },
   "questions": [
     {
-      "id": "The exact Question ID from the ASSIGNED QUESTIONS FOR THIS ROUND list",
-      "elementId": "The exact Element ID",
+      "id": "The exact Group ID from the ASSIGNED CONSOLIDATED QUESTION GROUPS list",
+      "originalQuestionIds": [
+        "Original Question ID 1",
+        "Original Question ID 2"
+      ],
       "category": "The exact Category",
-      "text": "A technical, specific question in Portuguese related to the assigned element and category"
+      "text": "A single consolidated, technical, specific question in Portuguese addressing all elements in the group"
     }
   ],
   "resolvedQuestionIds": [
