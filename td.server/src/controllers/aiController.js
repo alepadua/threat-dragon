@@ -677,10 +677,52 @@ const _rawExtractJson = (str) => {
     }
 };
 
-const extractJson = (str) => {
+const convertDeltasToRevisedModel = (threatDeltas, methodology = 'STRIDE', title = '', description = '') => {
+    const cells = (threatDeltas || []).map((delta) => ({
+            id: delta.cellId,
+            shape: 'process',
+            data: {
+                threats: delta.threats || []
+            }
+        }));
+    
+    return {
+        version: '2.0.0',
+        summary: {
+            title: title,
+            owner: 'Security Team',
+            description: description,
+            id: 0
+        },
+        detail: {
+            contributors: [{ name: 'AI Threat Modeler' }],
+            reviewer: 'AI Threat Modeler',
+            diagrams: [
+                {
+                    id: 0,
+                    title: 'Main System DFD',
+                    diagramType: methodology || 'STRIDE',
+                    placeholder: 'Main System DFD description',
+                    thumbnail: './public/content/images/thumbnail.stride.jpg',
+                    version: '2.0.0',
+                    cells: cells
+                }
+            ],
+            diagramTop: 1,
+            threatTop: 100
+        }
+    };
+};
+
+const extractJson = (str, methodology = 'STRIDE') => {
     const parsed = _rawExtractJson(str);
-    if (parsed && parsed.threatModel && parsed.threatModel.detail && parsed.threatModel.detail.diagrams && parsed.threatModel.detail.diagrams[0]) {
-        parsed.threatModel.detail.diagrams[0].cells = healDiagramCells(parsed.threatModel.detail.diagrams[0].cells);
+    if (parsed) {
+        if (parsed.threatDeltas && !parsed.threatModel) {
+            parsed.threatModel = convertDeltasToRevisedModel(parsed.threatDeltas, methodology);
+        }
+        if (parsed.threatModel && parsed.threatModel.detail && parsed.threatModel.detail.diagrams && parsed.threatModel.detail.diagrams[0]) {
+            parsed.threatModel.detail.diagrams[0].cells = healDiagramCells(parsed.threatModel.detail.diagrams[0].cells);
+        }
     }
     return parsed;
 };
@@ -1091,6 +1133,9 @@ const mergeDiagramCells = (currentModel, revisedModel, refinementHistory, dfdApp
 
         revisedDiagram.cells = healDiagramCells(deduplicateDiagramCells(preservedCells));
         normalizeCellThreats(revisedDiagram.cells, diagramType);
+        if (currentModel && currentModel.summary) {
+            revisedModel.summary = { ...currentModel.summary };
+        }
         return revisedModel;
     }
 
@@ -1917,6 +1962,15 @@ const runGenerateJob = async (job, body, activeSession, finalDocs, finalImages, 
 
         const refinementHistory = (activeSession && activeSession.refinementHistory) || bodyRefinementHistory || [];
 
+        // Pre-compute the question plan early on DFD approval transition so that questions are assigned in Phase 2's first prompt
+        if (dfdApprovedBool && activeSession && !activeSession.questionPlan && currentModel) {
+            const diagramCells = currentModel.detail?.diagrams?.[0]?.cells || [];
+            if (diagramCells.length > 0) {
+                activeSession.questionPlan = questionPlanningEngine.computeQuestionPlan(diagramCells, finalMethodology);
+                logger.info(`[Job ${job.jobId}] Pre-computed question plan on transition: ${activeSession.questionPlan.totalQuestions} questions for ${finalMethodology}`);
+            }
+        }
+
         const agentName = !dfdApprovedBool ? 'DFDAgent' : 'ThreatAgent';
         let threatModelApprovedBool = (threatModelApproved === true || threatModelApproved === 'true');
 
@@ -2068,6 +2122,8 @@ For each threat, the threat's "type" property MUST be set to one of the STRIDE c
         let promptText = '';
         let jsonKeysInstruction = '';
         let questionsInstruction = '';
+        let roundGroups = [];
+        let activeQuestionsPrompt = '';
 
         if (!dfdApprovedBool) {
             questionsInstruction = `An array containing EXACTLY ONE string in Portuguese.
@@ -2083,17 +2139,16 @@ CURRENT REFINEMENT PHASE: DFD TOPOLOGY REFINEMENT (Phase 1)
 - Do NOT ask any custom questions about security, protocols, databases, or access rules. Return exactly the single validation question in the "questions" array.
 `;
             jsonKeysInstruction = `You MUST return ONLY a JSON object containing two keys:
-1. "threatModel": The valid Threat Dragon V2 JSON object containing the summary and detail (diagrams, cells, and threats).
-2. "questions": ${questionsInstruction}`;
+1. "questions": ${questionsInstruction}
+2. "threatModel": The valid Threat Dragon V2 JSON object containing the summary and detail (diagrams, cells, and threats).`;
         } else {
             // Get the next batch of planned questions from the plan
-            let activeQuestionsPrompt = '';
             if (activeSession && activeSession.questionPlan) {
                 const answeredIds = activeSession.answeredQuestionIds || [];
                 const currentQuestionIds = (activeSession.questions || []).map((q) => q.id || q);
                 const combinedIds = Array.from(new Set([...answeredIds, ...currentQuestionIds]));
                 const batchSize = getQuestionBatchSize(aiConfig);
-                const roundGroups = groupAndConsolidateQuestions(activeSession.questionPlan, combinedIds, batchSize);
+                roundGroups = groupAndConsolidateQuestions(activeSession.questionPlan, combinedIds, batchSize);
                 
                 if (roundGroups && roundGroups.length > 0) {
                     activeQuestionsPrompt = '\n--- ASSIGNED CONSOLIDATED QUESTION GROUPS FOR THIS ROUND ---\n';
@@ -2150,10 +2205,21 @@ CURRENT REFINEMENT PHASE: THREAT ANALYSIS & SECURITY CONTROLS REFINEMENT (Phase 
             }
 
             jsonKeysInstruction = `You MUST return ONLY a JSON object containing three keys:
-1. "threatModel": The valid Threat Dragon V2 JSON object containing the summary and detail.
-   - IMPORTANT SCHEMA OPTIMIZATION FOR PHASE 2 (dfdApproved is true): To maximize your output token limit for rich, detailed, and comprehensive threat descriptions and mitigations, you MUST NOT return all cells in the "cells" array. Instead, ONLY include the cell objects under "threatModel.detail.diagrams[0].cells" that have new, updated, or modified threats. Completely omit any cell that has no changes.
-2. "questions": ${questionsInstruction}
-3. "resolvedQuestionIds": An array of strings containing the Question IDs (from the previous round) that have been successfully answered/mitigated by the user.
+1. "questions": ${questionsInstruction}
+2. "resolvedQuestionIds": An array of strings containing the Question IDs (from the previous round) that have been successfully answered/mitigated by the user.
+3. "threatDeltas": An array of objects. Each object MUST represent the new or updated threats for a single element/flow and contain:
+   - "cellId": The exact ID string of the element/flow (from the system diagram).
+   - "threats": An array of threat objects for this element conforming to the threat schema:
+     - "id": A unique UUID string or new ID (e.g. "threat-xxxx").
+     - "title": A concise, descriptive title in Portuguese.
+     - "type": One of the STRIDE/F3 categories matching the element shape rules.
+     - "description": A detailed explanation of the threat in Portuguese.
+     - "mitigation": Specific technical steps or configuration changes recommended to mitigate the threat in Portuguese.
+     - "status": "Open", "Mitigated", or "Accepted".
+     - "severity": "High", "Medium", or "Low".
+     - "score": A completion score (0-100) indicating mitigation status or severity.
+     - "modelType": Exactly "STRIDE" or "MITRE_F3" (matching methodology).
+     - "number": A unique sequential integer.
 
 ${previousQuestionsPrompt}`;
         }
@@ -2344,34 +2410,6 @@ Every object inside the "threats" array of any cell must have:
 }`;
         } else {
             jsonOutputSchema = `{
-  "threatModel": {
-    "version": "2.0.0",
-    "summary": {
-      "title": "${title || (activeSession && activeSession.title) || ''}",
-      "owner": "Security Team",
-      "description": "${description || (activeSession && activeSession.description) || ''}",
-      "id": 0
-    },
-    "detail": {
-      "contributors": [{"name": "AI Threat Modeler"}],
-      "reviewer": "AI Threat Modeler",
-      "diagrams": [
-        {
-          "id": 0,
-          "title": "Main System DFD",
-          "diagramType": "${finalMethodology === 'MITRE_F3' ? 'MITRE_F3' : 'STRIDE'}",
-          "placeholder": "Main System DFD description",
-          "thumbnail": "./public/content/images/thumbnail.stride.jpg",
-          "version": "2.0.0",
-          "cells": [
-            // List of cells conforming to the strict schemas above
-          ]
-        }
-      ],
-      "diagramTop": 1,
-      "threatTop": 100
-    }
-  },
   "questions": [
     {
       "id": "The exact Group ID from the ASSIGNED CONSOLIDATED QUESTION GROUPS list",
@@ -2386,6 +2424,25 @@ Every object inside the "threats" array of any cell must have:
   "resolvedQuestionIds": [
     "Question ID 1",
     "Question ID 2"
+  ],
+  "threatDeltas": [
+    {
+      "cellId": "The exact ID of the element/flow cell (e.g., process-api-gateway)",
+      "threats": [
+        {
+          "id": "UUID or unique string (e.g., threat-xxxx)",
+          "title": "Ameaça em Português",
+          "type": "Spoofing",
+          "description": "Descrição detalhada...",
+          "mitigation": "Mitigação detalhada...",
+          "status": "Open",
+          "severity": "Medium",
+          "score": 75,
+          "modelType": "STRIDE",
+          "number": 1
+        }
+      ]
+    }
   ]
 }`;
         }
@@ -2406,7 +2463,7 @@ Every object inside the "threats" array of any cell must have:
 
         let parsedOutput;
         try {
-            parsedOutput = extractJson(responseText);
+            parsedOutput = extractJson(responseText, finalMethodology);
             if (currentModel && parsedOutput && parsedOutput.threatModel) {
                 parsedOutput.threatModel = mergeDiagramCells(currentModel, parsedOutput.threatModel, refinementHistory, dfdApprovedBool);
             }
@@ -2618,18 +2675,22 @@ You MUST revise and correct the threat model to address all these points. Specif
 3. Decompose any excessively grouped components.
 4. Correct layout coordinates using the tier rules to prevent overlaps.
 
-Return ONLY a JSON object containing the keys "threatModel" and "questions" (as specified in the original instructions). Do not wrap the JSON output in markdown formatting.
+Return ONLY a JSON object containing the keys "${dfdApprovedBool ? 'threatDeltas' : 'threatModel'}" and "questions" (as specified in the original instructions). Do not wrap the JSON output in markdown formatting.
 `;
 
             try {
                 const revResponseText = await callAIModel(revisionPromptText, finalImages, getStageConfig('revision', aiConfig), job);
 
-                const parsedRevision = revResponseText ? extractJson(revResponseText) : null;
+                const parsedRevision = revResponseText ? extractJson(revResponseText, finalMethodology) : null;
                 if (parsedRevision && parsedRevision.threatModel) {
                     const originalResolved = parsedOutput.resolvedQuestionIds;
+                    const originalQuestions = parsedOutput.questions;
                     parsedOutput = parsedRevision;
                     if (!parsedOutput.resolvedQuestionIds && originalResolved) {
                         parsedOutput.resolvedQuestionIds = originalResolved;
+                    }
+                    if ((!parsedOutput.questions || parsedOutput.questions.length === 0) && originalQuestions && originalQuestions.length > 0) {
+                        parsedOutput.questions = originalQuestions;
                     }
                     parsedOutput.threatModel = mergeDiagramCells(currentModel, parsedOutput.threatModel, refinementHistory, dfdApprovedBool);
                     logger.info(`[Job ${job.jobId}] Successfully received revised threat model from self-correction loop. Re-evaluating revised model...`);
@@ -2693,7 +2754,6 @@ Return ONLY a JSON object containing the keys "threatModel" and "questions" (as 
             }
 
             // Extract what question groups were assigned to the LLM in this round to heal the returned ones
-            let roundGroups = [];
             if (questionPlan) {
                 const previousAnsweredIds = activeSession.answeredQuestionIds || [];
                 const currentQuestionIds = (activeSession.questions || []).map((q) => q.id || q);
@@ -2702,14 +2762,70 @@ Return ONLY a JSON object containing the keys "threatModel" and "questions" (as 
                 roundGroups = groupAndConsolidateQuestions(questionPlan, combinedIds, batchSize);
             }
 
+            // Step 2: Decoupled Question Generator (Phase 2 only)
+            if (roundGroups && roundGroups.length > 0) {
+                const questionsPrompt = `You are the QuestionAgent, a technical security analyst assisting in threat modeling.
+Your task is to formulate precise, technical, and concrete clarifying questions in Portuguese for each of the assigned question groups below.
+
+ASSIGNED CONSOLIDATED QUESTION GROUPS:
+${activeQuestionsPrompt}
+
+CONTEXT:
+Here is the current Threat Model:
+${JSON.stringify(parsedOutput.threatModel, null, 2)}
+
+REFINEMENT CONVERSATION HISTORY:
+${refinementHistory.map((h) => `${h.role}: ${h.content}`).join('\n')}
+
+For each group, formulate a single consolidated question in Portuguese targeting secure configuration details, deployment parameters, authentication practices, and specific network boundaries for that group.
+You MUST return ONLY a JSON object with a single key "questions":
+{
+  "questions": [
+    {
+      "id": "The exact Group ID string from the assigned list",
+      "originalQuestionIds": ["original-question-id-1", ...],
+      "category": "The exact Category string from the assigned list",
+      "text": "A single consolidated, technical, specific question in Portuguese addressing all the elements in the group for that category."
+    }
+  ]
+}
+Do not wrap the JSON output in markdown formatting.`;
+
+                try {
+                    logger.info(`[Job ${job.jobId}] [QuestionAgent] Sending request to AI Provider (${aiConfig.provider}) for decoupled question generation`);
+                    // Call the Question Generator model without images
+                    const questionsResponseText = await callAIModel(questionsPrompt, [], getStageConfig('generator', aiConfig), job);
+                    const parsedQuestions = questionsResponseText ? extractJson(questionsResponseText, finalMethodology) : null;
+                    if (parsedQuestions && parsedQuestions.questions) {
+                        parsedOutput.questions = parsedQuestions.questions;
+                    } else {
+                        logger.warn(`[Job ${job.jobId}] Decoupled question generation did not return valid questions list.`);
+                    }
+                } catch (qErr) {
+                    logger.error(`[Job ${job.jobId}] Error during decoupled question generation: ${qErr.message}`);
+                }
+            }
+
             // Heal the returned questions using roundGroups
             parsedOutput.questions = healParsedConsolidatedQuestions(parsedOutput.questions, roundGroups);
 
-            // Extract resolved question IDs from LLM response
+            // Extract resolved question IDs from LLM response and map back to original question IDs
             if (parsedOutput.resolvedQuestionIds && Array.isArray(parsedOutput.resolvedQuestionIds)) {
                 parsedOutput.resolvedQuestionIds.forEach((id) => {
-                    if (id && typeof id === 'string' && !answeredQuestionIds.includes(id)) {
-                        answeredQuestionIds.push(id);
+                    if (id && typeof id === 'string') {
+                        if (!answeredQuestionIds.includes(id)) {
+                            answeredQuestionIds.push(id);
+                        }
+                        
+                        // Map the group ID back to its original question IDs so the framework progress advances
+                        const matchedGroup = (activeSession.questions || []).find((q) => q.id === id);
+                        if (matchedGroup && Array.isArray(matchedGroup.originalQuestionIds)) {
+                            matchedGroup.originalQuestionIds.forEach((origId) => {
+                                if (!answeredQuestionIds.includes(origId)) {
+                                    answeredQuestionIds.push(origId);
+                                }
+                            });
+                        }
                     }
                 });
             }
