@@ -761,6 +761,80 @@ describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
             await aiController.exportQuestions(req, res);
             expect(res.status).to.have.been.calledWith(400);
         });
+
+        it('should return 202 and start async generation if there are questions without text', async () => {
+            const mockSession = {
+                title: 'Test Session',
+                aiProvider: 'gemini',
+                apiKey: 'test-key',
+                questionPlan: {
+                    methodology: 'STRIDE',
+                    elementQuestions: [
+                        {
+                            elementId: 'el-1',
+                            elementName: 'Auth Service',
+                            elementShape: 'process',
+                            categories: [
+                                {
+                                    category: 'Spoofing',
+                                    questions: [
+                                        { id: 'q-1', type: 'threat_identification', questionText: '' }
+                                    ]
+                                }
+                            ]
+                        }
+                    ],
+                    globalQuestions: []
+                }
+            };
+            getSessionStub.returns(mockSession);
+            const req = { params: { sessionId: 'session-1' } };
+            const res = {
+                status: sinon.stub().returnsThis(),
+                json: sinon.stub()
+            };
+
+            await aiController.exportQuestions(req, res);
+            expect(res.status).to.have.been.calledWith(202);
+            expect(res.json).to.have.been.calledWith(sinon.match.has('data'));
+        });
+
+        it('should return 200 if all questions already have text', async () => {
+            const mockSession = {
+                title: 'Test Session',
+                aiProvider: 'gemini',
+                apiKey: 'test-key',
+                questionPlan: {
+                    methodology: 'STRIDE',
+                    elementQuestions: [
+                        {
+                            elementId: 'el-1',
+                            elementName: 'Auth Service',
+                            elementShape: 'process',
+                            categories: [
+                                {
+                                    category: 'Spoofing',
+                                    questions: [
+                                        { id: 'q-1', type: 'threat_identification', questionText: 'Some text here' }
+                                    ]
+                                }
+                            ]
+                        }
+                    ],
+                    globalQuestions: []
+                }
+            };
+            getSessionStub.returns(mockSession);
+            const req = { params: { sessionId: 'session-1' } };
+            const res = {
+                status: sinon.stub().returnsThis(),
+                json: sinon.stub()
+            };
+
+            await aiController.exportQuestions(req, res);
+            expect(res.status).to.have.been.calledWith(200);
+            expect(res.json).to.have.been.calledWith(sinon.match.has('data'));
+        });
     });
 
     describe('importAnswers', () => {

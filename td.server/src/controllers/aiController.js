@@ -3956,15 +3956,18 @@ const updateSessionState = (req, res) => {
 // Generates all pending questions via LLM for CSV export
 const exportQuestions = async (req, res) => {
     const { sessionId } = req.params;
+    logger.info(`[exportQuestions] Request received for session ${sessionId}`);
 
     try {
         const session = aiContextStore.getSession(sessionId);
         if (!session) {
+            logger.warn(`[exportQuestions] Session not found: ${sessionId}`);
             return res.status(404).json({ status: 404, message: 'Session not found' });
         }
 
         const questionPlan = session.questionPlan;
         if (!questionPlan) {
+            logger.warn(`[exportQuestions] Question plan not computed yet for session: ${sessionId}`);
             return res.status(400).json({ status: 400, message: 'Question plan not computed yet. Approve the DFD first.' });
         }
 
@@ -3988,6 +3991,7 @@ const exportQuestions = async (req, res) => {
                         elementName: elem.elementName,
                         elementType: elem.elementShape,
                         type: q.type,
+                        questionText: q.questionText || '',
                         answered: answeredIds.has(q.id),
                         answer: existingAnswer ? existingAnswer.answer : '',
                         source: existingAnswer ? (existingAnswer.source || 'manual') : ''
@@ -4032,24 +4036,30 @@ const exportQuestions = async (req, res) => {
         const questionsWithoutText = allQuestions.filter((q) => !q.questionText);
         if (questionsWithoutText.length > 0) {
             const job = createJob();
+            job.sessionId = sessionId;
             job.status = 'generating';
             job.progress = 10;
             activeJobs.set(job.jobId, { ...job });
 
-            // Build batches of up to 50 questions each for LLM generation
-            const batches = [];
-            for (let i = 0; i < questionsWithoutText.length; i += 50) {
-                batches.push(questionsWithoutText.slice(i, i + 50));
-            }
+            logger.info(`[exportQuestions] Started async generation of question texts for ${questionsWithoutText.length} questions in session ${sessionId}. Job ID: ${job.jobId}`);
 
-            // Build system description context
-            const systemDescription = `System: ${session.title || 'Unknown'}\nDescription: ${session.description || 'N/A'}\nMethodology: ${questionPlan.methodology || 'STRIDE'}`;
+            // Run asynchronously to prevent HTTP gateway timeout (504)
+            (async () => {
+                try {
+                    // Build batches of up to 50 questions each for LLM generation
+                    const batches = [];
+                    for (let i = 0; i < questionsWithoutText.length; i += 50) {
+                        batches.push(questionsWithoutText.slice(i, i + 50));
+                    }
 
-            for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
-                const batch = batches[batchIdx];
-                const batchSummary = batch.map((q, idx) => `${idx + 1}. [${q.id}] Category: "${q.category}", Element: "${q.elementName}" (${q.elementType}), Type: ${q.type}`).join('\n');
+                    // Build system description context
+                    const systemDescription = `System: ${session.title || 'Unknown'}\nDescription: ${session.description || 'N/A'}\nMethodology: ${questionPlan.methodology || 'STRIDE'}`;
 
-                const promptText = `
+                    for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
+                        const batch = batches[batchIdx];
+                        const batchSummary = batch.map((q, idx) => `${idx + 1}. [${q.id}] Category: "${q.category}", Element: "${q.elementName}" (${q.elementType}), Type: ${q.type}`).join('\n');
+
+                        const promptText = `
 You are a security expert generating threat modeling assessment questions for a ${questionPlan.methodology} analysis.
 
 ${systemDescription}
@@ -4069,45 +4079,92 @@ Respond ONLY with a valid JSON array of objects, each with "id" and "questionTex
   {"id": "q-def456", "questionText": "Quais controles de criptografia são utilizados para proteger os dados em trânsito no Data Flow entre o Frontend e o Backend?"}
 ]
 `;
-                try {
-                    /* eslint-disable-next-line no-await-in-loop */
-                    const llmResponse = await callAIModel(promptText, [], aiConfig);
-                    const parsed = extractJson(llmResponse);
-                    if (Array.isArray(parsed)) {
-                        parsed.forEach((item) => {
-                            const target = allQuestions.find((q) => q.id === item.id);
-                            if (target && item.questionText) {
-                                target.questionText = item.questionText;
+                        try {
+                            const llmResponse = await callAIModel(promptText, [], aiConfig);
+                            const parsed = extractJson(llmResponse);
+                            if (Array.isArray(parsed)) {
+                                parsed.forEach((item) => {
+                                    const target = allQuestions.find((q) => q.id === item.id);
+                                    if (target && item.questionText) {
+                                        target.questionText = item.questionText;
+                                    }
+                                });
                             }
-                        });
+                        } catch (llmErr) {
+                            logger.error(`[exportQuestions] LLM batch ${batchIdx + 1} failed: ${llmErr.message}`);
+                        }
+
+                        job.progress = 10 + Math.round(((batchIdx + 1) / batches.length) * 80);
+                        activeJobs.set(job.jobId, { ...job });
                     }
-                } catch (llmErr) {
-                    logger.error(`[exportQuestions] LLM batch ${batchIdx + 1} failed: ${llmErr.message}`);
+
+                    // Fill any remaining questions without LLM text with template fallbacks
+                    allQuestions.forEach((q) => {
+                        if (!q.questionText) {
+                            if (q.type === 'threat_identification') {
+                                q.questionText = `[${q.category}] Como a ameaça "${q.category}" pode se manifestar no componente "${q.elementName}" (${q.elementType})?`;
+                            } else if (q.type === 'mitigation') {
+                                q.questionText = `[${q.category}] Quais controles ou mitigações estão implementados para a categoria "${q.category}" no componente "${q.elementName}" (${q.elementType})?`;
+                            } else {
+                                q.questionText = `[${q.category}] Avalie o componente "${q.elementName}" em relação à categoria "${q.category}".`;
+                            }
+                        }
+                    });
+
+                    // Update question texts in the session's question plan
+                    const updatedElementQuestions = questionPlan.elementQuestions.map((elem) => {
+                        return {
+                            ...elem,
+                            categories: elem.categories.map((cat) => {
+                                return {
+                                    ...cat,
+                                    questions: cat.questions.map((q) => {
+                                        const matched = allQuestions.find((aq) => aq.id === q.id);
+                                        return {
+                                            ...q,
+                                            questionText: (matched && matched.questionText) ? matched.questionText : q.questionText
+                                        };
+                                    })
+                                };
+                            })
+                        };
+                    });
+
+                    const updatedQuestionPlan = {
+                        ...questionPlan,
+                        elementQuestions: updatedElementQuestions
+                    };
+
+                    aiContextStore.updateSession(sessionId, {
+                        questionPlan: updatedQuestionPlan
+                    });
+
+                    job.status = 'completed';
+                    job.progress = 100;
+                    activeJobs.set(job.jobId, { ...job });
+                    logger.info(`[exportQuestions] Async generation of question texts completed for session ${sessionId}. Job ID: ${job.jobId}`);
+
+                } catch (asyncErr) {
+                    logger.error(`[exportQuestions] Async generation error: ${asyncErr.message}`);
+                    job.status = 'failed';
+                    job.error = asyncErr.message;
+                    activeJobs.set(job.jobId, { ...job });
                 }
+            })();
 
-                job.progress = 10 + Math.round(((batchIdx + 1) / batches.length) * 80);
-                activeJobs.set(job.jobId, { ...job });
-            }
-
-            // Fill any remaining questions without LLM text with template fallbacks
-            allQuestions.forEach((q) => {
-                if (!q.questionText) {
-                    if (q.type === 'threat_identification') {
-                        q.questionText = `[${q.category}] Como a ameaça "${q.category}" pode se manifestar no componente "${q.elementName}" (${q.elementType})?`;
-                    } else if (q.type === 'mitigation') {
-                        q.questionText = `[${q.category}] Quais controles ou mitigações estão implementados para a categoria "${q.category}" no componente "${q.elementName}" (${q.elementType})?`;
-                    } else {
-                        q.questionText = `[${q.category}] Avalie o componente "${q.elementName}" em relação à categoria "${q.category}".`;
-                    }
+            return res.status(202).json({
+                status: 202,
+                message: 'Questions generation started asynchronously.',
+                data: {
+                    jobId: job.jobId,
+                    sessionId,
+                    status: job.status,
+                    progress: job.progress
                 }
             });
-
-            job.status = 'completed';
-            job.progress = 100;
-            activeJobs.set(job.jobId, { ...job });
         }
 
-        logger.info(`[exportQuestions] Exported ${allQuestions.length} questions for session ${sessionId} (${allQuestions.filter((q) => q.answered).length} already answered)`);
+        logger.info(`[exportQuestions] Returning questions directly (all have texts) for session ${sessionId}. Count: ${allQuestions.length}`);
 
         return res.status(200).json({
             status: 200,

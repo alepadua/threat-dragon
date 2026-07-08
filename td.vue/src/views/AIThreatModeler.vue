@@ -2123,53 +2123,106 @@ export default {
             
             try {
                 const response = await axios.get(`/api/ai/session/${this.sessionId}/export-questions`);
-                const data = response.data.data;
                 
-                // Convert to CSV
-                const headers = ['ID', 'Categoria', 'Componente', 'Tipo Elemento', 'Tipo Pergunta', 'Pergunta', 'Respondida', 'Resposta', 'Fonte'];
-                const csvRows = [headers.join(';')];
-                
-                (data.questions || []).forEach((q) => {
-                    const row = [
-                        q.id,
-                        q.category,
-                        q.elementName,
-                        q.elementType,
-                        q.type,
-                        `"${(q.questionText || '').replace(/"/g, '""')}"`,
-                        q.answered ? 'Sim' : 'Não',
-                        `"${(q.answer || '').replace(/"/g, '""')}"`,
-                        q.source || ''
-                    ];
-                    csvRows.push(row.join(';'));
-                });
-                
-                const csvContent = '\uFEFF' + csvRows.join('\n'); // BOM for Excel UTF-8
-                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = `${(this.form.title || 'threat-model').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-perguntas.csv`;
-                document.body.appendChild(link);
-                link.click();
-                link.remove();
-                URL.revokeObjectURL(url);
-                
-                this.accelerationResult = {
-                    type: 'success',
-                    title: 'CSV Exportado!',
-                    message: `${data.totalQuestions} perguntas exportadas (${data.answeredCount} já respondidas, ${data.pendingCount} pendentes). Preencha a coluna "Resposta" e importe de volta.`
+                const processExportData = (data) => {
+                    // Convert to CSV
+                    const headers = ['ID', 'Categoria', 'Componente', 'Tipo Elemento', 'Tipo Pergunta', 'Pergunta', 'Respondida', 'Resposta', 'Fonte'];
+                    const csvRows = [headers.join(';')];
+                    
+                    (data.questions || []).forEach((q) => {
+                        const row = [
+                            q.id,
+                            q.category,
+                            q.elementName,
+                            q.elementType,
+                            q.type,
+                            `"${(q.questionText || '').replace(/"/g, '""')}"`,
+                            q.answered ? 'Sim' : 'Não',
+                            `"${(q.answer || '').replace(/"/g, '""')}"`,
+                            q.source || ''
+                        ];
+                        csvRows.push(row.join(';'));
+                    });
+                    
+                    const csvContent = '\uFEFF' + csvRows.join('\n'); // BOM for Excel UTF-8
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `${(this.form.title || 'threat-model').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-perguntas.csv`;
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    URL.revokeObjectURL(url);
+                    
+                    this.accelerationLoading = false;
+                    this.accelerationProgress = 0;
+                    this.accelerationResult = {
+                        type: 'success',
+                        title: 'CSV Exportado!',
+                        message: `${data.totalQuestions} perguntas exportadas (${data.answeredCount} já respondidas, ${data.pendingCount} pendentes). Preencha a coluna "Resposta" e importe de volta.`
+                    };
                 };
+
+                if (response.status === 202) {
+                    const result = response.data.data;
+                    if (result.jobId) {
+                        const pollExport = () => {
+                            axios.get(`/api/ai/job/${result.jobId}/status`).then(res => {
+                                const job = res.data.data;
+                                this.accelerationProgress = job.progress || 50;
+                                this.accelerationStatus = `Gerando perguntas via IA... ${job.progress || 0}%`;
+                                
+                                if (job.status === 'completed') {
+                                    axios.get(`/api/ai/session/${this.sessionId}/export-questions`).then(finalRes => {
+                                        processExportData(finalRes.data.data);
+                                    }).catch(fetchErr => {
+                                        this.accelerationLoading = false;
+                                        this.accelerationResult = {
+                                            type: 'error',
+                                            title: 'Erro ao baixar perguntas',
+                                            message: fetchErr.message
+                                        };
+                                    });
+                                } else if (job.status === 'failed') {
+                                    this.accelerationLoading = false;
+                                    this.accelerationResult = {
+                                        type: 'error',
+                                        title: 'Erro na geração de perguntas',
+                                        message: job.error || 'Erro desconhecido.'
+                                    };
+                                } else {
+                                    setTimeout(pollExport, 2000);
+                                }
+                            }).catch(pollErr => {
+                                this.accelerationLoading = false;
+                                this.accelerationResult = {
+                                    type: 'error',
+                                    title: 'Erro de polling',
+                                    message: pollErr.message
+                                };
+                            });
+                        };
+                        pollExport();
+                    } else {
+                        this.accelerationLoading = false;
+                        this.accelerationResult = {
+                            type: 'error',
+                            title: 'Erro de geração',
+                            message: 'Nenhum Job ID retornado.'
+                        };
+                    }
+                } else {
+                    processExportData(response.data.data);
+                }
             } catch (err) {
                 console.error('Export error:', err);
+                this.accelerationLoading = false;
                 this.accelerationResult = {
                     type: 'error',
                     title: 'Erro na exportação',
                     message: err.response?.data?.message || err.message
                 };
-            } finally {
-                this.accelerationLoading = false;
-                this.accelerationProgress = 0;
             }
         },
         // Import Answers from CSV
