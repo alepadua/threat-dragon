@@ -4089,6 +4089,7 @@ Below is a list of question slots. For each one, generate a clear, specific, and
 The question should be relevant to the specific element, category, and question type indicated.
 - "threat_identification" questions ask about how a specific threat manifests for that element.
 - "mitigation" questions ask what controls/mitigations are in place for that threat category on that element.
+- "consolidated" questions ask BOTH how a specific threat manifests on that element AND what controls/mitigations are in place to address it.
 
 Questions list:
 ${batchSummary}
@@ -4125,6 +4126,8 @@ Respond ONLY with a valid JSON array of objects, each with "id" and "questionTex
                                 q.questionText = `[${q.category}] Como a ameaça "${q.category}" pode se manifestar no componente "${q.elementName}" (${q.elementType})?`;
                             } else if (q.type === 'mitigation') {
                                 q.questionText = `[${q.category}] Quais controles ou mitigações estão implementados para a categoria "${q.category}" no componente "${q.elementName}" (${q.elementType})?`;
+                            } else if (q.type === 'consolidated') {
+                                q.questionText = `[${q.category}] Como a ameaça "${q.category}" pode se manifestar no componente "${q.elementName}" (${q.elementType}) e quais mitigações/controles estão implementados?`;
                             } else {
                                 q.questionText = `[${q.category}] Avalie o componente "${q.elementName}" em relação à categoria "${q.category}".`;
                             }

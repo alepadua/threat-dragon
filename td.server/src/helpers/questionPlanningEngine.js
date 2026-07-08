@@ -19,8 +19,8 @@ const FRAMEWORK_DEFINITIONS = {
             store:   ['Tampering', 'Information disclosure', 'Denial of service'],
             flow:    ['Tampering', 'Information disclosure', 'Denial of service']
         },
-        questionsPerPair: 2, // 1 threat identification + 1 mitigation
-        boundaryQuestionsEach: 2,
+        questionsPerPair: 1, // consolidated single question per category
+        boundaryQuestionsEach: 1, // reduced from 2 to 1
         globalQuestions: [
             'Qual é a política de logging e auditoria implementada no sistema?',
             'Quais regulamentos de compliance (LGPD, PCI-DSS, SOC2) se aplicam a este sistema?',
@@ -37,7 +37,7 @@ const FRAMEWORK_DEFINITIONS = {
             store:   ['Linkability', 'Identifiability', 'Detectability', 'Disclosure of information', 'Non-compliance'],
             flow:    ['Linkability', 'Identifiability', 'Detectability', 'Disclosure of information']
         },
-        questionsPerPair: 2,
+        questionsPerPair: 1,
         boundaryQuestionsEach: 1,
         globalQuestions: [
             'Foi realizada uma Avaliação de Impacto à Proteção de Dados (DPIA) para este sistema?',
@@ -56,7 +56,7 @@ const FRAMEWORK_DEFINITIONS = {
             store:   ['Confidentiality', 'Integrity', 'Availability'],
             flow:    ['Confidentiality', 'Integrity', 'Availability']
         },
-        questionsPerPair: 2,
+        questionsPerPair: 1,
         boundaryQuestionsEach: 1,
         globalQuestions: [
             'Qual é a classificação de dados (público, interno, confidencial, restrito) aplicada neste sistema?',
@@ -73,7 +73,7 @@ const FRAMEWORK_DEFINITIONS = {
             store:   ['Distributed', 'Immutable', 'Ephemeral'],
             flow:    ['Distributed', 'Ephemeral']
         },
-        questionsPerPair: 2,
+        questionsPerPair: 1,
         boundaryQuestionsEach: 0,
         globalQuestions: [
             'Qual é a estratégia de CI/CD utilizada para deploy dos componentes?',
@@ -91,8 +91,8 @@ const FRAMEWORK_DEFINITIONS = {
             store:   ['Initial Access', 'Monetization'],
             flow:    ['Execution', 'Monetization']
         },
-        questionsPerPair: 2,
-        boundaryQuestionsEach: 2,
+        questionsPerPair: 1,
+        boundaryQuestionsEach: 1,
         globalQuestions: [
             'Quais processos de KYC (Know Your Customer) e AML (Anti-Money Laundering) estão implementados?',
             'Existe monitoramento de transações em tempo real para detecção de fraudes?',
@@ -170,6 +170,20 @@ const computeQuestionPlan = (cells, methodology) => {
         return _buildPlanResult(framework, elementQuestions, 0);
     }
 
+    // Helper to get type and name of source/target cells in flows
+    const getCellTypeAndName = (cellId, allCells) => {
+        const cell = allCells.find((c) => c.id === cellId);
+        if (!cell) { return { type: 'unknown', name: 'Unknown' }; }
+        const type = classifyShape(cell.shape) || 'unknown';
+        const name = (cell.data && cell.data.name) ||
+                     (cell.attrs && cell.attrs.text && cell.attrs.text.text) ||
+                     cell.id || 'Unknown';
+        return { type, name };
+    };
+
+    const nonFlowCells = [];
+    const flowCells = [];
+
     cells.forEach((cell) => {
         const shape = cell.shape;
 
@@ -182,6 +196,64 @@ const computeQuestionPlan = (cells, methodology) => {
         const elementType = classifyShape(shape);
         if (!elementType) { return; }
 
+        if (elementType === 'flow') {
+            flowCells.push(cell);
+        } else {
+            nonFlowCells.push(cell);
+        }
+    });
+
+    // Group flow cells by source_type to target_type
+    const flowGroups = {};
+    flowCells.forEach((cell) => {
+        const sourceId = cell.source?.cell;
+        const targetId = cell.target?.cell;
+        const sourceInfo = getCellTypeAndName(sourceId, cells);
+        const targetInfo = getCellTypeAndName(targetId, cells);
+
+        const groupKey = `${sourceInfo.type}_to_${targetInfo.type}`;
+        if (!flowGroups[groupKey]) {
+            flowGroups[groupKey] = {
+                key: groupKey,
+                sourceType: sourceInfo.type,
+                targetType: targetInfo.type,
+                flows: []
+            };
+        }
+        const flowName = (cell.data && cell.data.name) ||
+                         (cell.attrs && cell.attrs.text && cell.attrs.text.text) ||
+                         cell.id || 'Unknown';
+        flowGroups[groupKey].flows.push(flowName);
+    });
+
+    // Build virtual flow cells for the flow groups
+    const virtualFlowCells = Object.keys(flowGroups).map((groupKey) => {
+        const groupInfo = flowGroups[groupKey];
+        const flowExamples = groupInfo.flows.slice(0, 3).join(', ') + (groupInfo.flows.length > 3 ? '...' : '');
+
+        const getTypeNamePt = (type) => {
+            if (type === 'process') { return 'Processo'; }
+            if (type === 'store') { return 'Data Store'; }
+            if (type === 'actor') { return 'Entidade Externa'; }
+            return 'Desconhecido';
+        };
+
+        const groupName = `Fluxos: ${getTypeNamePt(groupInfo.sourceType)} para ${getTypeNamePt(groupInfo.targetType)} (ex: ${flowExamples})`;
+
+        return {
+            id: `flow-group-${groupKey}`,
+            shape: 'flow',
+            data: {
+                name: groupName
+            }
+        };
+    });
+
+    // Process all non-flow cells and virtual flow groups
+    const finalCellsToProcess = [...nonFlowCells, ...virtualFlowCells];
+
+    finalCellsToProcess.forEach((cell) => {
+        const elementType = classifyShape(cell.shape);
         const applicableCategories = framework.elementMapping[elementType] || [];
         if (applicableCategories.length === 0) { return; }
 
@@ -198,7 +270,7 @@ const computeQuestionPlan = (cells, methodology) => {
                     elementId: cell.id,
                     elementName: cellName,
                     elementType,
-                    type: i === 0 ? 'threat_identification' : 'mitigation',
+                    type: framework.questionsPerPair === 1 ? 'consolidated' : (i === 0 ? 'threat_identification' : 'mitigation'),
                     answered: false
                 });
             }
