@@ -41,6 +41,7 @@ export const createSession = (data) => {
         methodology: data.methodology || 'STRIDE',
         questionPlan: data.questionPlan || null,
         answeredQuestionIds: data.answeredQuestionIds || [],
+        requirements: data.requirements || [],
         aiProvider: data.aiProvider || 'gemini',
         customBaseUrl: data.customBaseUrl || '',
         customModel: data.customModel || '',

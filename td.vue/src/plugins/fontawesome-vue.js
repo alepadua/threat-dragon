@@ -47,7 +47,8 @@ import {
     faCommentDots,
     faTasks,
     faHistory,
-    faSync
+    faSync,
+    faBolt
 } from '@fortawesome/free-solid-svg-icons';
 
 import {faBitbucket, faGithub, faGitlab, faVuejs, faGoogle, faGoogleDrive} from '@fortawesome/free-brands-svg-icons';
@@ -103,7 +104,8 @@ library.add(
     faCommentDots,
     faTasks,
     faHistory,
-    faSync
+    faSync,
+    faBolt
 );
 
 export { FontAwesomeIcon };

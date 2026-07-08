@@ -2940,6 +2940,7 @@ const generate = async (req, res) => {
         customEmbeddingModel,
         currentModel,
         refinementHistory,
+        requirements,
         methodology = 'STRIDE',
         sessionId,
         dfdApproved,
@@ -2963,6 +2964,7 @@ const generate = async (req, res) => {
         description,
         docsCount: docs ? docs.length : 0,
         imagesCount: images ? images.length : 0,
+        requirementsCount: requirements ? requirements.length : 0,
         aiProvider,
         customBaseUrl,
         customModel,
@@ -3222,6 +3224,7 @@ substr(2, 5)}`;
                 description,
                 docs: finalDocs,
                 images: finalImages,
+                requirements: requirements || [],
                 refinementHistory: refinementHistory || [],
                 currentModel: currentModel || null,
                 methodology: finalMethodology,
@@ -3949,6 +3952,590 @@ const updateSessionState = (req, res) => {
     });
 };
 
+// ─── Export Questions Endpoint ────────────────────────────────────────────────
+// Generates all pending questions via LLM for CSV export
+const exportQuestions = async (req, res) => {
+    const { sessionId } = req.params;
+
+    try {
+        const session = aiContextStore.getSession(sessionId);
+        if (!session) {
+            return res.status(404).json({ status: 404, message: 'Session not found' });
+        }
+
+        const questionPlan = session.questionPlan;
+        if (!questionPlan) {
+            return res.status(400).json({ status: 400, message: 'Question plan not computed yet. Approve the DFD first.' });
+        }
+
+        const answeredIds = new Set(session.answeredQuestionIds || []);
+        const answeredQuestions = session.answeredQuestions || [];
+        const answeredMap = new Map();
+        answeredQuestions.forEach((aq) => {
+            if (aq.id) { answeredMap.set(aq.id, aq); }
+        });
+
+        // Collect ALL questions from the plan (pending + answered)
+        const allQuestions = [];
+        questionPlan.elementQuestions.forEach((elem) => {
+            elem.categories.forEach((catGroup) => {
+                catGroup.questions.forEach((q) => {
+                    const existingAnswer = answeredMap.get(q.id);
+                    allQuestions.push({
+                        id: q.id,
+                        category: catGroup.category,
+                        elementId: elem.elementId,
+                        elementName: elem.elementName,
+                        elementType: elem.elementShape,
+                        type: q.type,
+                        answered: answeredIds.has(q.id),
+                        answer: existingAnswer ? existingAnswer.answer : '',
+                        source: existingAnswer ? (existingAnswer.source || 'manual') : ''
+                    });
+                });
+            });
+        });
+
+        // Add global questions
+        (questionPlan.globalQuestions || []).forEach((gq, idx) => {
+            const gqId = `global-q-${idx}`;
+            const existingAnswer = answeredMap.get(gqId);
+            allQuestions.push({
+                id: gqId,
+                category: 'Global',
+                elementId: 'global',
+                elementName: 'Sistema',
+                elementType: 'global',
+                type: 'global',
+                questionText: gq,
+                answered: answeredIds.has(gqId),
+                answer: existingAnswer ? existingAnswer.answer : '',
+                source: existingAnswer ? (existingAnswer.source || 'manual') : ''
+            });
+        });
+
+        // Build AI config from session
+        const provider = session.aiProvider || 'gemini';
+        const aiConfig = {
+            provider,
+            apiKey: session.apiKey || (provider === 'bedrock-mantle' ? env.get().config.BEDROCK_MANTLE_API_KEY : env.get().config.GEMINI_API_KEY),
+            baseUrl: session.customBaseUrl || env.get().config.BEDROCK_MANTLE_BASE_URL,
+            model: session.customModel || env.get().config.BEDROCK_MANTLE_MODEL,
+            extendedThinking: session.extendedThinking === true || session.extendedThinking === 'true'
+        };
+
+        if (!aiConfig.apiKey) {
+            return badRequest(`API key is not configured for provider ${provider}.`, res, logger);
+        }
+
+        // Use LLM to generate contextual question texts
+        const questionsWithoutText = allQuestions.filter((q) => !q.questionText);
+        if (questionsWithoutText.length > 0) {
+            const job = createJob();
+            job.status = 'generating';
+            job.progress = 10;
+            activeJobs.set(job.jobId, { ...job });
+
+            // Build batches of up to 50 questions each for LLM generation
+            const batches = [];
+            for (let i = 0; i < questionsWithoutText.length; i += 50) {
+                batches.push(questionsWithoutText.slice(i, i + 50));
+            }
+
+            // Build system description context
+            const systemDescription = `System: ${session.title || 'Unknown'}\nDescription: ${session.description || 'N/A'}\nMethodology: ${questionPlan.methodology || 'STRIDE'}`;
+
+            for (let batchIdx = 0; batchIdx < batches.length; batchIdx++) {
+                const batch = batches[batchIdx];
+                const batchSummary = batch.map((q, idx) => `${idx + 1}. [${q.id}] Category: "${q.category}", Element: "${q.elementName}" (${q.elementType}), Type: ${q.type}`).join('\n');
+
+                const promptText = `
+You are a security expert generating threat modeling assessment questions for a ${questionPlan.methodology} analysis.
+
+${systemDescription}
+
+Below is a list of question slots. For each one, generate a clear, specific, and actionable security question in Portuguese (pt-BR) that a security team would need to answer to properly assess the threat/control.
+
+The question should be relevant to the specific element, category, and question type indicated.
+- "threat_identification" questions ask about how a specific threat manifests for that element.
+- "mitigation" questions ask what controls/mitigations are in place for that threat category on that element.
+
+Questions list:
+${batchSummary}
+
+Respond ONLY with a valid JSON array of objects, each with "id" and "questionText" fields. Example:
+[
+  {"id": "q-abc123", "questionText": "Como é feita a autenticação dos usuários no API Gateway?"},
+  {"id": "q-def456", "questionText": "Quais controles de criptografia são utilizados para proteger os dados em trânsito no Data Flow entre o Frontend e o Backend?"}
+]
+`;
+                try {
+                    /* eslint-disable-next-line no-await-in-loop */
+                    const llmResponse = await callAIModel(promptText, [], aiConfig);
+                    const parsed = extractJson(llmResponse);
+                    if (Array.isArray(parsed)) {
+                        parsed.forEach((item) => {
+                            const target = allQuestions.find((q) => q.id === item.id);
+                            if (target && item.questionText) {
+                                target.questionText = item.questionText;
+                            }
+                        });
+                    }
+                } catch (llmErr) {
+                    logger.error(`[exportQuestions] LLM batch ${batchIdx + 1} failed: ${llmErr.message}`);
+                }
+
+                job.progress = 10 + Math.round(((batchIdx + 1) / batches.length) * 80);
+                activeJobs.set(job.jobId, { ...job });
+            }
+
+            // Fill any remaining questions without LLM text with template fallbacks
+            allQuestions.forEach((q) => {
+                if (!q.questionText) {
+                    if (q.type === 'threat_identification') {
+                        q.questionText = `[${q.category}] Como a ameaça "${q.category}" pode se manifestar no componente "${q.elementName}" (${q.elementType})?`;
+                    } else if (q.type === 'mitigation') {
+                        q.questionText = `[${q.category}] Quais controles ou mitigações estão implementados para a categoria "${q.category}" no componente "${q.elementName}" (${q.elementType})?`;
+                    } else {
+                        q.questionText = `[${q.category}] Avalie o componente "${q.elementName}" em relação à categoria "${q.category}".`;
+                    }
+                }
+            });
+
+            job.status = 'completed';
+            job.progress = 100;
+            activeJobs.set(job.jobId, { ...job });
+        }
+
+        logger.info(`[exportQuestions] Exported ${allQuestions.length} questions for session ${sessionId} (${allQuestions.filter((q) => q.answered).length} already answered)`);
+
+        return res.status(200).json({
+            status: 200,
+            message: 'Questions exported successfully',
+            data: {
+                sessionId,
+                methodology: questionPlan.methodology,
+                systemTitle: session.title,
+                systemDescription: session.description,
+                totalQuestions: allQuestions.length,
+                answeredCount: allQuestions.filter((q) => q.answered).length,
+                pendingCount: allQuestions.filter((q) => !q.answered).length,
+                questions: allQuestions
+            }
+        });
+
+    } catch (err) {
+        logger.error(`[exportQuestions] Error: ${err.message}`);
+        return serverError(err.message, res, logger);
+    }
+};
+
+// ─── Import Answers Endpoint ─────────────────────────────────────────────────
+// Bulk-applies answers from an imported CSV
+const importAnswers = async (req, res) => {
+    const { sessionId } = req.params;
+    const { answers } = req.body; // Array of { id, answer }
+
+    try {
+        const session = aiContextStore.getSession(sessionId);
+        if (!session) {
+            return res.status(404).json({ status: 404, message: 'Session not found' });
+        }
+
+        if (!answers || !Array.isArray(answers) || answers.length === 0) {
+            return res.status(400).json({ status: 400, message: 'answers array is required and must not be empty' });
+        }
+
+        const questionPlan = session.questionPlan;
+        if (!questionPlan) {
+            return res.status(400).json({ status: 400, message: 'Question plan not computed yet.' });
+        }
+
+        // Build set of valid question IDs from the plan
+        const validIds = new Set();
+        questionPlan.elementQuestions.forEach((elem) => {
+            elem.categories.forEach((catGroup) => {
+                catGroup.questions.forEach((q) => {
+                    validIds.add(q.id);
+                });
+            });
+        });
+        // Also add global question IDs
+        (questionPlan.globalQuestions || []).forEach((_gq, idx) => {
+            validIds.add(`global-q-${idx}`);
+        });
+
+        const sessionAnswered = session.answeredQuestions || [];
+        const existingIds = new Set(sessionAnswered.map((q) => q.id));
+        let importedCount = 0;
+        let skippedCount = 0;
+
+        answers.forEach((item) => {
+            if (!item.id || !item.answer || item.answer.trim() === '') {
+                skippedCount++;
+                return;
+            }
+
+            if (!validIds.has(item.id)) {
+                logger.warn(`[importAnswers] Skipping unknown question ID: ${item.id}`);
+                skippedCount++;
+                return;
+            }
+
+            if (existingIds.has(item.id)) {
+                // Update existing answer
+                const existing = sessionAnswered.find((q) => q.id === item.id);
+                if (existing) {
+                    existing.answer = item.answer.trim();
+                    existing.timestamp = new Date().toISOString();
+                    existing.source = item.source || 'csv_import';
+                }
+            } else {
+                sessionAnswered.push({
+                    id: item.id,
+                    text: item.questionText || item.text || '',
+                    answer: item.answer.trim(),
+                    elementId: item.elementId || 'global',
+                    elementName: item.elementName || 'Sistema',
+                    category: item.category || 'Importado',
+                    timestamp: new Date().toISOString(),
+                    source: item.source || 'csv_import'
+                });
+                existingIds.add(item.id);
+            }
+            importedCount++;
+        });
+
+        // Update answeredQuestionIds
+        const answeredQuestionIds = Array.from(new Set([
+            ...(session.answeredQuestionIds || []),
+            ...sessionAnswered.filter((q) => q.id && !q.id.startsWith('manual-req-')).map((q) => q.id)
+        ]));
+
+        // Recompute progress
+        if (questionPlan) {
+            questionPlan.progress = questionPlanningEngine.computeProgress(questionPlan, answeredQuestionIds);
+            if (questionPlan.progress && questionPlan.progress.byCategory) {
+                questionPlan.byCategory = questionPlan.progress.byCategory;
+            }
+        }
+
+        // Rebuild history
+        const rebuiltHistory = rebuildHistoryFromAnswered(sessionAnswered);
+
+        // Save previous state for undo
+        const previousHistory = session.history || [];
+        if (session.currentModel) {
+            previousHistory.push({
+                currentModel: session.currentModel,
+                questions: session.questions || [],
+                evaluation: session.evaluation || null,
+                refinementHistory: session.refinementHistory || [],
+                dfdApproved: session.dfdApproved || false,
+                threatModelApproved: session.threatModelApproved || false
+            });
+        }
+
+        // Update session
+        const updatedSession = aiContextStore.updateSession(sessionId, {
+            answeredQuestions: sessionAnswered,
+            answeredQuestionIds,
+            refinementHistory: rebuiltHistory,
+            questionPlan,
+            history: previousHistory
+        });
+
+        // Start async re-generation job
+        const provider = session.aiProvider || 'gemini';
+        const aiConfig = {
+            provider,
+            apiKey: session.apiKey || (provider === 'bedrock-mantle' ? env.get().config.BEDROCK_MANTLE_API_KEY : env.get().config.GEMINI_API_KEY),
+            baseUrl: session.customBaseUrl || env.get().config.BEDROCK_MANTLE_BASE_URL,
+            model: session.customModel || env.get().config.BEDROCK_MANTLE_MODEL,
+            embeddingModel: session.customEmbeddingModel || env.get().config.BEDROCK_MANTLE_EMBEDDING_MODEL || 'amazon.titan-embed-text-v1',
+            extendedThinking: session.extendedThinking === true || session.extendedThinking === 'true',
+            maxContextTokens: session.maxContextTokens || null,
+            questionBatchSize: session.questionBatchSize || null
+        };
+
+        const job = createJob();
+        job.sessionId = sessionId;
+
+        runGenerateJob(
+            job,
+            {
+                title: updatedSession.title,
+                description: updatedSession.description,
+                currentModel: updatedSession.currentModel,
+                dfdApproved: updatedSession.dfdApproved
+            },
+            updatedSession,
+            updatedSession.docs || [],
+            updatedSession.images || [],
+            updatedSession.methodology || 'STRIDE',
+            updatedSession.dfdApproved || false,
+            aiConfig
+        );
+
+        logger.info(`[importAnswers] Imported ${importedCount} answers, skipped ${skippedCount}, for session ${sessionId}. Re-generation job: ${job.jobId}`);
+
+        return res.status(202).json({
+            status: 202,
+            message: `Successfully imported ${importedCount} answers. ${skippedCount} were skipped. Re-generation started.`,
+            data: {
+                jobId: job.jobId,
+                sessionId,
+                importedCount,
+                skippedCount,
+                totalAnswered: answeredQuestionIds.length,
+                totalQuestions: questionPlan.totalQuestions,
+                progress: questionPlan.progress
+            }
+        });
+
+    } catch (err) {
+        logger.error(`[importAnswers] Error: ${err.message}`);
+        return serverError(err.message, res, logger);
+    }
+};
+
+// ─── Apply Requirements Endpoint ─────────────────────────────────────────────
+// Uses LLM to match uploaded requirements/controls against pending questions
+const applyRequirements = async (req, res) => {
+    const { sessionId } = req.params;
+    const { requirements } = req.body; // Array of { control, description, category, status }
+
+    try {
+        const session = aiContextStore.getSession(sessionId);
+        if (!session) {
+            return res.status(404).json({ status: 404, message: 'Session not found' });
+        }
+
+        if (!requirements || !Array.isArray(requirements) || requirements.length === 0) {
+            return res.status(400).json({ status: 400, message: 'requirements array is required and must not be empty' });
+        }
+
+        const questionPlan = session.questionPlan;
+        if (!questionPlan) {
+            return res.status(400).json({ status: 400, message: 'Question plan not computed yet. Approve the DFD first.' });
+        }
+
+        // Build AI config
+        const provider = session.aiProvider || 'gemini';
+        const aiConfig = {
+            provider,
+            apiKey: session.apiKey || (provider === 'bedrock-mantle' ? env.get().config.BEDROCK_MANTLE_API_KEY : env.get().config.GEMINI_API_KEY),
+            baseUrl: session.customBaseUrl || env.get().config.BEDROCK_MANTLE_BASE_URL,
+            model: session.customModel || env.get().config.BEDROCK_MANTLE_MODEL,
+            extendedThinking: session.extendedThinking === true || session.extendedThinking === 'true'
+        };
+
+        if (!aiConfig.apiKey) {
+            return badRequest(`API key is not configured for provider ${provider}.`, res, logger);
+        }
+
+        // Collect pending questions
+        const answeredIds = new Set(session.answeredQuestionIds || []);
+        const pendingQuestions = [];
+        questionPlan.elementQuestions.forEach((elem) => {
+            elem.categories.forEach((catGroup) => {
+                catGroup.questions.forEach((q) => {
+                    if (!answeredIds.has(q.id)) {
+                        pendingQuestions.push({
+                            id: q.id,
+                            category: catGroup.category,
+                            elementId: elem.elementId,
+                            elementName: elem.elementName,
+                            elementType: elem.elementShape,
+                            type: q.type
+                        });
+                    }
+                });
+            });
+        });
+
+        if (pendingQuestions.length === 0) {
+            return res.status(200).json({
+                status: 200,
+                message: 'No pending questions to match against requirements.',
+                data: { matchedCount: 0, pendingCount: 0, matches: [] }
+            });
+        }
+
+        // Create async job
+        const job = createJob();
+        job.sessionId = sessionId;
+        job.status = 'generating';
+        job.progress = 10;
+        activeJobs.set(job.jobId, { ...job });
+
+        // Run matching asynchronously
+        (async () => {
+            try {
+                // Format requirements for LLM
+                const reqSummary = requirements.map((r, idx) => {
+                    let line = `${idx + 1}. Controle: "${r.control || r.requisito || r.name || 'N/A'}"`;
+                    if (r.description || r.descricao) {
+                        line += ` | Descrição: "${r.description || r.descricao}"`;
+                    }
+                    if (r.category || r.categoria) {
+                        line += ` | Categoria: "${r.category || r.categoria}"`;
+                    }
+                    if (r.status) {
+                        line += ` | Status: "${r.status}"`;
+                    }
+                    return line;
+                }).join('\n');
+
+                // Process in batches of 30 pending questions
+                const allMatches = [];
+                const batchSize = 30;
+                for (let i = 0; i < pendingQuestions.length; i += batchSize) {
+                    const batch = pendingQuestions.slice(i, i + batchSize);
+                    const qSummary = batch.map((q, idx) => `${idx + 1}. [${q.id}] Category: "${q.category}", Element: "${q.elementName}" (${q.elementType}), Type: ${q.type}`).join('\n');
+
+                    const promptText = `
+You are a security requirements analyst. You are given a list of security REQUIREMENTS/CONTROLS that are already implemented in a system, and a list of PENDING QUESTIONS from a ${questionPlan.methodology} threat modeling assessment.
+
+Your task is to determine which questions can be automatically answered based on the implemented requirements/controls.
+
+A question is "covered" by a requirement if the requirement directly addresses or mitigates the concern raised by the question's category and element. Only match with HIGH CONFIDENCE.
+
+IMPLEMENTED REQUIREMENTS/CONTROLS:
+${reqSummary}
+
+PENDING QUESTIONS:
+${qSummary}
+
+System: "${session.title || 'N/A'}"
+Description: "${session.description || 'N/A'}"
+
+For each question that CAN be answered by one or more requirements, generate:
+- The question ID
+- The matched requirement(s) 
+- An auto-generated answer in Portuguese explaining how the requirement covers this concern
+- A confidence score (0.0 to 1.0)
+
+ONLY include matches with confidence >= 0.7.
+
+Respond ONLY with a valid JSON array. Example:
+[
+  {
+    "questionId": "q-abc123",
+    "matchedRequirements": ["Controle de Autenticação MFA"],
+    "autoAnswer": "Este requisito é atendido pelo controle de Autenticação MFA implementado, que garante autenticação multifator para todos os acessos ao sistema.",
+    "confidence": 0.9
+  }
+]
+
+If no matches are found, respond with an empty array: []
+`;
+
+                    try {
+                        /* eslint-disable-next-line no-await-in-loop */
+                        const llmResponse = await callAIModel(promptText, [], aiConfig);
+                        const parsed = extractJson(llmResponse);
+                        if (Array.isArray(parsed)) {
+                            allMatches.push(...parsed.filter((m) => m.questionId && m.autoAnswer && m.confidence >= 0.7));
+                        }
+                    } catch (llmErr) {
+                        logger.error(`[applyRequirements] LLM batch failed: ${llmErr.message}`);
+                    }
+
+                    job.progress = 10 + Math.round(((i + batchSize) / pendingQuestions.length) * 70);
+                    activeJobs.set(job.jobId, { ...job });
+                }
+
+                // Apply matches
+                const sessionAnswered = session.answeredQuestions || [];
+                const existingIds = new Set(sessionAnswered.map((q) => q.id));
+                let matchedCount = 0;
+
+                allMatches.forEach((match) => {
+                    const qId = match.questionId;
+                    if (!existingIds.has(qId)) {
+                        const pq = pendingQuestions.find((q) => q.id === qId);
+                        if (pq) {
+                            sessionAnswered.push({
+                                id: qId,
+                                text: `[Auto-respondida por Requisito] ${match.matchedRequirements.join(', ')}`,
+                                answer: match.autoAnswer,
+                                elementId: pq.elementId,
+                                elementName: pq.elementName,
+                                category: pq.category,
+                                timestamp: new Date().toISOString(),
+                                source: 'requirements',
+                                matchedRequirements: match.matchedRequirements,
+                                confidence: match.confidence
+                            });
+                            existingIds.add(qId);
+                            matchedCount++;
+                        }
+                    }
+                });
+
+                // Update session
+                const updatedAnsweredIds = Array.from(new Set([
+                    ...(session.answeredQuestionIds || []),
+                    ...sessionAnswered.filter((q) => q.id && !q.id.startsWith('manual-req-')).map((q) => q.id)
+                ]));
+
+                if (questionPlan) {
+                    questionPlan.progress = questionPlanningEngine.computeProgress(questionPlan, updatedAnsweredIds);
+                    if (questionPlan.progress && questionPlan.progress.byCategory) {
+                        questionPlan.byCategory = questionPlan.progress.byCategory;
+                    }
+                }
+
+                const rebuiltHistory = rebuildHistoryFromAnswered(sessionAnswered);
+
+                aiContextStore.updateSession(sessionId, {
+                    answeredQuestions: sessionAnswered,
+                    answeredQuestionIds: updatedAnsweredIds,
+                    refinementHistory: rebuiltHistory,
+                    questionPlan,
+                    requirements
+                });
+
+                job.status = 'completed';
+                job.progress = 100;
+                job.result = {
+                    matchedCount,
+                    totalRequirements: requirements.length,
+                    totalPendingBefore: pendingQuestions.length,
+                    totalPendingAfter: pendingQuestions.length - matchedCount,
+                    matches: allMatches,
+                    progress: questionPlan.progress
+                };
+                activeJobs.set(job.jobId, { ...job });
+
+                logger.info(`[applyRequirements] Matched ${matchedCount}/${pendingQuestions.length} questions with ${requirements.length} requirements for session ${sessionId}`);
+
+            } catch (asyncErr) {
+                logger.error(`[applyRequirements] Async job error: ${asyncErr.message}`);
+                job.status = 'failed';
+                job.error = asyncErr.message;
+                activeJobs.set(job.jobId, { ...job });
+            }
+        })();
+
+        return res.status(202).json({
+            status: 202,
+            message: 'Requirements matching job started.',
+            data: {
+                jobId: job.jobId,
+                sessionId,
+                totalRequirements: requirements.length,
+                totalPendingQuestions: pendingQuestions.length
+            }
+        });
+
+    } catch (err) {
+        logger.error(`[applyRequirements] Error: ${err.message}`);
+        return serverError(err.message, res, logger);
+    }
+};
+
 export default {
     generate,
     getSessionState,
@@ -3961,6 +4548,9 @@ export default {
     computeQuestionCountStateless,
     getAvailableFrameworks,
     getJobStatus,
+    exportQuestions,
+    importAnswers,
+    applyRequirements,
     _areTitlesSimilar: areTitlesSimilar,
     _mergeDiagramCells: mergeDiagramCells,
     _mergeControlsAssessment: mergeControlsAssessment,

@@ -326,6 +326,40 @@
                         </div>
                     </b-form-group>
 
+                    <!-- Requirements/Controls spreadsheet dropzone -->
+                    <b-form-group label="Planilha de Requisitos / Controles Implementados (Opcional)" label-class="font-weight-bold">
+                        <div
+                            class="dropzone py-4 text-center border-dashed rounded mb-2"
+                            style="border-color: #28a745;"
+                            @dragover.prevent
+                            @drop.prevent="onRequirementsDrop"
+                            @click="triggerFileInput('reqFile')"
+                        >
+                            <font-awesome-icon icon="shield-alt" class="text-success mb-2" size="2x" />
+                            <p class="mb-0 text-muted font-size-sm">Arraste ou clique para selecionar a planilha XLSX com os requisitos/controles</p>
+                            <small class="text-muted">.xlsx (aba "Requisitos" será lida automaticamente)</small>
+                            <input
+                                id="reqFile"
+                                type="file"
+                                accept=".xlsx,.csv"
+                                class="d-none"
+                                @change="onRequirementsSelect"
+                            />
+                        </div>
+                        <div v-if="requirementsFile" class="file-list p-2 bg-light border rounded border-success">
+                            <div class="d-flex justify-content-between align-items-center font-size-sm py-1">
+                                <span>
+                                    <font-awesome-icon icon="check" class="text-success mr-2" />
+                                    {{ requirementsFile.name }}
+                                    <b-badge variant="success" class="ml-2">{{ parsedRequirements.length }} requisitos</b-badge>
+                                </span>
+                                <b-button size="sm" variant="link" class="text-danger p-0" @click="removeRequirements">
+                                    <font-awesome-icon icon="trash" />
+                                </b-button>
+                            </div>
+                        </div>
+                    </b-form-group>
+
                     <!-- Generate Button -->
                     <div class="text-right mt-4">
                         <b-button
@@ -925,6 +959,94 @@
                                     </b-button>
                                 </div>
                             </b-form>
+
+                            <!-- Acceleration Tools Section -->
+                            <div class="acceleration-tools mt-4 pt-3 border-top">
+                                <h6 class="font-weight-bold text-dark mb-3">
+                                    <font-awesome-icon icon="bolt" class="mr-1 text-warning" />
+                                    Ferramentas de Aceleração
+                                </h6>
+                                <p class="font-size-xs text-muted mb-3">
+                                    Use estas ferramentas para responder perguntas em massa via planilha CSV (para outra IA) ou subir requisitos/controles já implementados para auto-responder perguntas.
+                                </p>
+
+                                <div class="d-flex flex-wrap" style="gap: 8px;">
+                                    <!-- Export CSV -->
+                                    <b-button
+                                        variant="outline-primary"
+                                        size="sm"
+                                        class="font-weight-bold"
+                                        :disabled="accelerationLoading"
+                                        @click="exportQuestionsCsv"
+                                    >
+                                        <font-awesome-icon icon="cloud-download-alt" class="mr-1" />
+                                        Exportar Perguntas (CSV)
+                                    </b-button>
+
+                                    <!-- Import CSV -->
+                                    <b-button
+                                        variant="outline-success"
+                                        size="sm"
+                                        class="font-weight-bold"
+                                        :disabled="accelerationLoading"
+                                        @click="triggerFileInput('importCsvFile')"
+                                    >
+                                        <font-awesome-icon icon="cloud-upload-alt" class="mr-1" />
+                                        Importar Respostas (CSV)
+                                    </b-button>
+                                    <input
+                                        id="importCsvFile"
+                                        type="file"
+                                        accept=".csv"
+                                        class="d-none"
+                                        @change="onImportCsvSelect"
+                                    />
+
+                                    <!-- Upload Requirements -->
+                                    <b-button
+                                        variant="outline-info"
+                                        size="sm"
+                                        class="font-weight-bold"
+                                        :disabled="accelerationLoading"
+                                        @click="triggerFileInput('reqFileInteractive')"
+                                    >
+                                        <font-awesome-icon icon="shield-alt" class="mr-1" />
+                                        Upload Requisitos/Controles
+                                    </b-button>
+                                    <input
+                                        id="reqFileInteractive"
+                                        type="file"
+                                        accept=".xlsx,.csv"
+                                        class="d-none"
+                                        @change="onRequirementsSelectInteractive"
+                                    />
+                                </div>
+
+                                <!-- Acceleration Progress -->
+                                <div v-if="accelerationLoading" class="mt-3 p-3 bg-light border rounded">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <b-spinner small variant="primary" class="mr-2"></b-spinner>
+                                        <span class="font-weight-bold font-size-sm text-dark">{{ accelerationStatus }}</span>
+                                    </div>
+                                    <b-progress :value="accelerationProgress" :max="100" animated striped variant="primary" height="8px"></b-progress>
+                                </div>
+
+                                <!-- Acceleration Results -->
+                                <div v-if="accelerationResult" class="mt-3 p-3 border rounded shadow-sm" :class="accelerationResult.type === 'success' ? 'bg-success-light border-success' : 'bg-warning-light border-warning'">
+                                    <div class="d-flex justify-content-between align-items-start">
+                                        <div>
+                                            <h6 class="font-weight-bold mb-1" :class="accelerationResult.type === 'success' ? 'text-success' : 'text-warning'">
+                                                <font-awesome-icon :icon="accelerationResult.type === 'success' ? 'check-circle' : 'info-circle'" class="mr-1" />
+                                                {{ accelerationResult.title }}
+                                            </h6>
+                                            <p class="font-size-xs text-muted mb-0">{{ accelerationResult.message }}</p>
+                                        </div>
+                                        <b-button size="sm" variant="link" class="text-muted p-0" @click="accelerationResult = null">
+                                            <font-awesome-icon icon="times" />
+                                        </b-button>
+                                    </div>
+                                </div>
+                            </div>
 
                             <!-- Collapsible Model Config Panel -->
                             <div class="mt-3 pt-2 border-top">
@@ -1660,6 +1782,7 @@ import { mapState } from 'vuex';
 import axios from 'axios';
 import { getProviderType } from '@/service/provider/providers.js';
 import { PROVIDER_SELECTED } from '@/store/actions/provider.js';
+import * as XLSX from 'xlsx';
 import tmActions from '@/store/actions/threatmodel.js';
 import TdFormSelect from '@/components/FormSelect.vue';
 import TdReadOnlyDiagram from '@/components/ReadOnlyDiagram.vue';
@@ -1734,7 +1857,14 @@ export default {
             questionProgress: { answered: 0, total: 0, percentage: 0 },
             showModelConfig: false,
             answeredQuestions: [],
-            questionAnswers: {}
+            questionAnswers: {},
+            // Acceleration features
+            requirementsFile: null,
+            parsedRequirements: [],
+            accelerationLoading: false,
+            accelerationProgress: 0,
+            accelerationStatus: '',
+            accelerationResult: null
         };
     },
     computed: {
@@ -1909,6 +2039,347 @@ export default {
         removeImage(idx) {
             this.images.splice(idx, 1);
         },
+        // Requirements Drop / Select (XLSX)
+        onRequirementsDrop(evt) {
+            const files = evt.dataTransfer.files;
+            if (files.length > 0) this.handleRequirementsFile(files[0]);
+        },
+        onRequirementsSelect(evt) {
+            const files = evt.target.files;
+            if (files.length > 0) this.handleRequirementsFile(files[0]);
+        },
+        onRequirementsSelectInteractive(evt) {
+            const files = evt.target.files;
+            if (files.length > 0) {
+                this.handleRequirementsFile(files[0]);
+                // After parsing, apply to session
+                this.$nextTick(() => {
+                    if (this.parsedRequirements.length > 0) {
+                        this.applyRequirementsToSession();
+                    }
+                });
+            }
+        },
+        handleRequirementsFile(file) {
+            if (!file) return;
+            const ext = file.name.split('.').pop().toLowerCase();
+            if (ext !== 'xlsx' && ext !== 'csv') {
+                this.$bvToast.toast('Apenas arquivos .xlsx e .csv são suportados.', { variant: 'warning', title: 'Formato inválido' });
+                return;
+            }
+            this.requirementsFile = file;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    // Try to find the "Requisitos" sheet (case-insensitive)
+                    let sheetName = workbook.SheetNames.find(s => s.toLowerCase().includes('requisito'));
+                    if (!sheetName) {
+                        // Fallback to third sheet if exists, else first
+                        sheetName = workbook.SheetNames[2] || workbook.SheetNames[0];
+                    }
+                    
+                    const sheet = workbook.Sheets[sheetName];
+                    const jsonData = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+                    
+                    // Map columns flexibly
+                    this.parsedRequirements = jsonData.map((row) => {
+                        const keys = Object.keys(row);
+                        const findCol = (patterns) => {
+                            const found = keys.find(k => patterns.some(p => k.toLowerCase().includes(p)));
+                            return found ? row[found] : '';
+                        };
+                        return {
+                            control: findCol(['controle', 'control', 'requisito', 'requirement', 'nome', 'name']),
+                            description: findCol(['descri', 'description', 'detalhe', 'detail']),
+                            category: findCol(['categori', 'category', 'dominio', 'domain', 'tipo', 'type']),
+                            status: findCol(['status', 'estado', 'state', 'implementa'])
+                        };
+                    }).filter(r => r.control && r.control.trim() !== '');
+                    
+                    this.$bvToast.toast(`${this.parsedRequirements.length} requisitos extraídos da aba "${sheetName}".`, { variant: 'success', title: 'Planilha processada' });
+                } catch (parseErr) {
+                    console.error('Error parsing requirements file:', parseErr);
+                    this.$bvToast.toast('Erro ao processar a planilha. Verifique o formato.', { variant: 'danger', title: 'Erro' });
+                    this.requirementsFile = null;
+                    this.parsedRequirements = [];
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        },
+        removeRequirements() {
+            this.requirementsFile = null;
+            this.parsedRequirements = [];
+        },
+        // Export Questions to CSV
+        async exportQuestionsCsv() {
+            if (!this.sessionId) return;
+            this.accelerationLoading = true;
+            this.accelerationProgress = 10;
+            this.accelerationStatus = 'Gerando perguntas via IA...';
+            this.accelerationResult = null;
+            
+            try {
+                const response = await axios.get(`/api/ai/session/${this.sessionId}/export-questions`);
+                const data = response.data.data;
+                
+                // Convert to CSV
+                const headers = ['ID', 'Categoria', 'Componente', 'Tipo Elemento', 'Tipo Pergunta', 'Pergunta', 'Respondida', 'Resposta', 'Fonte'];
+                const csvRows = [headers.join(';')];
+                
+                (data.questions || []).forEach((q) => {
+                    const row = [
+                        q.id,
+                        q.category,
+                        q.elementName,
+                        q.elementType,
+                        q.type,
+                        `"${(q.questionText || '').replace(/"/g, '""')}"`,
+                        q.answered ? 'Sim' : 'Não',
+                        `"${(q.answer || '').replace(/"/g, '""')}"`,
+                        q.source || ''
+                    ];
+                    csvRows.push(row.join(';'));
+                });
+                
+                const csvContent = '\uFEFF' + csvRows.join('\n'); // BOM for Excel UTF-8
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `${(this.form.title || 'threat-model').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-perguntas.csv`;
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(url);
+                
+                this.accelerationResult = {
+                    type: 'success',
+                    title: 'CSV Exportado!',
+                    message: `${data.totalQuestions} perguntas exportadas (${data.answeredCount} já respondidas, ${data.pendingCount} pendentes). Preencha a coluna "Resposta" e importe de volta.`
+                };
+            } catch (err) {
+                console.error('Export error:', err);
+                this.accelerationResult = {
+                    type: 'error',
+                    title: 'Erro na exportação',
+                    message: err.response?.data?.message || err.message
+                };
+            } finally {
+                this.accelerationLoading = false;
+                this.accelerationProgress = 0;
+            }
+        },
+        // Import Answers from CSV
+        async onImportCsvSelect(evt) {
+            const file = evt.target.files[0];
+            if (!file || !this.sessionId) return;
+            
+            this.accelerationLoading = true;
+            this.accelerationProgress = 20;
+            this.accelerationStatus = 'Lendo arquivo CSV...';
+            this.accelerationResult = null;
+            
+            try {
+                const text = await file.text();
+                const lines = text.split('\n').filter(l => l.trim() !== '');
+                if (lines.length < 2) {
+                    throw new Error('CSV vazio ou sem dados.');
+                }
+                
+                // Detect separator (semicolon or comma)
+                const sep = lines[0].includes(';') ? ';' : ',';
+                const headerLine = lines[0].replace(/^\uFEFF/, ''); // Remove BOM
+                const headers = headerLine.split(sep).map(h => h.trim().replace(/^"|"$/g, '').toLowerCase());
+                
+                // Find column indices
+                const idIdx = headers.findIndex(h => h === 'id');
+                const answerIdx = headers.findIndex(h => h.includes('resposta') || h === 'answer');
+                const questionIdx = headers.findIndex(h => h.includes('pergunta') || h === 'question' || h === 'questiontext');
+                const categoryIdx = headers.findIndex(h => h.includes('categori') || h === 'category');
+                const elementIdx = headers.findIndex(h => h.includes('componente') || h === 'elementname');
+                
+                if (idIdx === -1 || answerIdx === -1) {
+                    throw new Error('CSV deve conter colunas "ID" e "Resposta" (ou "Answer").');
+                }
+                
+                // Parse answers
+                const answers = [];
+                for (let i = 1; i < lines.length; i++) {
+                    const cols = this.parseCsvLine(lines[i], sep);
+                    const id = (cols[idIdx] || '').trim();
+                    const answer = (cols[answerIdx] || '').trim();
+                    
+                    if (id && answer) {
+                        answers.push({
+                            id,
+                            answer,
+                            questionText: questionIdx !== -1 ? (cols[questionIdx] || '').trim() : '',
+                            category: categoryIdx !== -1 ? (cols[categoryIdx] || '').trim() : '',
+                            elementName: elementIdx !== -1 ? (cols[elementIdx] || '').trim() : '',
+                            source: 'csv_import'
+                        });
+                    }
+                }
+                
+                if (answers.length === 0) {
+                    throw new Error('Nenhuma resposta válida encontrada no CSV.');
+                }
+                
+                this.accelerationProgress = 50;
+                this.accelerationStatus = `Importando ${answers.length} respostas...`;
+                
+                // Send to backend
+                const response = await axios.post(`/api/ai/session/${this.sessionId}/import-answers`, { answers });
+                const result = response.data.data;
+                
+                // Poll job for re-generation
+                this.accelerationProgress = 70;
+                this.accelerationStatus = 'Reprocessando modelo com respostas importadas...';
+                
+                if (result.jobId) {
+                    this.step = 'generating';
+                    this.progressSteps.forEach(step => step.state = 'pending');
+                    this.progressIndex = 1;
+                    this.jobProgress = 0;
+                    this.jobStatus = 'queued';
+                    this.jobStreamText = '';
+                    this.accelerationLoading = false;
+                    
+                    this.pollJobStatus(result.jobId, (genResult) => {
+                        this.progressIndex = 5;
+                        this.updateLocalState(genResult);
+                        this.refinementRound++;
+                        this.step = 'interactive';
+                        this.accelerationResult = {
+                            type: 'success',
+                            title: `${result.importedCount} respostas importadas!`,
+                            message: `${result.importedCount} respostas aplicadas, ${result.skippedCount} ignoradas. Progresso: ${result.totalAnswered}/${result.totalQuestions} perguntas respondidas.`
+                        };
+                    }, (err) => {
+                        this.errorMessage = err.message || 'Erro ao reprocessar modelo.';
+                        this.step = 'error';
+                    });
+                    return;
+                }
+                
+                this.accelerationResult = {
+                    type: 'success',
+                    title: `${result.importedCount} respostas importadas!`,
+                    message: `${result.importedCount} respostas aplicadas, ${result.skippedCount} ignoradas.`
+                };
+            } catch (err) {
+                console.error('Import error:', err);
+                this.accelerationResult = {
+                    type: 'error',
+                    title: 'Erro na importação',
+                    message: err.response?.data?.message || err.message
+                };
+            } finally {
+                this.accelerationLoading = false;
+                this.accelerationProgress = 0;
+                // Reset file input
+                const input = document.getElementById('importCsvFile');
+                if (input) input.value = '';
+            }
+        },
+        // CSV line parser that handles quoted fields
+        parseCsvLine(line, sep) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+                const c = line[i];
+                if (inQuotes) {
+                    if (c === '"') {
+                        if (i + 1 < line.length && line[i + 1] === '"') {
+                            current += '"';
+                            i++;
+                        } else {
+                            inQuotes = false;
+                        }
+                    } else {
+                        current += c;
+                    }
+                } else if (c === '"') {
+                    inQuotes = true;
+                } else if (c === sep) {
+                    result.push(current);
+                    current = '';
+                } else {
+                    current += c;
+                }
+            }
+            result.push(current);
+            return result;
+        },
+        // Apply Requirements to Session
+        async applyRequirementsToSession() {
+            if (!this.sessionId || this.parsedRequirements.length === 0) return;
+            
+            this.accelerationLoading = true;
+            this.accelerationProgress = 10;
+            this.accelerationStatus = `Analisando ${this.parsedRequirements.length} requisitos contra perguntas pendentes...`;
+            this.accelerationResult = null;
+            
+            try {
+                const response = await axios.post(`/api/ai/session/${this.sessionId}/apply-requirements`, {
+                    requirements: this.parsedRequirements
+                });
+                
+                const result = response.data.data;
+                
+                if (result.jobId) {
+                    // Poll for async job completion
+                    const pollReq = () => {
+                        axios.get(`/api/ai/job/${result.jobId}/status`).then(res => {
+                            const job = res.data.data;
+                            this.accelerationProgress = job.progress || 50;
+                            this.accelerationStatus = `Matching via IA... ${job.progress || 0}%`;
+                            
+                            if (job.status === 'completed') {
+                                this.accelerationLoading = false;
+                                const matchResult = job.result || {};
+                                this.accelerationResult = {
+                                    type: 'success',
+                                    title: `${matchResult.matchedCount || 0} perguntas auto-respondidas!`,
+                                    message: `${matchResult.matchedCount || 0} de ${matchResult.totalPendingBefore || 0} perguntas pendentes foram respondidas automaticamente com base nos ${matchResult.totalRequirements || 0} requisitos. Restam ${matchResult.totalPendingAfter || 0} perguntas para resposta manual.`
+                                };
+                                // Refresh session to get updated question plan
+                                this.resumeSession(this.sessionId);
+                            } else if (job.status === 'failed') {
+                                this.accelerationLoading = false;
+                                this.accelerationResult = {
+                                    type: 'error',
+                                    title: 'Erro no matching',
+                                    message: job.error || 'Erro desconhecido.'
+                                };
+                            } else {
+                                setTimeout(pollReq, 2000);
+                            }
+                        }).catch(pollErr => {
+                            this.accelerationLoading = false;
+                            this.accelerationResult = {
+                                type: 'error',
+                                title: 'Erro no polling',
+                                message: pollErr.message
+                            };
+                        });
+                    };
+                    pollReq();
+                }
+            } catch (err) {
+                console.error('Apply requirements error:', err);
+                this.accelerationLoading = false;
+                this.accelerationResult = {
+                    type: 'error',
+                    title: 'Erro ao aplicar requisitos',
+                    message: err.response?.data?.message || err.message
+                };
+            }
+        },
         // Progress UI Helpers
         getProgressStepClass(idx) {
             if (this.progressIndex > idx) return 'text-success font-weight-bold';
@@ -1994,6 +2465,7 @@ export default {
                     description: this.form.description,
                     docs: this.docs,
                     images: this.images,
+                    requirements: this.parsedRequirements,
                     apiKey: this.form.apiKey,
                     methodology: this.form.methodology,
                     aiProvider: this.form.aiProvider,
@@ -2103,6 +2575,9 @@ export default {
                         await this.approveThreatModel();
                     } else if (this.dfdApproved) {
                         this.step = 'interactive';
+                        if (this.parsedRequirements && this.parsedRequirements.length > 0) {
+                            this.applyRequirementsToSession();
+                        }
                     } else {
                         this.step = 'validate-dfd';
                     }
@@ -2120,6 +2595,9 @@ export default {
                         await this.approveThreatModel();
                     } else if (this.dfdApproved) {
                         this.step = 'interactive';
+                        if (this.parsedRequirements && this.parsedRequirements.length > 0) {
+                            this.applyRequirementsToSession();
+                        }
                     } else {
                         this.step = 'validate-dfd';
                     }
@@ -2696,6 +3174,18 @@ export default {
 
 .text-warning-dark {
     color: #856404;
+}
+
+.bg-success-light {
+    background-color: rgba(40, 167, 69, 0.08);
+}
+
+.bg-warning-light {
+    background-color: rgba(255, 193, 7, 0.08);
+}
+
+.acceleration-tools {
+    border-top-style: dashed !important;
 }
 
 .bg-primary-light {

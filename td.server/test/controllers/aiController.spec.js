@@ -726,4 +726,114 @@ describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
             expect(res.status).to.have.been.calledWith(400);
         });
     });
+
+    describe('exportQuestions', () => {
+        let getSessionStub;
+
+        beforeEach(() => {
+            getSessionStub = sinon.stub(aiContextStore, 'getSession');
+        });
+
+        afterEach(() => {
+            getSessionStub.restore();
+        });
+
+        it('should return 404 if session is not found', async () => {
+            getSessionStub.returns(null);
+            const req = { params: { sessionId: 'nonexistent' } };
+            const res = {
+                status: sinon.stub().returnsThis(),
+                json: sinon.stub()
+            };
+
+            await aiController.exportQuestions(req, res);
+            expect(res.status).to.have.been.calledWith(404);
+        });
+
+        it('should return 400 if questionPlan is not computed', async () => {
+            getSessionStub.returns({ title: 'Test' });
+            const req = { params: { sessionId: 'session-1' } };
+            const res = {
+                status: sinon.stub().returnsThis(),
+                json: sinon.stub()
+            };
+
+            await aiController.exportQuestions(req, res);
+            expect(res.status).to.have.been.calledWith(400);
+        });
+    });
+
+    describe('importAnswers', () => {
+        let getSessionStub, updateSessionStub;
+
+        beforeEach(() => {
+            getSessionStub = sinon.stub(aiContextStore, 'getSession');
+            updateSessionStub = sinon.stub(aiContextStore, 'updateSession');
+        });
+
+        afterEach(() => {
+            getSessionStub.restore();
+            updateSessionStub.restore();
+        });
+
+        it('should return 404 if session is not found', async () => {
+            getSessionStub.returns(null);
+            const req = { params: { sessionId: 'nonexistent' }, body: { answers: [] } };
+            const res = {
+                status: sinon.stub().returnsThis(),
+                json: sinon.stub()
+            };
+
+            await aiController.importAnswers(req, res);
+            expect(res.status).to.have.been.calledWith(404);
+        });
+
+        it('should return 400 if answers array is missing or empty', async () => {
+            getSessionStub.returns({});
+            const req = { params: { sessionId: 'session-1' }, body: {} };
+            const res = {
+                status: sinon.stub().returnsThis(),
+                json: sinon.stub()
+            };
+
+            await aiController.importAnswers(req, res);
+            expect(res.status).to.have.been.calledWith(400);
+        });
+    });
+
+    describe('applyRequirements', () => {
+        let getSessionStub;
+
+        beforeEach(() => {
+            getSessionStub = sinon.stub(aiContextStore, 'getSession');
+        });
+
+        afterEach(() => {
+            getSessionStub.restore();
+        });
+
+        it('should return 404 if session is not found', async () => {
+            getSessionStub.returns(null);
+            const req = { params: { sessionId: 'nonexistent' }, body: { requirements: [] } };
+            const res = {
+                status: sinon.stub().returnsThis(),
+                json: sinon.stub()
+            };
+
+            await aiController.applyRequirements(req, res);
+            expect(res.status).to.have.been.calledWith(404);
+        });
+
+        it('should return 400 if requirements array is missing or empty', async () => {
+            getSessionStub.returns({});
+            const req = { params: { sessionId: 'session-1' }, body: {} };
+            const res = {
+                status: sinon.stub().returnsThis(),
+                json: sinon.stub()
+            };
+
+            await aiController.applyRequirements(req, res);
+            expect(res.status).to.have.been.calledWith(400);
+        });
+    });
 });
