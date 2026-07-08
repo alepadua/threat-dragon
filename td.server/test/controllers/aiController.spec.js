@@ -299,6 +299,19 @@ describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
         });
 
 
+        it('should successfully repair missing commas between object properties, array objects, and array brackets', () => {
+            const json = '{"key1": "value1" \n "key2": 123 \n "key3": true \n "key4": {"nested": "value"} "key5": [1, 2] \n "key6": "value6", "items": [{"id": 1} {"id": 2}]}';
+            const parsed = aiController._extractJson(json);
+            expect(parsed.key1).to.equal("value1");
+            expect(parsed.key2).to.equal(123);
+            expect(parsed.key3).to.equal(true);
+            expect(parsed.key4.nested).to.equal("value");
+            expect(parsed.key5).to.deep.equal([1, 2]);
+            expect(parsed.key6).to.equal("value6");
+            expect(parsed.items).to.deep.equal([{id: 1}, {id: 2}]);
+        });
+
+
         it('should heal cell references in diagram edges/flows when source/target IDs are mismatched or invalid', () => {
             const jsonObj = {
                 threatModel: {

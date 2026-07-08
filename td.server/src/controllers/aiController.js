@@ -366,12 +366,32 @@ const healParsedConsolidatedQuestions = (parsedQuestions, roundGroups) => {
     return healedGroups;
 };
 
+const repairMissingCommas = (str) => {
+    let clean = str;
+    // 1. Missing comma between properties in an object (e.g. "prop1": "val" "prop2": "val")
+    const propRegex = /(["\d]|true|false|null|\}|\])(\s+)(?="[A-Za-z0-9_\-]+"\s*:)/gi;
+    clean = clean.replace(propRegex, (match, p1, p2) => p1 + ',' + p2);
+    
+    // 2. Missing comma between objects in an array (e.g. { "id": 1 } { "id": 2 })
+    const objRegex = /(\})(\s+)(?=\{)/g;
+    clean = clean.replace(objRegex, (match, p1, p2) => p1 + ',' + p2);
+    
+    // 3. Missing comma between arrays in an array (e.g. [1, 2] [3, 4])
+    const arrRegex = /(\])(\s+)(?=\[)/g;
+    clean = clean.replace(arrRegex, (match, p1, p2) => p1 + ',' + p2);
+    
+    return clean;
+};
+
 const cleanJson = (str) => {
     let clean = str.trim();
-    clean = clean.replace(/^```json/iu, '').replace(/```$/u, '').
-trim();
+    clean = clean.replace(/^```json/iu, '').replace(/```$/u, '').trim();
     clean = clean.replace(/\/\*[\s\S]*?\*\//gu, '');
     clean = clean.replace(/(?<prefix>^|[^:])\/\/.*$/gmu, '$<prefix>');
+    
+    // Repair missing commas in the JSON output structure
+    clean = repairMissingCommas(clean);
+    
     clean = clean.replace(/,\s*(?<brace>[\]}])/gu, '$<brace>');
     return clean.trim();
 };
