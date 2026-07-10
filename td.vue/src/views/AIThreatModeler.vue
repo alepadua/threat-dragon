@@ -961,7 +961,13 @@
                                         Submit Answers & Refine
                                     </b-button>
                                     
-                                    <b-button v-if="evaluation && evaluation.completenessScore >= 80" variant="success" class="font-weight-bold text-white px-4 py-2" @click="approveThreatModel">
+                                    <b-button
+                                        v-if="evaluation"
+                                        :disabled="questionProgress.answered < questionProgress.total"
+                                        variant="success"
+                                        class="font-weight-bold text-white px-4 py-2"
+                                        @click="approveThreatModel"
+                                    >
                                         <font-awesome-icon icon="check-double" class="mr-2" />
                                         Approve & Conclude
                                     </b-button>
