@@ -1437,6 +1437,28 @@
                             </div>
 
                             <div v-else>
+                                <!-- AI Answers Auditing/Revision Feedback -->
+                                <div v-if="deduplicateProposals && deduplicateProposals.answersRevision && deduplicateProposals.answersRevision.length > 0" class="mb-4">
+                                    <b-alert show variant="warning" class="shadow-sm border-0 font-size-sm">
+                                        <h6 class="font-weight-bold mb-2 text-warning-dark">
+                                            <font-awesome-icon icon="exclamation-triangle" class="mr-2 text-warning" />
+                                            Revisões de Respostas Sugeridas pela IA
+                                        </h6>
+                                        <p class="mb-2 text-dark font-weight-bold font-size-xs">As respostas a seguir foram marcadas pela auditoria como precisando de melhorias:</p>
+                                        <ul class="pl-3 mb-0">
+                                            <li v-for="(rev, rIdx) in deduplicateProposals.answersRevision" :key="rIdx" class="mb-2 text-dark">
+                                                <strong>Contexto:</strong> {{ rev.questionContext }}
+                                                <div class="mt-1">
+                                                    <strong>Problema:</strong> {{ rev.issueFound }}
+                                                </div>
+                                                <div class="mt-1 text-muted italic font-size-xs">
+                                                    <strong>Recomendação:</strong> {{ rev.recommendationForUser }}
+                                                </div>
+                                            </li>
+                                        </ul>
+                                    </b-alert>
+                                </div>
+
                                 <div
                                     v-for="(aq, idx) in displayedAnsweredQuestions"
                                     :key="aq.id || idx"

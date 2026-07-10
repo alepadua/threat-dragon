@@ -3603,7 +3603,7 @@ const runDeduplicateJob = async (job, body, session) => {
             historyContext = '\nNo refinement conversation history.\n';
         }
 
-        const promptText = `
+        const promptTextDedupAudit = `
 You are a Security Model Auditing and Refinement Expert. Your task is to analyze the following threat model, its security controls assessment report, the original system architecture documentation, and the conversation history of user answers.
 
 Here is the current Threat Dragon V2 model (JSON):
@@ -3618,7 +3618,7 @@ ${docsContext}
 Here is the conversation history of user answers and feedback:
 ${historyContext}
 
-Please perform the following four analyses:
+Please perform the following three analyses:
 
 1. SECURITY CONTROL DEDUPLICATION:
 Find any controls in the Security Control Efficacy Report that cover the same category or target the same core security issue. Group them. If they can be unified, provide a single "proposedMergedItem" where "userAnswer" combines all key points from the merged items' userAnswers, and "details" merges all recommendations. Do NOT merge controls that address different issues.
@@ -3632,15 +3632,6 @@ Compare the threat model components, trust boundaries, data flows, technologies,
 - Audit whether the discussed security controls are actually effective or if their effectiveness is hallucinated/overstated, explaining clearly "why" (the rationale).
 - Identify any element, technology, protocol, or trust boundary that has been hallucinated by the model (i.e. it is NOT mentioned anywhere in the documentation and was NOT confirmed by the user in the answers).
 - For each discrepancy, hallucinated control, or overstated efficacy found, generate a detailed hallucination alert.
-
-4. THREAT MITIGATION STATUS EVALUATION:
-For EVERY threat mapped to every element/flow in the threat model, evaluate whether it is mitigated based on its current description/mitigation field and the user answers.
-Classify each threat's mitigation status into one of:
-- "Mitigada" (if a complete, confirmed technical mitigation exists or has been verified by user answers).
-- "Parcialmente Mitigada" (if there is a partial mitigation, but some aspects are missing or require improvement).
-- "Não Mitigada" (if no mitigation exists, or the user answers explicitly state that the mitigation/control is missing or not implemented).
-Provide a detailed technical reason for the classification, and technical recommendations to achieve full mitigation.
-CRITICAL: For each threat, you MUST include the "supportingAnswers" field — an array of direct quotes (exact excerpts) from the user's conversation answers that were used as evidence to determine the mitigation status. If no user answer is relevant, provide an empty array.
 
 Return a JSON object structured EXACTLY as follows:
 {
@@ -3690,21 +3681,10 @@ Return a JSON object structured EXACTLY as follows:
   "hallucinationAlerts": [
     {
       "id": "string (unique identifier like hall-1)",
-      "targetType": "Component" or "Data Flow" or "Security Control" or "Threat",
+      "targetType": "Component or Data Flow or Security Control or Threat",
       "targetName": "string (name of the element, flow, or control)",
       "issue": "string (clear explanation in Portuguese of the hallucinated detail or discrepancy. If it targets a Security Control, explain if the control is effective and why)",
-      "severity": "High" or "Medium" or "Low"
-    }
-  ],
-  "mitigationStatus": [
-    {
-      "threatId": "string (the threat id from the model)",
-      "threatTitle": "string",
-      "elementName": "string (the name of the element/flow containing this threat)",
-      "status": "Mitigada" or "Parcialmente Mitigada" or "Não Mitigada",
-      "reason": "string (detailed justification in Portuguese based on user responses and mitigation field)",
-      "recommendations": "string (technical recommendations in Portuguese on how to fully mitigate this threat)",
-      "supportingAnswers": ["string (exact quote from user answer that supports this status)", "..."]
+      "severity": "High or Medium or Low"
     }
   ]
 }
@@ -3715,33 +3695,96 @@ All proposed titles, userAnswers, descriptions, mitigations, details, issues, re
 Return ONLY the raw JSON object, without any markdown code block formatting.
 `;
 
-        logger.info(`[Job ${job.jobId}] Requesting deduplication and audit proposals from AI Provider (${aiConfig.provider})`);
+        const promptTextMitigationRevision = `
+You are a Threat Mitigation and Security Review Expert. Your task is to analyze the following threat model, the original system architecture documentation, and the conversation history of user answers.
+
+Here is the current Threat Dragon V2 model (JSON):
+${JSON.stringify(currentModel, null, 2)}
+
+Here is the system architecture documentation:
+${docsContext}
+
+Here is the conversation history of user answers and feedback:
+${historyContext}
+
+Please perform the following two analyses:
+
+1. THREAT MITIGATION STATUS EVALUATION:
+For EVERY threat mapped to every element/flow in the threat model, evaluate whether it is mitigated based on its current description/mitigation field and the user answers.
+Classify each threat's mitigation status into one of:
+- "Mitigada" (if a complete, confirmed technical mitigation exists or has been verified by user answers).
+- "Parcialmente Mitigada" (if there is a partial mitigation, but some aspects are missing or require improvement).
+- "Não Mitigada" (if no mitigation exists, or the user answers explicitly state that the mitigation/control is missing or not implemented).
+Provide a detailed technical reason for the classification, and technical recommendations to achieve full mitigation.
+CRITICAL: For each threat, you MUST include the "supportingAnswers" field — an array of direct quotes (exact excerpts) from the user's conversation answers that were used as evidence to determine the mitigation status. If no user answer is relevant, provide an empty array.
+
+2. ANSWERS REVISION / QUALITY REVIEW (REVISÃO DE RESPOSTAS):
+Review all the user's answers provided in the conversation history. Identify any answers that are overly vague, technically contradictory, or insufficient to properly secure the system component they refer to. Provide targeted feedback on these specific answers.
+
+Return a JSON object structured EXACTLY as follows:
+{
+  "mitigationStatus": [
+    {
+      "threatId": "string (the threat id from the model)",
+      "threatTitle": "string",
+      "elementName": "string (the name of the element/flow containing this threat)",
+      "status": "Mitigada" or "Parcialmente Mitigada" or "Não Mitigada",
+      "reason": "string (detailed justification in Portuguese based on user responses and mitigation field)",
+      "recommendations": "string (technical recommendations in Portuguese on how to fully mitigate this threat)",
+      "supportingAnswers": ["string (exact quote from user answer that supports this status)", "..."]
+    }
+  ],
+  "answersRevision": [
+    {
+      "questionContext": "string (clear indication of which component or question this refers to, written in Portuguese)",
+      "issueFound": "string (explanation in Portuguese of why the answer is vague, contradictory, or insufficient)",
+      "recommendationForUser": "string (technical recommendations in Portuguese on what details the user should provide to improve it)"
+    }
+  ]
+}
+
+LANGUAGE REQUIREMENT:
+All reasons, recommendations, questionContext, issueFound, and recommendationForUser MUST be written in Portuguese.
+
+Return ONLY the raw JSON object, without any markdown code block formatting.
+`;
+
+        logger.info(`[Job ${job.jobId}] Requesting parallel deduplication/audit and mitigation/revision jobs from AI Provider (${aiConfig.provider})`);
         
-        job.progress = 50;
+        job.progress = 40;
         activeJobs.set(job.jobId, { ...job });
 
-        const candidateText = await callAIModel(promptText, [], aiConfig, job);
+        const [responseDedupAudit, responseMitigationRevision] = await Promise.all([
+            callAIModel(promptTextDedupAudit, [], aiConfig, job),
+            callAIModel(promptTextMitigationRevision, [], aiConfig, job)
+        ]);
         
-        if (!candidateText) {
-            throw new Error('AI API returned an empty response for deduplication and audit proposals');
+        if (!responseDedupAudit || !responseMitigationRevision) {
+            throw new Error('AI API returned an empty response for one or both of the parallel jobs');
         }
 
-        const parsedProposals = extractJson(candidateText);
+        const parsedDedupAudit = extractJson(responseDedupAudit);
+        const parsedMitigationRevision = extractJson(responseMitigationRevision);
 
-        if (!parsedProposals.controlDeduplications) {parsedProposals.controlDeduplications = [];}
-        if (!parsedProposals.threatDeduplications) {parsedProposals.threatDeduplications = [];}
-        if (!parsedProposals.hallucinationAlerts) {parsedProposals.hallucinationAlerts = [];}
-        if (!parsedProposals.mitigationStatus) {parsedProposals.mitigationStatus = [];}
+        const parsedProposals = {
+            controlDeduplications: parsedDedupAudit.controlDeduplications || [],
+            threatDeduplications: parsedDedupAudit.threatDeduplications || [],
+            hallucinationAlerts: parsedDedupAudit.hallucinationAlerts || [],
+            mitigationStatus: parsedMitigationRevision.mitigationStatus || [],
+            answersRevision: parsedMitigationRevision.answersRevision || []
+        };
         
         // Cache the proposals in the session context
         session.deduplicateProposals = parsedProposals;
         session.hallucinationAlerts = parsedProposals.hallucinationAlerts;
         session.mitigationStatus = parsedProposals.mitigationStatus;
+        session.answersRevision = parsedProposals.answersRevision;
 
         aiContextStore.updateSession(session.sessionId, {
             deduplicateProposals: parsedProposals,
             hallucinationAlerts: parsedProposals.hallucinationAlerts,
-            mitigationStatus: parsedProposals.mitigationStatus
+            mitigationStatus: parsedProposals.mitigationStatus,
+            answersRevision: parsedProposals.answersRevision
         });
 
         job.status = 'completed';
@@ -3843,6 +3886,9 @@ const applyDeduplication = (req, res) => {
             evaluation: updatedEvaluation,
             threatModelApproved: true,
             deduplicateProposals: null, // Clear proposals cache
+            hallucinationAlerts: null,
+            mitigationStatus: null,
+            answersRevision: null,
             history: previousHistory
         });
 
