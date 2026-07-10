@@ -782,6 +782,14 @@
                                 <font-awesome-icon icon="cloud-download-alt" class="mr-2" />
                                 Download Model JSON
                             </b-button>
+                            <b-button v-if="deduplicateProposals && deduplicateProposals.mitigationStatus && deduplicateProposals.mitigationStatus.length > 0" variant="outline-success" class="w-100 mb-2 py-2 font-weight-bold" @click="viewMitigationStatus">
+                                <font-awesome-icon icon="shield-alt" class="mr-2" />
+                                Ver Status de Mitigação de Ameaças
+                            </b-button>
+                            <b-button v-if="deduplicateProposals" variant="outline-info" class="w-100 mb-2 py-2 font-weight-bold" @click="viewQaReview">
+                                <font-awesome-icon icon="history" class="mr-2" />
+                                Revisão de Perguntas e Respostas
+                            </b-button>
                             <b-button variant="outline-danger" class="w-100" size="sm" @click="resetForm">
                                 Start Over
                             </b-button>
@@ -1285,6 +1293,11 @@
                             </div>
 
                             <div v-else>
+                                <!-- Coverage Validation Alert -->
+                                <b-alert v-if="mitigationCoverageGap > 0" variant="warning" show class="d-flex align-items-center mb-3 py-2 font-size-sm">
+                                    <font-awesome-icon icon="exclamation-triangle" class="mr-2" />
+                                    <span><strong>Aviso de Cobertura:</strong> {{ mitigationCoverageGap }} ameaça(s) do modelo não foram avaliadas pela IA na análise de mitigação.</span>
+                                </b-alert>
                                 <!-- Stats Cards -->
                                 <b-row class="mb-4">
                                     <b-col sm="3" class="mb-2">
@@ -1348,10 +1361,11 @@
                                     <table class="table table-hover table-striped mb-0 font-size-sm">
                                         <thead class="thead-dark">
                                             <tr>
-                                                <th style="width: 25%">Ameaça / Componente</th>
-                                                <th style="width: 15%" class="text-center">Status</th>
-                                                <th style="width: 35%">Motivo</th>
-                                                <th style="width: 25%">Recomendações</th>
+                                                <th style="width: 20%">Ameaça / Componente</th>
+                                                <th style="width: 10%" class="text-center">Status</th>
+                                                <th style="width: 25%">Motivo</th>
+                                                <th style="width: 20%">Recomendações</th>
+                                                <th style="width: 25%">Respostas de Referência</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -1378,9 +1392,18 @@
                                                     </span>
                                                     <span v-else class="text-muted italic font-size-xs">Nenhuma recomendação adicional</span>
                                                 </td>
+                                                <td>
+                                                    <div v-if="threat.supportingAnswers && threat.supportingAnswers.length > 0">
+                                                        <div v-for="(answer, aIdx) in threat.supportingAnswers" :key="aIdx" class="mb-1 font-size-xs">
+                                                            <span class="badge badge-light border text-muted mr-1">Ref {{ aIdx + 1 }}</span>
+                                                            <em class="text-dark" style="font-style: italic; line-height: 1.3;">"{{ answer }}"</em>
+                                                        </div>
+                                                    </div>
+                                                    <span v-else class="text-muted italic font-size-xs">Sem referências diretas</span>
+                                                </td>
                                             </tr>
                                             <tr v-if="deduplicateProposals.mitigationStatus.filter(t => mitigationFilter === 'All' || t.status === mitigationFilter).length === 0">
-                                                <td colspan="4" class="text-center text-muted py-4">
+                                                <td colspan="5" class="text-center text-muted py-4">
                                                     Nenhuma ameaça correspondente ao filtro selecionado.
                                                 </td>
                                             </tr>
@@ -1409,7 +1432,7 @@
 
                             <div v-else>
                                 <div
-                                    v-for="(aq, idx) in answeredQuestions"
+                                    v-for="(aq, idx) in displayedAnsweredQuestions"
                                     :key="aq.id || idx"
                                     class="bg-light border rounded p-3 mb-3 shadow-sm"
                                 >
@@ -1913,6 +1936,41 @@ export default {
         },
         totalThreats() {
             return this.stats?.threats || 0;
+        },
+        displayedAnsweredQuestions() {
+            if (!this.answeredQuestions || this.answeredQuestions.length === 0) {
+                return [];
+            }
+            // Administrative messages to exclude
+            const adminPhrases = ['aprovado', 'o dfd está completo', 'the dfd is complete', 'approved'];
+            const seen = new Set();
+            return this.answeredQuestions.filter((aq) => {
+                // Exclude manual requests (non-framework)
+                if (aq.id && aq.id.startsWith('manual-req-')) {
+                    return false;
+                }
+                // Exclude administrative category
+                if (aq.category && aq.category.toLowerCase() === 'ajuste manual') {
+                    return false;
+                }
+                // Exclude administrative answers
+                const answerLower = (aq.answer || '').toLowerCase().trim();
+                if (adminPhrases.some(p => answerLower === p || answerLower === p + '.')) {
+                    return false;
+                }
+                // Deduplicate by (text, answer) pair to avoid consolidated expansion duplicates
+                const dedupeKey = `${(aq.text || '').trim().toLowerCase()}|||${answerLower}`;
+                if (seen.has(dedupeKey)) {
+                    return false;
+                }
+                seen.add(dedupeKey);
+                return true;
+            });
+        },
+        mitigationCoverageGap() {
+            const totalModelThreats = this.stats?.threats || 0;
+            const evaluatedThreats = (this.deduplicateProposals?.mitigationStatus || []).length;
+            return Math.max(0, totalModelThreats - evaluatedThreats);
         }
     },
     watch: {
@@ -2992,6 +3050,32 @@ export default {
         },
         cancelDeduplication() {
             this.step = 'interactive';
+        },
+        viewMitigationStatus() {
+            this.step = 'deduplicate-review';
+            // Navigate to Tab 3 (mitigationStatus) on next tick
+            this.$nextTick(() => {
+                const tabs = this.$el.querySelector('.deduplicate-review .nav-pills, .card .nav-pills');
+                if (tabs) {
+                    const tabLinks = tabs.querySelectorAll('.nav-link');
+                    if (tabLinks.length >= 3) {
+                        tabLinks[2].click();
+                    }
+                }
+            });
+        },
+        viewQaReview() {
+            this.step = 'deduplicate-review';
+            // Navigate to Tab 4 (Q&A Review) on next tick
+            this.$nextTick(() => {
+                const tabs = this.$el.querySelector('.deduplicate-review .nav-pills, .card .nav-pills');
+                if (tabs) {
+                    const tabLinks = tabs.querySelectorAll('.nav-link');
+                    if (tabLinks.length >= 4) {
+                        tabLinks[3].click();
+                    }
+                }
+            });
         },
         async confirmDeduplicationAndApprove(controlDups = null, threatDups = null) {
             this.step = 'generating-proposals';

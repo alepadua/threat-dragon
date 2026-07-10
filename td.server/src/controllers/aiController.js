@@ -3640,6 +3640,7 @@ Classify each threat's mitigation status into one of:
 - "Parcialmente Mitigada" (if there is a partial mitigation, but some aspects are missing or require improvement).
 - "Não Mitigada" (if no mitigation exists, or the user answers explicitly state that the mitigation/control is missing or not implemented).
 Provide a detailed technical reason for the classification, and technical recommendations to achieve full mitigation.
+CRITICAL: For each threat, you MUST include the "supportingAnswers" field — an array of direct quotes (exact excerpts) from the user's conversation answers that were used as evidence to determine the mitigation status. If no user answer is relevant, provide an empty array.
 
 Return a JSON object structured EXACTLY as follows:
 {
@@ -3702,7 +3703,8 @@ Return a JSON object structured EXACTLY as follows:
       "elementName": "string (the name of the element/flow containing this threat)",
       "status": "Mitigada" or "Parcialmente Mitigada" or "Não Mitigada",
       "reason": "string (detailed justification in Portuguese based on user responses and mitigation field)",
-      "recommendations": "string (technical recommendations in Portuguese on how to fully mitigate this threat)"
+      "recommendations": "string (technical recommendations in Portuguese on how to fully mitigate this threat)",
+      "supportingAnswers": ["string (exact quote from user answer that supports this status)", "..."]
     }
   ]
 }
