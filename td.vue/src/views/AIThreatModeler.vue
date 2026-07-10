@@ -786,7 +786,7 @@
                                 <font-awesome-icon icon="shield-alt" class="mr-2" />
                                 Ver Status de Mitigação de Ameaças
                             </b-button>
-                            <b-button v-if="deduplicateProposals" variant="outline-info" class="w-100 mb-2 py-2 font-weight-bold" @click="viewQaReview">
+                            <b-button v-if="sessionId && answeredQuestions && answeredQuestions.length > 0" variant="outline-info" class="w-100 mb-2 py-2 font-weight-bold" @click="viewQaReview">
                                 <font-awesome-icon icon="history" class="mr-2" />
                                 Revisão de Perguntas e Respostas
                             </b-button>
