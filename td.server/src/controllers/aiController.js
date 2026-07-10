@@ -4281,18 +4281,29 @@ const importAnswers = async (req, res) => {
             return res.status(400).json({ status: 400, message: 'Question plan not computed yet.' });
         }
 
-        // Build set of valid question IDs from the plan
-        const validIds = new Set();
+        // Build map of valid question IDs and their official plan details
+        const planQuestionsMap = new Map();
         questionPlan.elementQuestions.forEach((elem) => {
             elem.categories.forEach((catGroup) => {
                 catGroup.questions.forEach((q) => {
-                    validIds.add(q.id);
+                    planQuestionsMap.set(q.id, {
+                        text: q.questionText || '',
+                        elementId: elem.elementId,
+                        elementName: elem.elementName,
+                        category: catGroup.category
+                    });
                 });
             });
         });
-        // Also add global question IDs
-        (questionPlan.globalQuestions || []).forEach((_gq, idx) => {
-            validIds.add(`global-q-${idx}`);
+        // Also add global questions
+        (questionPlan.globalQuestions || []).forEach((gq, idx) => {
+            const gqId = `global-q-${idx}`;
+            planQuestionsMap.set(gqId, {
+                text: gq,
+                elementId: 'global',
+                elementName: 'Sistema',
+                category: 'Global'
+            });
         });
 
         const sessionAnswered = session.answeredQuestions || [];
@@ -4306,28 +4317,38 @@ const importAnswers = async (req, res) => {
                 return;
             }
 
-            if (!validIds.has(item.id)) {
+            const planQ = planQuestionsMap.get(item.id);
+            if (!planQ) {
                 logger.warn(`[importAnswers] Skipping unknown question ID: ${item.id}`);
                 skippedCount++;
                 return;
             }
+
+            const resolvedText = planQ.text || item.questionText || item.text || '';
+            const resolvedElementId = planQ.elementId || item.elementId || 'global';
+            const resolvedElementName = planQ.elementName || item.elementName || 'Sistema';
+            const resolvedCategory = planQ.category || item.category || 'Importado';
 
             if (existingIds.has(item.id)) {
                 // Update existing answer
                 const existing = sessionAnswered.find((q) => q.id === item.id);
                 if (existing) {
                     existing.answer = item.answer.trim();
+                    existing.text = resolvedText;
+                    existing.elementId = resolvedElementId;
+                    existing.elementName = resolvedElementName;
+                    existing.category = resolvedCategory;
                     existing.timestamp = new Date().toISOString();
                     existing.source = item.source || 'csv_import';
                 }
             } else {
                 sessionAnswered.push({
                     id: item.id,
-                    text: item.questionText || item.text || '',
+                    text: resolvedText,
                     answer: item.answer.trim(),
-                    elementId: item.elementId || 'global',
-                    elementName: item.elementName || 'Sistema',
-                    category: item.category || 'Importado',
+                    elementId: resolvedElementId,
+                    elementName: resolvedElementName,
+                    category: resolvedCategory,
                     timestamp: new Date().toISOString(),
                     source: item.source || 'csv_import'
                 });

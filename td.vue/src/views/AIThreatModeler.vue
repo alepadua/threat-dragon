@@ -1143,7 +1143,13 @@
                                         </h5>
                                     </template>
 
-                                    <div v-if="!deduplicateProposals || !deduplicateProposals.controlDeduplications || deduplicateProposals.controlDeduplications.length === 0" class="text-center py-5">
+                                    <div v-if="!deduplicateProposals" class="text-center py-4">
+                                        <b-alert variant="info" show class="d-flex align-items-center mb-0 text-left font-size-xs">
+                                            <font-awesome-icon icon="info-circle" class="mr-2" />
+                                            <div>A análise de deduplicação de controles estará disponível após concluir o refinamento.</div>
+                                        </b-alert>
+                                    </div>
+                                    <div v-else-if="!deduplicateProposals.controlDeduplications || deduplicateProposals.controlDeduplications.length === 0" class="text-center py-5">
                                         <font-awesome-icon icon="check-circle" size="3x" class="text-success mb-3" />
                                         <p class="text-muted font-weight-bold">Nenhuma redundância encontrada nos controles.</p>
                                     </div>
@@ -1194,7 +1200,13 @@
                                         </h5>
                                     </template>
 
-                                    <div v-if="!deduplicateProposals || !deduplicateProposals.threatDeduplications || deduplicateProposals.threatDeduplications.length === 0" class="text-center py-5">
+                                    <div v-if="!deduplicateProposals" class="text-center py-4">
+                                        <b-alert variant="info" show class="d-flex align-items-center mb-0 text-left font-size-xs">
+                                            <font-awesome-icon icon="info-circle" class="mr-2" />
+                                            <div>A análise de deduplicação de ameaças estará disponível após concluir o refinamento.</div>
+                                        </b-alert>
+                                    </div>
+                                    <div v-else-if="!deduplicateProposals.threatDeduplications || deduplicateProposals.threatDeduplications.length === 0" class="text-center py-5">
                                         <font-awesome-icon icon="check-circle" size="3x" class="text-success mb-3" />
                                         <p class="text-muted font-weight-bold">Nenhuma redundância encontrada nas ameaças.</p>
                                     </div>
@@ -1242,7 +1254,15 @@
                     <!-- Tab 2: Anti-Hallucination Audit -->
                     <b-tab title="Auditoria de Alucinações">
                         <div class="text-left">
-                            <div v-if="!deduplicateProposals || !deduplicateProposals.hallucinationAlerts || deduplicateProposals.hallucinationAlerts.length === 0" class="text-center py-5 bg-light rounded border">
+                            <div v-if="!deduplicateProposals" class="text-center py-5 bg-light rounded border">
+                                <b-alert variant="info" show class="d-flex align-items-center mb-0 mx-auto col-md-8 text-left font-size-sm">
+                                    <font-awesome-icon icon="info-circle" size="lg" class="mr-3" />
+                                    <div>
+                                        <strong>Aviso:</strong> A auditoria de alucinações estará disponível após concluir o refinamento clicando em <strong>"Approve & Conclude"</strong> (Confirmar e Concluir) na aba anterior.
+                                    </div>
+                                </b-alert>
+                            </div>
+                            <div v-else-if="!deduplicateProposals.hallucinationAlerts || deduplicateProposals.hallucinationAlerts.length === 0" class="text-center py-5 bg-light rounded border">
                                 <font-awesome-icon icon="check-circle" size="3x" class="text-success mb-3" />
                                 <h5 class="text-success font-weight-bold">Nenhuma Inconsistência Encontrada</h5>
                                 <p class="text-muted mb-0">O auditor de segurança da IA não encontrou componentes, tecnologias ou permissões alucinadas/não confirmadas.</p>
@@ -1292,7 +1312,15 @@
                     <!-- Tab 3: Threat Mitigation Status -->
                     <b-tab title="Status de Mitigação de Ameaças">
                         <div class="text-left">
-                            <div v-if="!deduplicateProposals || !deduplicateProposals.mitigationStatus || deduplicateProposals.mitigationStatus.length === 0" class="text-center py-5 bg-light rounded border">
+                            <div v-if="!deduplicateProposals" class="text-center py-5 bg-light rounded border">
+                                <b-alert variant="info" show class="d-flex align-items-center mb-0 mx-auto col-md-8 text-left font-size-sm">
+                                    <font-awesome-icon icon="info-circle" size="lg" class="mr-3" />
+                                    <div>
+                                        <strong>Aviso:</strong> O status de mitigação das ameaças estará disponível após concluir o refinamento clicando em <strong>"Approve & Conclude"</strong> (Confirmar e Concluir) na aba anterior.
+                                    </div>
+                                </b-alert>
+                            </div>
+                            <div v-else-if="!deduplicateProposals.mitigationStatus || deduplicateProposals.mitigationStatus.length === 0" class="text-center py-5 bg-light rounded border">
                                 <font-awesome-icon icon="info-circle" size="3x" class="text-secondary mb-3" />
                                 <h5 class="text-secondary font-weight-bold">Sem Dados de Mitigação</h5>
                                 <p class="text-muted mb-0">Nenhuma ameaça foi mapeada ou avaliada para este modelo ainda.</p>
@@ -2335,10 +2363,10 @@ export default {
                 
                 // Find column indices
                 const idIdx = headers.findIndex(h => h === 'id');
-                const answerIdx = headers.findIndex(h => h.includes('resposta') || h === 'answer');
-                const questionIdx = headers.findIndex(h => h.includes('pergunta') || h === 'question' || h === 'questiontext');
-                const categoryIdx = headers.findIndex(h => h.includes('categori') || h === 'category');
-                const elementIdx = headers.findIndex(h => h.includes('componente') || h === 'elementname');
+                const answerIdx = headers.findIndex(h => h === 'resposta' || h === 'answer' || (h.includes('resposta') && !h.includes('tipo') && !h.includes('type')));
+                const questionIdx = headers.findIndex(h => h === 'pergunta' || h === 'question' || h === 'questiontext' || (h.includes('pergunta') && !h.includes('tipo') && !h.includes('type')));
+                const categoryIdx = headers.findIndex(h => h === 'categoria' || h === 'category' || (h.includes('categori') && !h.includes('tipo') && !h.includes('type')));
+                const elementIdx = headers.findIndex(h => h === 'componente' || h === 'elementname' || (h.includes('componente') && !h.includes('tipo') && !h.includes('type')));
                 
                 if (idIdx === -1 || answerIdx === -1) {
                     throw new Error('CSV deve conter colunas "ID" e "Resposta" (ou "Answer").');
