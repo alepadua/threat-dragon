@@ -782,7 +782,7 @@
                                 <font-awesome-icon icon="cloud-download-alt" class="mr-2" />
                                 Download Model JSON
                             </b-button>
-                            <b-button v-if="deduplicateProposals && deduplicateProposals.mitigationStatus && deduplicateProposals.mitigationStatus.length > 0" variant="outline-success" class="w-100 mb-2 py-2 font-weight-bold" @click="viewMitigationStatus">
+                            <b-button v-if="activeMitigationStatus && activeMitigationStatus.length > 0" variant="outline-success" class="w-100 mb-2 py-2 font-weight-bold" @click="viewMitigationStatus">
                                 <font-awesome-icon icon="shield-alt" class="mr-2" />
                                 Ver Status de Mitigação de Ameaças
                             </b-button>
@@ -1135,7 +1135,6 @@
                         <b-row class="text-left">
                             <!-- Controls Deduplication Card -->
                             <b-col md="6" class="mb-3">
-                                <b-card class="border-0 shadow-sm h-100 bg-light" header-class="bg-info text-white py-2">
                                     <template #header>
                                         <h5 class="mb-0 font-weight-bold font-size-md">
                                             <font-awesome-icon icon="shield-alt" class="mr-2" />
@@ -1143,7 +1142,11 @@
                                         </h5>
                                     </template>
 
-                                    <div v-if="!deduplicateProposals" class="text-center py-4">
+                                    <div v-if="threatModelApproved" class="text-center py-5">
+                                        <font-awesome-icon icon="check-circle" size="3x" class="text-success mb-3" />
+                                        <p class="text-muted font-weight-bold">Deduplicação concluída e aplicada ao modelo.</p>
+                                    </div>
+                                    <div v-else-if="!deduplicateProposals" class="text-center py-4">
                                         <b-alert variant="info" show class="d-flex align-items-center mb-0 text-left font-size-xs">
                                             <font-awesome-icon icon="info-circle" class="mr-2" />
                                             <div>A análise de deduplicação de controles estará disponível após concluir o refinamento.</div>
@@ -1200,7 +1203,11 @@
                                         </h5>
                                     </template>
 
-                                    <div v-if="!deduplicateProposals" class="text-center py-4">
+                                    <div v-if="threatModelApproved" class="text-center py-5">
+                                        <font-awesome-icon icon="check-circle" size="3x" class="text-success mb-3" />
+                                        <p class="text-muted font-weight-bold">Deduplicação concluída e aplicada ao modelo.</p>
+                                    </div>
+                                    <div v-else-if="!deduplicateProposals" class="text-center py-4">
                                         <b-alert variant="info" show class="d-flex align-items-center mb-0 text-left font-size-xs">
                                             <font-awesome-icon icon="info-circle" class="mr-2" />
                                             <div>A análise de deduplicação de ameaças estará disponível após concluir o refinamento.</div>
@@ -1254,7 +1261,7 @@
                     <!-- Tab 2: Anti-Hallucination Audit -->
                     <b-tab title="Auditoria de Alucinações">
                         <div class="text-left">
-                            <div v-if="!deduplicateProposals" class="text-center py-5 bg-light rounded border">
+                            <div v-if="!threatModelApproved && !deduplicateProposals" class="text-center py-5 bg-light rounded border">
                                 <b-alert variant="info" show class="d-flex align-items-center mb-0 mx-auto col-md-8 text-left font-size-sm">
                                     <font-awesome-icon icon="info-circle" size="lg" class="mr-3" />
                                     <div>
@@ -1262,7 +1269,7 @@
                                     </div>
                                 </b-alert>
                             </div>
-                            <div v-else-if="!deduplicateProposals.hallucinationAlerts || deduplicateProposals.hallucinationAlerts.length === 0" class="text-center py-5 bg-light rounded border">
+                            <div v-else-if="!activeHallucinationAlerts || activeHallucinationAlerts.length === 0" class="text-center py-5 bg-light rounded border">
                                 <font-awesome-icon icon="check-circle" size="3x" class="text-success mb-3" />
                                 <h5 class="text-success font-weight-bold">Nenhuma Inconsistência Encontrada</h5>
                                 <p class="text-muted mb-0">O auditor de segurança da IA não encontrou componentes, tecnologias ou permissões alucinadas/não confirmadas.</p>
@@ -1277,7 +1284,7 @@
                                 </b-alert>
 
                                 <div
-                                    v-for="alert in deduplicateProposals.hallucinationAlerts"
+                                    v-for="alert in activeHallucinationAlerts"
                                     :key="alert.id"
                                     class="border rounded p-3 mb-3 bg-white shadow-sm d-flex"
                                 >
@@ -1312,7 +1319,7 @@
                     <!-- Tab 3: Threat Mitigation Status -->
                     <b-tab title="Status de Mitigação de Ameaças">
                         <div class="text-left">
-                            <div v-if="!deduplicateProposals" class="text-center py-5 bg-light rounded border">
+                            <div v-if="!threatModelApproved && !deduplicateProposals" class="text-center py-5 bg-light rounded border">
                                 <b-alert variant="info" show class="d-flex align-items-center mb-0 mx-auto col-md-8 text-left font-size-sm">
                                     <font-awesome-icon icon="info-circle" size="lg" class="mr-3" />
                                     <div>
@@ -1320,7 +1327,7 @@
                                     </div>
                                 </b-alert>
                             </div>
-                            <div v-else-if="!deduplicateProposals.mitigationStatus || deduplicateProposals.mitigationStatus.length === 0" class="text-center py-5 bg-light rounded border">
+                            <div v-else-if="!activeMitigationStatus || activeMitigationStatus.length === 0" class="text-center py-5 bg-light rounded border">
                                 <font-awesome-icon icon="info-circle" size="3x" class="text-secondary mb-3" />
                                 <h5 class="text-secondary font-weight-bold">Sem Dados de Mitigação</h5>
                                 <p class="text-muted mb-0">Nenhuma ameaça foi mapeada ou avaliada para este modelo ainda.</p>
@@ -1336,25 +1343,25 @@
                                 <b-row class="mb-4">
                                     <b-col sm="3" class="mb-2">
                                         <b-card bg-variant="light" class="text-center border-0 shadow-sm py-2">
-                                            <h3 class="mb-0 font-weight-bold text-dark">{{ deduplicateProposals.mitigationStatus.length }}</h3>
+                                            <h3 class="mb-0 font-weight-bold text-dark">{{ activeMitigationStatus.length }}</h3>
                                             <small class="text-muted font-weight-bold">Total Avaliadas</small>
                                         </b-card>
                                     </b-col>
                                     <b-col sm="3" class="mb-2">
                                         <b-card bg-variant="success" text-variant="white" class="text-center border-0 shadow-sm py-2">
-                                            <h3 class="mb-0 font-weight-bold">{{ deduplicateProposals.mitigationStatus.filter(t => t.status === 'Mitigada').length }}</h3>
+                                            <h3 class="mb-0 font-weight-bold">{{ activeMitigationStatus.filter(t => t.status === 'Mitigada').length }}</h3>
                                             <small class="font-weight-bold text-white-50">Mitigadas</small>
                                         </b-card>
                                     </b-col>
                                     <b-col sm="3" class="mb-2">
                                         <b-card bg-variant="warning" class="text-center border-0 shadow-sm py-2">
-                                            <h3 class="mb-0 font-weight-bold text-dark">{{ deduplicateProposals.mitigationStatus.filter(t => t.status === 'Parcialmente Mitigada').length }}</h3>
+                                            <h3 class="mb-0 font-weight-bold text-dark">{{ activeMitigationStatus.filter(t => t.status === 'Parcialmente Mitigada').length }}</h3>
                                             <small class="text-muted font-weight-bold">Parciais</small>
                                         </b-card>
                                     </b-col>
                                     <b-col sm="3" class="mb-2">
                                         <b-card bg-variant="danger" text-variant="white" class="text-center border-0 shadow-sm py-2">
-                                            <h3 class="mb-0 font-weight-bold">{{ deduplicateProposals.mitigationStatus.filter(t => t.status === 'Não Mitigada').length }}</h3>
+                                            <h3 class="mb-0 font-weight-bold">{{ activeMitigationStatus.filter(t => t.status === 'Não Mitigada').length }}</h3>
                                             <small class="font-weight-bold text-white-50">Não Mitigadas</small>
                                         </b-card>
                                     </b-col>
@@ -1367,25 +1374,25 @@
                                             :variant="mitigationFilter === 'All' ? 'secondary' : 'outline-secondary'"
                                             @click="mitigationFilter = 'All'"
                                         >
-                                            Ver Todas ({{ deduplicateProposals.mitigationStatus.length }})
+                                            Ver Todas ({{ activeMitigationStatus.length }})
                                         </b-button>
                                         <b-button
                                             :variant="mitigationFilter === 'Mitigada' ? 'success' : 'outline-success'"
                                             @click="mitigationFilter = 'Mitigada'"
                                         >
-                                            Mitigada ({{ deduplicateProposals.mitigationStatus.filter(t => t.status === 'Mitigada').length }})
+                                            Mitigada ({{ activeMitigationStatus.filter(t => t.status === 'Mitigada').length }})
                                         </b-button>
                                         <b-button
                                             :variant="mitigationFilter === 'Parcialmente Mitigada' ? 'warning' : 'outline-warning'"
                                             @click="mitigationFilter = 'Parcialmente Mitigada'"
                                         >
-                                            Parcialmente ({{ deduplicateProposals.mitigationStatus.filter(t => t.status === 'Parcialmente Mitigada').length }})
+                                            Parcialmente ({{ activeMitigationStatus.filter(t => t.status === 'Parcialmente Mitigada').length }})
                                         </b-button>
                                         <b-button
                                             :variant="mitigationFilter === 'Não Mitigada' ? 'danger' : 'outline-danger'"
                                             @click="mitigationFilter = 'Não Mitigada'"
                                         >
-                                            Não Mitigada ({{ deduplicateProposals.mitigationStatus.filter(t => t.status === 'Não Mitigada').length }})
+                                            Não Mitigada ({{ activeMitigationStatus.filter(t => t.status === 'Não Mitigada').length }})
                                         </b-button>
                                     </b-button-group>
                                 </div>
@@ -1404,7 +1411,7 @@
                                         </thead>
                                         <tbody>
                                             <tr
-                                                v-for="threat in deduplicateProposals.mitigationStatus.filter(t => mitigationFilter === 'All' || t.status === mitigationFilter)"
+                                                v-for="threat in activeMitigationStatus.filter(t => mitigationFilter === 'All' || t.status === mitigationFilter)"
                                                 :key="threat.threatId"
                                             >
                                                 <td>
@@ -1436,7 +1443,7 @@
                                                     <span v-else class="text-muted italic font-size-xs">Sem referências diretas</span>
                                                 </td>
                                             </tr>
-                                            <tr v-if="deduplicateProposals.mitigationStatus.filter(t => mitigationFilter === 'All' || t.status === mitigationFilter).length === 0">
+                                            <tr v-if="activeMitigationStatus.filter(t => mitigationFilter === 'All' || t.status === mitigationFilter).length === 0">
                                                 <td colspan="5" class="text-center text-muted py-4">
                                                     Nenhuma ameaça correspondente ao filtro selecionado.
                                                 </td>
@@ -2025,8 +2032,26 @@ export default {
         },
         mitigationCoverageGap() {
             const totalModelThreats = this.stats?.threats || 0;
-            const evaluatedThreats = (this.deduplicateProposals?.mitigationStatus || []).length;
+            const evaluatedThreats = (this.activeMitigationStatus || []).length;
             return Math.max(0, totalModelThreats - evaluatedThreats);
+        },
+        activeMitigationStatus() {
+            if (this.deduplicateProposals && this.deduplicateProposals.mitigationStatus) {
+                return this.deduplicateProposals.mitigationStatus;
+            }
+            if (this.evaluation && this.evaluation.mitigationStatus) {
+                return this.evaluation.mitigationStatus;
+            }
+            return null;
+        },
+        activeHallucinationAlerts() {
+            if (this.deduplicateProposals && this.deduplicateProposals.hallucinationAlerts) {
+                return this.deduplicateProposals.hallucinationAlerts;
+            }
+            if (this.evaluation && this.evaluation.hallucinationAlerts) {
+                return this.evaluation.hallucinationAlerts;
+            }
+            return null;
         }
     },
     watch: {
