@@ -1135,6 +1135,7 @@
                         <b-row class="text-left">
                             <!-- Controls Deduplication Card -->
                             <b-col md="6" class="mb-3">
+                                <b-card class="border-0 shadow-sm h-100 bg-light" header-class="bg-info text-white py-2">
                                     <template #header>
                                         <h5 class="mb-0 font-weight-bold font-size-md">
                                             <font-awesome-icon icon="shield-alt" class="mr-2" />
