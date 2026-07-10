@@ -3749,15 +3749,17 @@ All reasons, recommendations, questionContext, issueFound, and recommendationFor
 Return ONLY the raw JSON object, without any markdown code block formatting.
 `;
 
-        logger.info(`[Job ${job.jobId}] Requesting parallel deduplication/audit and mitigation/revision jobs from AI Provider (${aiConfig.provider})`);
+        logger.info(`[Job ${job.jobId}] Requesting sequential deduplication/audit and mitigation/revision jobs from AI Provider (${aiConfig.provider})`);
         
         job.progress = 40;
         activeJobs.set(job.jobId, { ...job });
 
-        const [responseDedupAudit, responseMitigationRevision] = await Promise.all([
-            callAIModel(promptTextDedupAudit, [], aiConfig, job),
-            callAIModel(promptTextMitigationRevision, [], aiConfig, job)
-        ]);
+        const responseDedupAudit = await callAIModel(promptTextDedupAudit, [], aiConfig, job);
+
+        job.progress = 70;
+        activeJobs.set(job.jobId, { ...job });
+
+        const responseMitigationRevision = await callAIModel(promptTextMitigationRevision, [], aiConfig, job);
         
         if (!responseDedupAudit || !responseMitigationRevision) {
             throw new Error('AI API returned an empty response for one or both of the parallel jobs');
