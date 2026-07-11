@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import fs from 'fs';
+import encryptionHelper from './encryption.helper.js';
 import loggerHelper from './logger.helper.js';
 import path from 'path';
 
@@ -25,9 +26,19 @@ const getVectorsPath = (sessionId) => {
     return path.join(SESSIONS_DIR, `${safeId}.vectors.json`);
 };
 
-export const createSession = (data) => {
+export const createSession = async (data) => {
     ensureSessionsDir();
     const sessionId = crypto.randomUUID();
+    let encryptedKey = '';
+    if (data.apiKey && data.apiKey.trim() !== '') {
+        try {
+            const encrypted = await encryptionHelper.encryptPromise(data.apiKey);
+            encryptedKey = JSON.stringify(encrypted);
+        } catch (err) {
+            logger.error(`Error encrypting API key on session creation: ${err.message}`);
+        }
+    }
+
     const sessionData = {
         sessionId,
         createdAt: new Date().toISOString(),
@@ -45,12 +56,16 @@ export const createSession = (data) => {
         aiProvider: data.aiProvider || 'gemini',
         customBaseUrl: data.customBaseUrl || '',
         customModel: data.customModel || '',
-        apiKey: data.apiKey || ''
+        apiKey: encryptedKey
     };
 
     fs.writeFileSync(getSessionPath(sessionId), JSON.stringify(sessionData, null, 2), 'utf-8');
     logger.info(`Created new threat modeling session: ${sessionId}`);
-    return sessionData;
+    
+    return {
+        ...sessionData,
+        apiKey: data.apiKey || ''
+    };
 };
 
 export const getSession = (sessionId) => {
@@ -62,7 +77,18 @@ export const getSession = (sessionId) => {
     }
     try {
         const content = fs.readFileSync(filePath, 'utf-8');
-        return JSON.parse(content);
+        const session = JSON.parse(content);
+        if (session.apiKey && session.apiKey.trim() !== '') {
+            if (session.apiKey.startsWith('{')) {
+                try {
+                    const encryptedObj = JSON.parse(session.apiKey);
+                    session.apiKey = encryptionHelper.decrypt(encryptedObj);
+                } catch (decErr) {
+                    logger.error(`Error decrypting API key for session ${sessionId}: ${decErr.message}`);
+                }
+            }
+        }
+        return session;
     } catch (err) {
         logger.error(`Error reading session ${sessionId}: ${err.message}`);
         return null;
@@ -93,20 +119,53 @@ export const getVectors = (sessionId) => {
     }
 };
 
-export const updateSession = (sessionId, updates) => {
+export const updateSession = async (sessionId, updates) => {
     ensureSessionsDir();
     const session = getSession(sessionId);
     if (!session) {
         return null;
     }
 
+    let updatedApiKey = session.apiKey;
+    if (updates.apiKey !== undefined) {
+        if (updates.apiKey === '*****') {
+            updatedApiKey = session.apiKey;
+        } else if (updates.apiKey && updates.apiKey.trim() !== '') {
+            try {
+                const encrypted = await encryptionHelper.encryptPromise(updates.apiKey);
+                updatedApiKey = JSON.stringify(encrypted);
+            } catch (err) {
+                logger.error(`Error encrypting updated API key: ${err.message}`);
+            }
+        } else {
+            updatedApiKey = '';
+        }
+    }
+
+    const decryptedApiKey = (updates.apiKey !== undefined)
+        ? (updates.apiKey === '*****' ? session.apiKey : updates.apiKey)
+        : session.apiKey;
+
     const updatedSession = {
         ...session,
         ...updates,
+        apiKey: decryptedApiKey,
         updatedAt: new Date().toISOString()
     };
 
-    fs.writeFileSync(getSessionPath(sessionId), JSON.stringify(updatedSession, null, 2), 'utf-8');
+    const diskSession = { ...updatedSession };
+    if (diskSession.apiKey && diskSession.apiKey.trim() !== '') {
+        try {
+            const encrypted = await encryptionHelper.encryptPromise(diskSession.apiKey);
+            diskSession.apiKey = JSON.stringify(encrypted);
+        } catch (err) {
+            logger.error(`Error encrypting API key for disk write: ${err.message}`);
+        }
+    } else {
+        diskSession.apiKey = '';
+    }
+
+    fs.writeFileSync(getSessionPath(sessionId), JSON.stringify(diskSession, null, 2), 'utf-8');
     logger.info(`Updated threat modeling session: ${sessionId}`);
     return updatedSession;
 };
@@ -130,11 +189,47 @@ export const deleteSession = (sessionId) => {
     return false;
 };
 
+export const cleanOldSessions = (maxAgeDays = 7) => {
+    ensureSessionsDir();
+    try {
+        const files = fs.readdirSync(SESSIONS_DIR);
+        const now = Date.now();
+        const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
+        let deletedCount = 0;
+
+        files.forEach((file) => {
+            if (file.endsWith('.json') && !file.endsWith('.vectors.json')) {
+                const filePath = path.join(SESSIONS_DIR, file);
+                try {
+                    const stats = fs.statSync(filePath);
+                    const ageMs = now - stats.mtimeMs;
+                    if (ageMs > maxAgeMs) {
+                        const sessionId = path.basename(file, '.json');
+                        deleteSession(sessionId);
+                        deletedCount++;
+                    }
+                } catch (statErr) {
+                    logger.error(`Error checking stats for session file ${file}: ${statErr.message}`);
+                }
+            }
+        });
+
+        if (deletedCount > 0) {
+            logger.info(`Garbage Collector: Cleaned up ${deletedCount} inactive sessions (> ${maxAgeDays} days).`);
+        }
+        return deletedCount;
+    } catch (err) {
+        logger.error(`Error during session garbage collection: ${err.message}`);
+        return 0;
+    }
+};
+
 export default {
     createSession,
     getSession,
     updateSession,
     deleteSession,
     saveVectors,
-    getVectors
+    getVectors,
+    cleanOldSessions
 };

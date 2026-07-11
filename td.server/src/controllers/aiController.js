@@ -16,6 +16,27 @@ import crypto from 'crypto';
 global.DOMMatrix = DOMMatrix;
 
 const logger = loggerHelper.get('controllers/aiController.js');
+
+// Run session garbage collection once on startup
+try {
+    aiContextStore.cleanOldSessions(7);
+} catch (err) {
+    logger.error(`Failed to run startup session cleanup: ${err.message}`);
+}
+
+// Start periodic cleanup of inactive sessions every 24 hours
+const CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const cleanupInterval = setInterval(() => {
+    try {
+        aiContextStore.cleanOldSessions(7);
+    } catch (err) {
+        logger.error(`Failed to run periodic session cleanup: ${err.message}`);
+    }
+}, CLEANUP_INTERVAL_MS);
+if (cleanupInterval.unref) {
+    cleanupInterval.unref();
+}
+
 const REQUEST_TIMEOUT = parseInt(process.env.AI_REQUEST_TIMEOUT, 10) || 300000;
 
 const getProxyAgent = (context = 'general') => {
@@ -2026,7 +2047,7 @@ const runGenerateJob = async (job, body, activeSession, finalDocs, finalImages, 
         if (docsTexts.length > 0 && !skipRag && (!activeSession || !activeSession.embeddingsGenerated)) {
             // Stage 1: Local RAG Chunking and Embedding Generation
             await generateAndSaveEmbeddings(activeSession.sessionId, docsTexts, aiConfig);
-            aiContextStore.updateSession(activeSession.sessionId, { embeddingsGenerated: true });
+            await aiContextStore.updateSession(activeSession.sessionId, { embeddingsGenerated: true });
         }
 
         job.progress = 25;
@@ -2880,7 +2901,7 @@ Do not wrap the JSON output in markdown formatting.`;
         const historyToUse = isTransition ? [] : (refinementHistory || []);
         const updatedHistory = ensureModelMessageInHistory(historyToUse, parsedOutput.questions, dfdApprovedBool);
 
-        aiContextStore.updateSession(activeSession.sessionId, {
+        await aiContextStore.updateSession(activeSession.sessionId, {
             currentModel: parsedOutput.threatModel,
             questions: parsedOutput.questions || [],
             evaluation: evaluation,
@@ -3020,9 +3041,16 @@ const generate = async (req, res) => {
     } else if (activeSession && activeSession.extendedThinking) {
         extendedThinkingVal = true;
     }
+    let resolvedApiKey = clientApiKey;
+    if (resolvedApiKey === '*****') {
+        resolvedApiKey = (activeSession && activeSession.apiKey) || '';
+    }
+    if (!resolvedApiKey) {
+        resolvedApiKey = (activeSession && activeSession.apiKey) || (provider === 'bedrock-mantle' ? env.get().config.BEDROCK_MANTLE_API_KEY : env.get().config.GEMINI_API_KEY);
+    }
     const aiConfig = {
         provider: provider,
-        apiKey: clientApiKey || (activeSession && activeSession.apiKey) || (provider === 'bedrock-mantle' ? env.get().config.BEDROCK_MANTLE_API_KEY : env.get().config.GEMINI_API_KEY),
+        apiKey: resolvedApiKey,
         baseUrl: customBaseUrl || (activeSession && activeSession.customBaseUrl) || env.get().config.BEDROCK_MANTLE_BASE_URL,
         model: customModel || (activeSession && activeSession.customModel) || env.get().config.BEDROCK_MANTLE_MODEL,
         embeddingModel: customEmbeddingModel || (activeSession && activeSession.customEmbeddingModel) || env.get().config.BEDROCK_MANTLE_EMBEDDING_MODEL || 'amazon.titan-embed-text-v1',
@@ -3173,8 +3201,7 @@ substr(2, 5)}`;
                     ...sessionAnswered.filter((q) => q.id && !q.id.startsWith('manual-req-')).map((q) => q.id)
                 ]));
 
-                // Update history and model in session store
-                activeSession = aiContextStore.updateSession(sessionId, {
+                const sessionUpdates = {
                     answeredQuestions: sessionAnswered,
                     answeredQuestionIds: answeredQuestionIds,
                     refinementHistory: rebuiltHistory,
@@ -3183,7 +3210,6 @@ substr(2, 5)}`;
                     aiProvider: provider,
                     customBaseUrl: aiConfig.baseUrl,
                     customModel: aiConfig.model,
-                    apiKey: aiConfig.apiKey,
                     extendedThinking: aiConfig.extendedThinking,
                     maxContextTokens: aiConfig.maxContextTokens,
                     questionBatchSize: aiConfig.questionBatchSize,
@@ -3196,7 +3222,11 @@ substr(2, 5)}`;
                     revisionExtendedThinking: revisionExtendedThinking === true || revisionExtendedThinking === 'true',
                     deduplicatorModel: deduplicatorModel || '',
                     deduplicatorExtendedThinking: deduplicatorExtendedThinking === true || deduplicatorExtendedThinking === 'true'
-                });
+                };
+                if (clientApiKey !== undefined) {
+                    sessionUpdates.apiKey = clientApiKey;
+                }
+                activeSession = await aiContextStore.updateSession(sessionId, sessionUpdates);
             }
         }
 
@@ -3214,7 +3244,7 @@ substr(2, 5)}`;
                 });
             }
 
-            aiContextStore.updateSession(activeSession.sessionId, {
+            await aiContextStore.updateSession(activeSession.sessionId, {
                 history: previousHistory,
                 threatModelApproved: true
             });
@@ -3240,7 +3270,7 @@ substr(2, 5)}`;
             if (!title || title.trim() === '') {
                 return badRequest('Threat model title is required to initialize a session', res, logger);
             }
-            activeSession = aiContextStore.createSession({
+            activeSession = await aiContextStore.createSession({
                 title,
                 description,
                 docs: finalDocs,
@@ -3313,7 +3343,7 @@ const getSessionState = (req, res) => {
             aiProvider: session.aiProvider || 'gemini',
             customBaseUrl: session.customBaseUrl || '',
             customModel: session.customModel || '',
-            apiKey: session.apiKey || '',
+            apiKey: session.apiKey ? '*****' : '',
             refinementHistory: ensureModelMessageInHistory(session.refinementHistory || [], session.questions || [], session.dfdApproved || false),
             dfdApproved: session.dfdApproved || false,
             threatModelApproved: session.threatModelApproved || false,
@@ -3340,12 +3370,12 @@ const getSessionState = (req, res) => {
     });
 };
 
-const undoRefinement = (req, res) => {
+const undoRefinement = async (req, res) => {
     const { sessionId } = req.body;
     if (!sessionId) {
         return res.status(400).json({
             status: 400,
-            message: 'Session ID is required to undo.'
+            message: 'sessionId is required'
         });
     }
     try {
@@ -3369,7 +3399,7 @@ const undoRefinement = (req, res) => {
             lastState.questions || [],
             lastState.dfdApproved || false
         );
-        const updated = aiContextStore.updateSession(sessionId, {
+        const updated = await aiContextStore.updateSession(sessionId, {
             currentModel: lastState.currentModel,
             questions: lastState.questions,
             evaluation: lastState.evaluation,
@@ -3467,7 +3497,7 @@ const editAnswers = async (req, res) => {
         }
         
         // Save back to session store
-        const activeSession = aiContextStore.updateSession(sessionId, {
+        const activeSession = await aiContextStore.updateSession(sessionId, {
             answeredQuestions: sessionAnswered,
             refinementHistory: rebuiltHistory,
             answeredQuestionIds: session.answeredQuestionIds || [],
@@ -3807,7 +3837,7 @@ Return ONLY the raw JSON object, without any markdown code block formatting.
         session.mitigationStatus = parsedProposals.mitigationStatus;
         session.answersRevision = parsedProposals.answersRevision;
 
-        aiContextStore.updateSession(session.sessionId, {
+        await aiContextStore.updateSession(session.sessionId, {
             deduplicateProposals: parsedProposals,
             hallucinationAlerts: parsedProposals.hallucinationAlerts,
             mitigationStatus: parsedProposals.mitigationStatus,
@@ -3861,7 +3891,7 @@ const getDeduplicateProposals = async (req, res) => {
     }
 };
 
-const applyDeduplication = (req, res) => {
+const applyDeduplication = async (req, res) => {
     const { sessionId } = req.params;
     const { approvedControlDeduplicationIds = [], approvedThreatDeduplicationIds = [] } = req.body;
 
@@ -3908,7 +3938,7 @@ const applyDeduplication = (req, res) => {
             });
         }
 
-        aiContextStore.updateSession(sessionId, {
+        await aiContextStore.updateSession(sessionId, {
             currentModel: updatedModel,
             evaluation: updatedEvaluation,
             threatModelApproved: true,
@@ -4027,7 +4057,7 @@ const getAvailableFrameworks = (req, res) => {
     });
 };
 
-const updateSessionState = (req, res) => {
+const updateSessionState = async (req, res) => {
     const { sessionId } = req.params;
     const { currentModel } = req.body;
     const session = aiContextStore.getSession(sessionId);
@@ -4037,7 +4067,7 @@ const updateSessionState = (req, res) => {
             message: 'Session not found'
         });
     }
-    aiContextStore.updateSession(sessionId, {
+    await aiContextStore.updateSession(sessionId, {
         currentModel: currentModel || session.currentModel
     });
     logger.info(`Updated current model in session ${sessionId} with user manual edits.`);
@@ -4229,7 +4259,7 @@ Respond ONLY with a valid JSON array of objects, each with "id" and "questionTex
                         elementQuestions: updatedElementQuestions
                     };
 
-                    aiContextStore.updateSession(sessionId, {
+                    await aiContextStore.updateSession(sessionId, {
                         questionPlan: updatedQuestionPlan
                     });
 
@@ -4409,7 +4439,7 @@ const importAnswers = async (req, res) => {
         }
 
         // Update session
-        const updatedSession = aiContextStore.updateSession(sessionId, {
+        const updatedSession = await aiContextStore.updateSession(sessionId, {
             answeredQuestions: sessionAnswered,
             answeredQuestionIds,
             refinementHistory: rebuiltHistory,
@@ -4661,7 +4691,7 @@ If no matches are found, respond with an empty array: []
 
                 const rebuiltHistory = rebuildHistoryFromAnswered(sessionAnswered);
 
-                aiContextStore.updateSession(sessionId, {
+                await aiContextStore.updateSession(sessionId, {
                     answeredQuestions: sessionAnswered,
                     answeredQuestionIds: updatedAnsweredIds,
                     refinementHistory: rebuiltHistory,
@@ -4708,6 +4738,26 @@ If no matches are found, respond with an empty array: []
     }
 };
 
+const deleteSessionRoute = (req, res) => {
+    const { sessionId } = req.params;
+    try {
+        const deleted = aiContextStore.deleteSession(sessionId);
+        if (deleted) {
+            return res.status(200).json({
+                status: 200,
+                message: 'Session successfully deleted'
+            });
+        }
+        return res.status(404).json({
+            status: 404,
+            message: 'Session not found'
+        });
+    } catch (err) {
+        logger.error(`Error deleting session ${sessionId}: ${err.message}`);
+        return serverError(err.message, res, logger);
+    }
+};
+
 export default {
     generate,
     getSessionState,
@@ -4723,6 +4773,7 @@ export default {
     exportQuestions,
     importAnswers,
     applyRequirements,
+    deleteSessionRoute,
     _areTitlesSimilar: areTitlesSimilar,
     _mergeDiagramCells: mergeDiagramCells,
     _mergeControlsAssessment: mergeControlsAssessment,

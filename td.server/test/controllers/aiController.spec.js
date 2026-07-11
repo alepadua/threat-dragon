@@ -923,4 +923,42 @@ describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
             expect(res.status).to.have.been.calledWith(400);
         });
     });
+
+    describe('deleteSessionRoute', () => {
+        let deleteSessionStub;
+
+        beforeEach(() => {
+            deleteSessionStub = sinon.stub(aiContextStore, 'deleteSession');
+        });
+
+        afterEach(() => {
+            deleteSessionStub.restore();
+        });
+
+        it('should return 200 if session is successfully deleted', () => {
+            deleteSessionStub.returns(true);
+            const req = { params: { sessionId: 'session-to-delete' } };
+            const res = {
+                status: sinon.stub().returnsThis(),
+                json: sinon.stub()
+            };
+
+            aiController.deleteSessionRoute(req, res);
+            expect(res.status).to.have.been.calledWith(200);
+            expect(res.json).to.have.been.calledWith(sinon.match.has('message', 'Session successfully deleted'));
+        });
+
+        it('should return 404 if session is not found', () => {
+            deleteSessionStub.returns(false);
+            const req = { params: { sessionId: 'nonexistent-session' } };
+            const res = {
+                status: sinon.stub().returnsThis(),
+                json: sinon.stub()
+            };
+
+            aiController.deleteSessionRoute(req, res);
+            expect(res.status).to.have.been.calledWith(404);
+            expect(res.json).to.have.been.calledWith(sinon.match.has('message', 'Session not found'));
+        });
+    });
 });

@@ -6,9 +6,21 @@ import express from 'express';
 import googleProviderThreatmodelController from '../controllers/googleProviderThreatmodelController.js';
 import healthcheck from '../controllers/healthz.js';
 import homeController from '../controllers/homecontroller.js';
+import rateLimit from 'express-rate-limit';
 import templateController from '../controllers/templateController.js';
 import threatmodelController from '../controllers/threatmodelcontroller.js';
 
+const aiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // Limit each IP to 100 requests per windowMs
+    message: {
+        status: 429,
+        message: 'Too many requests to the AI service. Please try again later.'
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    skip: () => process.env.NODE_ENV !== 'production'
+});
 
 /**
  * Routes that do **NOT** require authentication
@@ -22,9 +34,14 @@ const unauthRoutes = (router) => {
     router.get('/healthz', healthcheck.healthz);
     router.get('/api/config', configController.config);
     router.get('/api/threatmodel/organisation', threatmodelController.organisation);
+    
+    // Apply rate limit specifically to AI endpoints
+    router.use('/api/ai', aiLimiter);
+
     router.post('/api/ai/threatmodel', aiController.generate);
     router.get('/api/ai/session/:sessionId', aiController.getSessionState);
     router.put('/api/ai/session/:sessionId', aiController.updateSessionState);
+    router.delete('/api/ai/session/:sessionId', aiController.deleteSessionRoute);
     router.post('/api/ai/threatmodel/undo', aiController.undoRefinement);
     router.post('/api/ai/session/:sessionId/deduplicate-proposals', aiController.getDeduplicateProposals);
     router.post('/api/ai/session/:sessionId/apply-deduplication', aiController.applyDeduplication);
@@ -36,7 +53,6 @@ const unauthRoutes = (router) => {
     router.get('/api/ai/session/:sessionId/export-questions', aiController.exportQuestions);
     router.post('/api/ai/session/:sessionId/import-answers', aiController.importAnswers);
     router.post('/api/ai/session/:sessionId/apply-requirements', aiController.applyRequirements);
-    
 
     router.get('/api/login/:provider', auth.login);
     router.get('/api/logout', auth.logout);
