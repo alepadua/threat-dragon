@@ -385,7 +385,8 @@ const repairMissingCommas = (str) => {
 
 const cleanJson = (str) => {
     let clean = str.trim();
-    clean = clean.replace(/^```json/iu, '').replace(/```$/u, '').trim();
+    clean = clean.replace(/^```json/iu, '').replace(/```$/u, '').
+trim();
     clean = clean.replace(/\/\*[\s\S]*?\*\//gu, '');
     clean = clean.replace(/(?<prefix>^|[^:])\/\/.*$/gmu, '$<prefix>');
     
@@ -3768,6 +3769,30 @@ Return ONLY the raw JSON object, without any markdown code block formatting.
         const parsedDedupAudit = extractJson(responseDedupAudit);
         const parsedMitigationRevision = extractJson(responseMitigationRevision);
 
+        // Augment mitigationStatus with original threat description and mitigation
+        const allThreats = [];
+        if (currentModel && currentModel.detail && currentModel.detail.diagrams) {
+            currentModel.detail.diagrams.forEach((diagram) => {
+                if (diagram.cells) {
+                    diagram.cells.forEach((cell) => {
+                        const cellThreats = cell.data?.threats || [];
+                        allThreats.push(...cellThreats);
+                    });
+                }
+            });
+        }
+
+        if (parsedMitigationRevision.mitigationStatus && Array.isArray(parsedMitigationRevision.mitigationStatus)) {
+            parsedMitigationRevision.mitigationStatus.forEach((statusItem) => {
+                const originalThreat = allThreats.find((t) => t.id === statusItem.threatId);
+                if (originalThreat) {
+                    statusItem.originalDescription = originalThreat.description;
+                    statusItem.originalMitigation = originalThreat.mitigation;
+                }
+            });
+        }
+
+
         const parsedProposals = {
             controlDeduplications: parsedDedupAudit.controlDeduplications || [],
             threatDeduplications: parsedDedupAudit.threatDeduplications || [],
@@ -4185,11 +4210,9 @@ Respond ONLY with a valid JSON array of objects, each with "id" and "questionTex
                     });
 
                     // Update question texts in the session's question plan
-                    const updatedElementQuestions = questionPlan.elementQuestions.map((elem) => {
-                        return {
+                    const updatedElementQuestions = questionPlan.elementQuestions.map((elem) => ({
                             ...elem,
-                            categories: elem.categories.map((cat) => {
-                                return {
+                            categories: elem.categories.map((cat) => ({
                                     ...cat,
                                     questions: cat.questions.map((q) => {
                                         const matched = allQuestions.find((aq) => aq.id === q.id);
@@ -4198,10 +4221,8 @@ Respond ONLY with a valid JSON array of objects, each with "id" and "questionTex
                                             questionText: (matched && matched.questionText) ? matched.questionText : q.questionText
                                         };
                                     })
-                                };
-                            })
-                        };
-                    });
+                                }))
+                        }));
 
                     const updatedQuestionPlan = {
                         ...questionPlan,

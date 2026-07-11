@@ -1368,9 +1368,9 @@
                                     </b-col>
                                 </b-row>
 
-                                <!-- Filters -->
-                                <div class="mb-3 d-flex justify-content-between align-items-center">
-                                    <b-button-group size="sm">
+                                <!-- Filters and Actions -->
+                                <div class="mb-3 d-flex justify-content-between align-items-center flex-wrap">
+                                    <b-button-group size="sm" class="mb-2 mb-md-0">
                                         <b-button
                                             :variant="mitigationFilter === 'All' ? 'secondary' : 'outline-secondary'"
                                             @click="mitigationFilter = 'All'"
@@ -1396,61 +1396,93 @@
                                             Não Mitigada ({{ activeMitigationStatus.filter(t => t.status === 'Não Mitigada').length }})
                                         </b-button>
                                     </b-button-group>
+                                    
+                                    <b-button size="sm" variant="primary" @click="downloadMitigationCsv" class="font-weight-bold">
+                                        <font-awesome-icon icon="download" class="mr-1" /> Baixar Relatório (CSV)
+                                    </b-button>
                                 </div>
 
-                                <!-- Table or List -->
-                                <div class="table-responsive bg-white border rounded shadow-sm">
-                                    <table class="table table-hover table-striped mb-0 font-size-sm">
-                                        <thead class="thead-dark">
-                                            <tr>
-                                                <th style="width: 20%">Ameaça / Componente</th>
-                                                <th style="width: 10%" class="text-center">Status</th>
-                                                <th style="width: 25%">Motivo</th>
-                                                <th style="width: 20%">Recomendações</th>
-                                                <th style="width: 25%">Respostas de Referência</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr
-                                                v-for="threat in activeMitigationStatus.filter(t => mitigationFilter === 'All' || t.status === mitigationFilter)"
-                                                :key="threat.threatId"
-                                            >
-                                                <td>
-                                                    <div class="font-weight-bold text-dark">{{ threat.threatTitle }}</div>
-                                                    <small class="text-muted">Componente: {{ threat.elementName }}</small>
-                                                </td>
-                                                <td class="text-center align-middle">
+                                <!-- Accordion List -->
+                                <div class="accordion" role="tablist">
+                                    <b-card
+                                        v-for="(threat, index) in activeMitigationStatus.filter(t => mitigationFilter === 'All' || t.status === mitigationFilter)"
+                                        :key="threat.threatId"
+                                        no-body
+                                        class="mb-2 shadow-sm border-0"
+                                    >
+                                        <b-card-header header-tag="header" class="p-1" role="tab">
+                                            <b-button block v-b-toggle="'accordion-' + threat.threatId" variant="light" class="text-left font-weight-bold d-flex justify-content-between align-items-center py-3 px-3">
+                                                <div>
+                                                    <span class="text-dark" style="font-size: 1.05rem;">{{ threat.threatTitle }}</span>
+                                                    <div class="mt-1">
+                                                        <small class="text-muted mr-3"><font-awesome-icon icon="microchip" class="mr-1"/>{{ threat.elementName }}</small>
+                                                    </div>
+                                                </div>
+                                                <div class="d-flex align-items-center">
                                                     <b-badge
                                                         :variant="threat.status === 'Mitigada' ? 'success' : threat.status === 'Parcialmente Mitigada' ? 'warning' : 'danger'"
-                                                        class="px-3 py-1 font-size-xs"
+                                                        class="px-3 py-2 font-size-sm"
                                                     >
                                                         {{ threat.status }}
                                                     </b-badge>
-                                                </td>
-                                                <td>{{ threat.reason }}</td>
-                                                <td>
-                                                    <span v-if="threat.recommendations && threat.recommendations.trim() !== ''">
-                                                        {{ threat.recommendations }}
-                                                    </span>
-                                                    <span v-else class="text-muted italic font-size-xs">Nenhuma recomendação adicional</span>
-                                                </td>
-                                                <td>
-                                                    <div v-if="threat.supportingAnswers && threat.supportingAnswers.length > 0">
-                                                        <div v-for="(answer, aIdx) in threat.supportingAnswers" :key="aIdx" class="mb-1 font-size-xs">
-                                                            <span class="badge badge-light border text-muted mr-1">Ref {{ aIdx + 1 }}</span>
-                                                            <em class="text-dark" style="font-style: italic; line-height: 1.3;">"{{ answer }}"</em>
+                                                    <font-awesome-icon icon="chevron-down" class="ml-3 text-muted" />
+                                                </div>
+                                            </b-button>
+                                        </b-card-header>
+                                        <b-collapse :id="'accordion-' + threat.threatId" accordion="mitigation-accordion" role="tabpanel">
+                                            <b-card-body>
+                                                <b-row>
+                                                    <!-- Left Column: Original Threat Info -->
+                                                    <b-col md="6" class="border-right pr-4">
+                                                        <h6 class="font-weight-bold text-dark mb-3">
+                                                            <font-awesome-icon icon="bug" class="mr-2 text-danger" />
+                                                            Contexto Original da Ameaça
+                                                        </h6>
+                                                        <div class="mb-3">
+                                                            <div class="font-weight-bold font-size-sm text-secondary mb-1">Descrição do Cenário:</div>
+                                                            <p class="font-size-sm text-dark bg-light p-2 rounded border">{{ threat.originalDescription || 'N/A' }}</p>
                                                         </div>
-                                                    </div>
-                                                    <span v-else class="text-muted italic font-size-xs">Sem referências diretas</span>
-                                                </td>
-                                            </tr>
-                                            <tr v-if="activeMitigationStatus.filter(t => mitigationFilter === 'All' || t.status === mitigationFilter).length === 0">
-                                                <td colspan="5" class="text-center text-muted py-4">
-                                                    Nenhuma ameaça correspondente ao filtro selecionado.
-                                                </td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
+                                                        <div>
+                                                            <div class="font-weight-bold font-size-sm text-secondary mb-1">Mitigação Planejada:</div>
+                                                            <p class="font-size-sm text-dark bg-light p-2 rounded border">{{ threat.originalMitigation || threat.recommendations || 'N/A' }}</p>
+                                                        </div>
+                                                    </b-col>
+                                                    <!-- Right Column: AI Audit & User Answers -->
+                                                    <b-col md="6" class="pl-4">
+                                                        <h6 class="font-weight-bold text-dark mb-3">
+                                                            <font-awesome-icon icon="robot" class="mr-2 text-primary" />
+                                                            Auditoria e Justificativa (IA)
+                                                        </h6>
+                                                        <div class="mb-3">
+                                                            <div class="font-weight-bold font-size-sm text-secondary mb-1">Motivo do Status:</div>
+                                                            <p class="font-size-sm text-dark">{{ threat.reason }}</p>
+                                                        </div>
+                                                        <div v-if="threat.recommendations && threat.recommendations !== threat.originalMitigation && threat.status !== 'Mitigada'" class="mb-3">
+                                                            <div class="font-weight-bold font-size-sm text-warning-dark mb-1">Recomendações Adicionais:</div>
+                                                            <p class="font-size-sm text-dark">{{ threat.recommendations }}</p>
+                                                        </div>
+                                                        <div>
+                                                            <div class="font-weight-bold font-size-sm text-secondary mb-2">Evidências nas Respostas:</div>
+                                                            <div v-if="threat.supportingAnswers && threat.supportingAnswers.length > 0">
+                                                                <div v-for="(answer, aIdx) in threat.supportingAnswers" :key="aIdx" class="mb-2 p-2 bg-white border rounded shadow-sm">
+                                                                    <div class="d-flex align-items-start">
+                                                                        <font-awesome-icon icon="comment-dots" class="text-info mt-1 mr-2" />
+                                                                        <em class="text-muted font-size-sm" style="line-height: 1.4;">"{{ answer }}"</em>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            <p v-else class="text-muted italic font-size-sm">Nenhuma referência direta nas respostas do usuário.</p>
+                                                        </div>
+                                                    </b-col>
+                                                </b-row>
+                                            </b-card-body>
+                                        </b-collapse>
+                                    </b-card>
+                                    
+                                    <div v-if="activeMitigationStatus.filter(t => mitigationFilter === 'All' || t.status === mitigationFilter).length === 0" class="text-center py-5 bg-white border rounded shadow-sm">
+                                        <font-awesome-icon icon="check-circle" size="3x" class="text-muted mb-3" />
+                                        <p class="text-muted font-weight-bold">Nenhuma ameaça correspondente ao filtro selecionado.</p>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -3251,6 +3283,41 @@ export default {
             document.body.appendChild(downloadAnchor);
             downloadAnchor.click();
             downloadAnchor.remove();
+        },
+        downloadMitigationCsv() {
+            if (!this.activeMitigationStatus || this.activeMitigationStatus.length === 0) return;
+            
+            const headers = ['Ameaça', 'Componente', 'Status', 'Descrição Original', 'Mitigação Planejada', 'Justificativa IA', 'Recomendações IA', 'Evidências (Respostas)'];
+            const csvRows = [headers.join(';')];
+            
+            // Apply current filter if needed, or export all. We will export based on the current filter to give the user control.
+            const threatsToExport = this.activeMitigationStatus.filter(t => this.mitigationFilter === 'All' || t.status === this.mitigationFilter);
+            
+            threatsToExport.forEach(t => {
+                const evidence = t.supportingAnswers ? t.supportingAnswers.join(' | ') : '';
+                const row = [
+                    `"${(t.threatTitle || '').replace(/"/g, '""')}"`,
+                    `"${(t.elementName || '').replace(/"/g, '""')}"`,
+                    `"${(t.status || '').replace(/"/g, '""')}"`,
+                    `"${(t.originalDescription || '').replace(/"/g, '""')}"`,
+                    `"${(t.originalMitigation || '').replace(/"/g, '""')}"`,
+                    `"${(t.reason || '').replace(/"/g, '""')}"`,
+                    `"${(t.recommendations || '').replace(/"/g, '""')}"`,
+                    `"${(evidence).replace(/"/g, '""')}"`
+                ];
+                csvRows.push(row.join(';'));
+            });
+            
+            const csvContent = '\uFEFF' + csvRows.join('\n'); // BOM for excel
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${(this.form.title || 'threat-model').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-revisao-ameacas.csv`;
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
         },
         async downloadPdfReport() {
             if (!this.generatedModel || !this.evaluation) return;
