@@ -18,6 +18,7 @@ describe('helpers/questionPlanningEngine.js', () => {
             // STRIDE process elements map to 6 categories: Spoofing, Tampering, Repudiation, Info Disclosure, Denial of Service, Elevation of Privilege.
             // With 1 consolidated question per category, we expect exactly 6 element questions.
             expect(plan.breakdown.elementQuestions).to.equal(6);
+            expect(plan.plannedQuestions).to.be.an('array').with.lengthOf(6);
 
             const elementQ = plan.elementQuestions[0];
             expect(elementQ.elementId).to.equal('cell-1');
@@ -83,6 +84,7 @@ describe('helpers/questionPlanningEngine.js', () => {
             // 5. Grouped flow process_to_store -> 3 categories -> 3 questions
             // Total element questions: 2 + 6 + 3 + 3 + 3 = 17 questions.
             expect(plan.breakdown.elementQuestions).to.equal(17);
+            expect(plan.plannedQuestions).to.be.an('array').with.lengthOf(17);
 
             // We expect exactly 5 element question entries in the plan
             expect(plan.elementQuestions).to.have.lengthOf(5);

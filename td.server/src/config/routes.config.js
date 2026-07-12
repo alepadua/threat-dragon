@@ -1,7 +1,9 @@
+import aiContextStore from '../helpers/aiContextStore.js';
 import aiController from '../controllers/aiController.js';
 import auth from '../controllers/auth.js';
 import bearer from './bearer.config.js';
 import configController from "../controllers/configcontroller";
+import crypto from 'crypto';
 import express from 'express';
 import googleProviderThreatmodelController from '../controllers/googleProviderThreatmodelController.js';
 import healthcheck from '../controllers/healthz.js';
@@ -22,6 +24,35 @@ const aiLimiter = rateLimit({
     skip: () => process.env.NODE_ENV !== 'production'
 });
 
+const sessionPasswordMiddleware = (req, res, next) => {
+    let sessionId = req.params.sessionId;
+    if (!sessionId && req.body) {
+        sessionId = req.body.sessionId;
+    }
+    if (!sessionId) {
+        return next();
+    }
+    const session = aiContextStore.getSession(sessionId);
+    if (!session) {
+        return res.status(404).json({
+            status: 404,
+            message: 'Session not found'
+        });
+    }
+    if (session.passwordHash) {
+        const clientPassword = req.headers['x-session-password'] || req.query.password || '';
+        const hashed = crypto.createHash('sha256').update(clientPassword + sessionId).
+digest('hex');
+        if (hashed !== session.passwordHash) {
+            return res.status(401).json({
+                status: 401,
+                message: 'Password required or incorrect'
+            });
+        }
+    }
+    next();
+};
+
 /**
  * Routes that do **NOT** require authentication
  * Use with caution!!!!
@@ -34,10 +65,12 @@ const unauthRoutes = (router) => {
     router.get('/healthz', healthcheck.healthz);
     router.get('/api/config', configController.config);
     router.get('/api/threatmodel/organisation', threatmodelController.organisation);
-    
+
     // Apply rate limit specifically to AI endpoints
     router.use('/api/ai', aiLimiter);
+    router.use('/api/ai', sessionPasswordMiddleware);
 
+    router.get('/api/ai/sessions', aiController.listActiveSessions);
     router.post('/api/ai/threatmodel', aiController.generate);
     router.get('/api/ai/session/:sessionId', aiController.getSessionState);
     router.put('/api/ai/session/:sessionId', aiController.updateSessionState);

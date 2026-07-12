@@ -3,6 +3,8 @@ import sinon from 'sinon';
 import axios from 'axios';
 import aiController from '../../src/controllers/aiController.js';
 import aiContextStore from '../../src/helpers/aiContextStore.js';
+import env from '../../src/env/Env.js';
+
 
 describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
     describe('_areTitlesSimilar', () => {
@@ -886,6 +888,83 @@ describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
             await aiController.importAnswers(req, res);
             expect(res.status).to.have.been.calledWith(400);
         });
+
+        it('should successfully import answers matching by ID and matching by fallback details', async () => {
+            const mockSession = {
+                aiProvider: 'gemini',
+                apiKey: 'test-key',
+                questionPlan: {
+                    methodologyKey: 'STRIDE',
+                    totalQuestions: 1,
+                    breakdown: {
+                        globalQuestions: 0,
+                        boundaryQuestions: 0,
+                        elementQuestions: 1
+                    },
+                    elementQuestions: [
+                        {
+                            elementId: 'elem-1',
+                            elementName: 'MyComponent',
+                            categories: [
+                                {
+                                    category: 'Spoofing',
+                                    questions: [
+                                        {
+                                            id: 'q-stable-123',
+                                            questionText: 'Como você autentica o componente?'
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                },
+                answeredQuestions: []
+            };
+
+            getSessionStub.returns(mockSession);
+            updateSessionStub.resolves({
+                ...mockSession,
+                answeredQuestions: [
+                    {
+                        id: 'q-stable-123',
+                        text: 'Como você autentica o componente?',
+                        answer: 'Com MFA',
+                        elementId: 'elem-1',
+                        elementName: 'MyComponent',
+                        category: 'Spoofing'
+                    }
+                ]
+            });
+
+            const axiosStub = sinon.stub(axios, 'post').resolves({ data: {} });
+
+            const req = {
+                params: { sessionId: 'session-1' },
+                body: {
+                    answers: [
+                        { id: 'q-stable-123', answer: 'Com MFA' },
+                        { id: 'wrong-id-999', elementName: 'MyComponent', category: 'Spoofing', questionText: 'Como você autentica o componente?', answer: 'Com MFA e TLS' }
+                    ]
+                }
+            };
+
+            const res = {
+                status: sinon.stub().returnsThis(),
+                json: sinon.stub()
+            };
+
+            await aiController.importAnswers(req, res);
+
+            axiosStub.restore();
+
+            expect(res.status).to.have.been.calledWith(202);
+            expect(res.json).to.have.been.calledWith(sinon.match.has('data'));
+            
+            const responseData = res.json.firstCall.args[0].data;
+            expect(responseData.importedCount).to.equal(2);
+            expect(responseData.skippedCount).to.equal(0);
+        });
     });
 
     describe('applyRequirements', () => {
@@ -961,4 +1040,102 @@ describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
             expect(res.json).to.have.been.calledWith(sinon.match.has('message', 'Session not found'));
         });
     });
+
+    describe('getSessionState', () => {
+        let getSessionStub;
+
+        beforeEach(() => {
+            getSessionStub = sinon.stub(aiContextStore, 'getSession');
+        });
+
+        afterEach(() => {
+            getSessionStub.restore();
+        });
+
+        it('should return 200 and return the full session properties including deduplicateProposals', () => {
+            const mockSession = {
+                sessionId: 'session-id-123',
+                title: 'Mock Title',
+                description: 'Mock Desc',
+                currentModel: {},
+                questions: [],
+                evaluation: { completenessScore: 80 },
+                deduplicateProposals: { threatDeduplications: [{ id: 't-1' }] },
+                hallucinationAlerts: [],
+                mitigationStatus: [{ threatId: 't-1', status: 'Mitigada' }],
+                answersRevision: []
+            };
+            getSessionStub.returns(mockSession);
+
+            const req = { params: { sessionId: 'session-id-123' } };
+            const res = {
+                status: sinon.stub().returnsThis(),
+                json: sinon.stub()
+            };
+
+            aiController.getSessionState(req, res);
+            expect(res.status).to.have.been.calledWith(200);
+            
+            const responseData = res.json.firstCall.args[0].data;
+            expect(responseData.sessionId).to.equal('session-id-123');
+            expect(responseData.deduplicateProposals).to.deep.equal(mockSession.deduplicateProposals);
+            expect(responseData.mitigationStatus).to.deep.equal(mockSession.mitigationStatus);
+        });
+
+        it('should return 404 if session is not found', () => {
+            getSessionStub.returns(null);
+            const req = { params: { sessionId: 'session-id-123' } };
+            const res = {
+                status: sinon.stub().returnsThis(),
+                json: sinon.stub()
+            };
+
+            aiController.getSessionState(req, res);
+            expect(res.status).to.have.been.calledWith(404);
+        });
+    });
+
+    describe('_resolveModel', () => {
+        let configStub;
+
+        beforeEach(() => {
+            configStub = sinon.stub(env.get(), 'config').value({
+                BEDROCK_MANTLE_MODEL: 'test-bedrock-model',
+                GEMINI_MODEL: 'test-gemini-model'
+            });
+        });
+
+        afterEach(() => {
+            configStub.restore();
+        });
+
+        it('should resolve to customModel if provided', () => {
+            const model = aiController._resolveModel('gemini', 'my-custom-model', null);
+            expect(model).to.equal('my-custom-model');
+        });
+
+        it('should resolve to session.customModel if customModel is not provided', () => {
+            const model = aiController._resolveModel('gemini', null, { customModel: 'session-model' });
+            expect(model).to.equal('session-model');
+        });
+
+        it('should resolve to provider-specific default from env if no customModel is specified', () => {
+            const geminiModel = aiController._resolveModel('gemini', null, null);
+            expect(geminiModel).to.equal('test-gemini-model');
+
+            const bedrockModel = aiController._resolveModel('bedrock-mantle', null, null);
+            expect(bedrockModel).to.equal('test-bedrock-model');
+        });
+
+        it('should fallback to hardcoded defaults if env defaults are missing', () => {
+            configStub.value({}); // Empty config
+
+            const geminiModel = aiController._resolveModel('gemini', null, null);
+            expect(geminiModel).to.equal('gemini-3.1-flash-lite');
+
+            const bedrockModel = aiController._resolveModel('bedrock-mantle', null, null);
+            expect(bedrockModel).to.equal('meta.llama3-70b-instruct-v1:0');
+        });
+    });
 });
+

@@ -1,12 +1,12 @@
 <template>
     <b-row class="justify-content-center">
         <b-col md="11" lg="10">
-            <!-- Input Form Card -->
-            <b-card
-                v-if="step === 'input'"
-                class="ai-modeler-card shadow-lg border-0 mb-4"
-                header-class="bg-dark text-white border-0 py-3"
-            >
+            <div v-if="step === 'input'">
+                <!-- Input Form Card -->
+                <b-card
+                    class="ai-modeler-card shadow-lg border-0 mb-4"
+                    header-class="bg-dark text-white border-0 py-3"
+                >
                 <template #header>
                     <div class="d-flex align-items-center">
                         <font-awesome-icon icon="robot" class="mr-3 text-warning" size="lg" />
@@ -360,6 +360,21 @@
                         </div>
                     </b-form-group>
 
+                    <!-- Session Password -->
+                    <b-form-group
+                        label="Senha da Sessão (Opcional)"
+                        label-class="font-weight-bold"
+                        description="Defina uma senha para proteger esta sessão e permitir que ela seja acessada em outros dispositivos/sessões com segurança."
+                    >
+                        <b-form-input
+                            id="session-password"
+                            v-model="form.password"
+                            type="password"
+                            placeholder="Defina uma senha para proteger esta sessão"
+                            class="custom-input"
+                        ></b-form-input>
+                    </b-form-group>
+
                     <!-- Generate Button -->
                     <div class="text-right mt-4">
                         <b-button
@@ -411,7 +426,7 @@
                                 <b-button size="sm" variant="success" class="mr-2 font-weight-bold" @click="resumeSession(session.sessionId)">
                                     Resume
                                 </b-button>
-                                <b-button size="sm" variant="outline-danger" class="font-weight-bold" @click="deleteSessionFromHistory(session.sessionId)">
+                                <b-button size="sm" variant="outline-danger" class="font-weight-bold" @click="deleteSessionFromServer(session)">
                                     <font-awesome-icon icon="trash" />
                                 </b-button>
                             </b-td>
@@ -419,6 +434,72 @@
                     </b-tbody>
                 </b-table-simple>
             </b-card>
+
+            <!-- Server Sessions History -->
+            <b-card
+                class="ai-modeler-card shadow-sm border-0 mb-4"
+                header-class="bg-dark text-white border-0 py-2"
+            >
+                <template #header>
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center">
+                            <font-awesome-icon icon="server" class="mr-2 text-warning" />
+                            <h5 class="mb-0 font-weight-bold">Active Sessions on Server</h5>
+                        </div>
+                        <b-button size="sm" variant="outline-light" class="py-1 font-weight-bold" @click="fetchServerSessions">
+                            <font-awesome-icon icon="sync" class="mr-1" /> Refresh
+                        </b-button>
+                    </div>
+                </template>
+                
+                <b-table-simple hover small responsive class="mb-0" v-if="serverSessions.length > 0">
+                    <b-thead>
+                        <b-tr>
+                            <b-th>Title</b-th>
+                            <b-th>Methodology</b-th>
+                            <b-th>Last Saved</b-th>
+                            <b-th>Security</b-th>
+                            <b-th class="text-right">Actions</b-th>
+                        </b-tr>
+                    </b-thead>
+                    <b-tbody>
+                        <b-tr v-for="session in serverSessions" :key="session.sessionId">
+                            <b-td class="align-middle font-weight-bold text-dark">{{ session.title }}</b-td>
+                            <b-td class="align-middle">
+                                <b-badge :variant="session.methodology === 'STRIDE' ? 'primary' : 'warning'">
+                                    {{ session.methodology }}
+                                </b-badge>
+                            </b-td>
+                            <b-td class="align-middle text-muted font-size-sm">
+                                {{ new Date(session.updatedAt || session.createdAt).toLocaleString() }}
+                            </b-td>
+                            <b-td class="align-middle">
+                                <span v-if="session.hasPassword" class="text-danger small font-weight-bold">
+                                    <font-awesome-icon icon="lock" class="mr-1" /> Protected
+                                </span>
+                                <span v-else class="text-success small font-weight-bold">
+                                    <font-awesome-icon icon="lock-open" class="mr-1" /> Public
+                                </span>
+                            </b-td>
+                            <b-td class="text-right align-middle">
+                                <b-button size="sm" variant="success" class="mr-2 font-weight-bold" @click="onPromptOrResume(session)">
+                                    Resume
+                                </b-button>
+                                <b-button size="sm" variant="outline-danger" class="font-weight-bold" @click="deleteSessionFromServer(session)">
+                                    <font-awesome-icon icon="trash" />
+                                </b-button>
+                            </b-td>
+                        </b-tr>
+                    </b-tbody>
+                </b-table-simple>
+                <div v-else class="text-center py-4 text-muted">
+                    <p class="mb-0 font-italic">No active sessions found on server.</p>
+                </div>
+            </b-card>
+            </div>
+
+
+
 
             <!-- Loading / Progress View -->
             <b-card v-else-if="step === 'generating'" class="shadow-lg border-0 mb-4 py-4 text-center">
@@ -1165,13 +1246,18 @@
                                             class="bg-white border rounded p-3 mb-3 shadow-sm"
                                         >
                                             <div class="d-flex justify-content-between align-items-start border-bottom pb-2 mb-2">
-                                                <b-form-checkbox
-                                                    v-model="selectedControlDups"
-                                                    :value="proposal.id"
-                                                    class="font-weight-bold text-info"
-                                                >
-                                                    Unificar Controles em: <b-badge variant="info">{{ proposal.controlCategory }}</b-badge>
-                                                </b-form-checkbox>
+                                                <div class="form-check">
+                                                    <input
+                                                        type="checkbox"
+                                                        v-model="selectedControlDups"
+                                                        :value="proposal.id"
+                                                        class="form-check-input"
+                                                        :id="'ctrl-dup-' + proposal.id"
+                                                    >
+                                                    <label class="form-check-label font-weight-bold text-info cursor-pointer ml-4" :for="'ctrl-dup-' + proposal.id">
+                                                        Unificar Controles em: <b-badge variant="info">{{ proposal.controlCategory }}</b-badge>
+                                                    </label>
+                                                </div>
                                             </div>
 
                                             <div class="font-size-xs text-muted mb-2">
@@ -1226,13 +1312,18 @@
                                             class="bg-white border rounded p-3 mb-3 shadow-sm"
                                         >
                                             <div class="d-flex justify-content-between align-items-start border-bottom pb-2 mb-2">
-                                                <b-form-checkbox
-                                                    v-model="selectedThreatDups"
-                                                    :value="proposal.id"
-                                                    class="font-weight-bold text-danger"
-                                                >
-                                                    Unificar Ameaças em: <b-badge variant="danger">{{ proposal.cellName }}</b-badge>
-                                                </b-form-checkbox>
+                                                <div class="form-check">
+                                                    <input
+                                                        type="checkbox"
+                                                        v-model="selectedThreatDups"
+                                                        :value="proposal.id"
+                                                        class="form-check-input"
+                                                        :id="'threat-dup-' + proposal.id"
+                                                    >
+                                                    <label class="form-check-label font-weight-bold text-danger cursor-pointer ml-4" :for="'threat-dup-' + proposal.id">
+                                                        Unificar Ameaças em: <b-badge variant="danger">{{ proposal.cellName }}</b-badge>
+                                                    </label>
+                                                </div>
                                             </div>
 
                                             <div class="font-size-xs text-muted mb-2">
@@ -1892,6 +1983,47 @@
                     </table>
                 </div>
             </div>
+            <!-- Password Prompt Modal -->
+            <b-modal
+                id="password-prompt-modal"
+                title="Password Required"
+                header-bg-variant="dark"
+                header-text-variant="light"
+                ok-title="Confirmar"
+                cancel-title="Cancelar"
+                @ok="handlePasswordPromptOk"
+            >
+                <b-form-group label="Esta sessão está protegida por senha. Insira a senha:" label-for="prompt-password">
+                    <b-form-input
+                        id="prompt-password"
+                        v-model="promptPassword"
+                        type="password"
+                        placeholder="Digite a senha da sessão"
+                        @keyup.enter="submitPasswordPrompt"
+                    ></b-form-input>
+                </b-form-group>
+            </b-modal>
+
+            <!-- Delete Password Prompt Modal -->
+            <b-modal
+                id="delete-password-prompt-modal"
+                title="Senha Requerida para Exclusão"
+                header-bg-variant="danger"
+                header-text-variant="light"
+                ok-title="Confirmar"
+                cancel-title="Cancelar"
+                @ok="handleDeletePasswordPromptOk"
+            >
+                <b-form-group label="Esta sessão está protegida por senha. Digite a senha para confirmar a exclusão:" label-for="delete-prompt-password">
+                    <b-form-input
+                        id="delete-prompt-password"
+                        v-model="deletePasswordPrompt"
+                        type="password"
+                        placeholder="Digite a senha da sessão"
+                        @keyup.enter="submitDeletePasswordPrompt"
+                    ></b-form-input>
+                </b-form-group>
+            </b-modal>
         </b-col>
     </b-row>
 </template>
@@ -1916,11 +2048,18 @@ export default {
         return {
             savedSessionId: localStorage.getItem('active_ai_session_id') || null,
             recentSessions: [],
+            serverSessions: [],
+            promptPassword: '',
+            pendingResumeSessionId: null,
+            sessionPassword: '',
+            pendingDeleteSession: null,
+            deletePasswordPrompt: '',
             step: 'input', // 'input', 'generating', 'interactive', 'error'
             form: {
                 title: '',
                 description: '',
                 apiKey: '',
+                password: '',
                 methodology: 'STRIDE',
                 aiProvider: 'gemini',
                 customBaseUrl: '',
@@ -2139,6 +2278,7 @@ export default {
         if (this.savedSessionId && this.$route.query.resume === 'true') {
             this.resumeSession(this.savedSessionId);
         }
+        this.fetchServerSessions();
     },
     methods: {
         triggerFileInput(id) {
@@ -2294,7 +2434,7 @@ export default {
             this.accelerationResult = null;
             
             try {
-                const response = await axios.get(`/api/ai/session/${this.sessionId}/export-questions`);
+                const response = await axios.get(`/api/ai/session/${this.sessionId}/export-questions`, { headers: this.getAuthHeaders() });
                 
                 const processExportData = (data) => {
                     // Convert to CSV
@@ -2346,7 +2486,7 @@ export default {
                                 this.accelerationStatus = `Gerando perguntas via IA... ${job.progress || 0}%`;
                                 
                                 if (job.status === 'completed') {
-                                    axios.get(`/api/ai/session/${this.sessionId}/export-questions`).then(finalRes => {
+                                    axios.get(`/api/ai/session/${this.sessionId}/export-questions`, { headers: this.getAuthHeaders() }).then(finalRes => {
                                         processExportData(finalRes.data.data);
                                     }).catch(fetchErr => {
                                         this.accelerationLoading = false;
@@ -2457,7 +2597,7 @@ export default {
                 this.accelerationStatus = `Importando ${answers.length} respostas...`;
                 
                 // Send to backend
-                const response = await axios.post(`/api/ai/session/${this.sessionId}/import-answers`, { answers });
+                const response = await axios.post(`/api/ai/session/${this.sessionId}/import-answers`, { answers }, { headers: this.getAuthHeaders() });
                 const result = response.data.data;
                 
                 // Poll job for re-generation
@@ -2477,7 +2617,19 @@ export default {
                         this.progressIndex = 5;
                         this.updateLocalState(genResult);
                         this.refinementRound++;
-                        this.step = 'interactive';
+                        
+                        const prog = genResult.questionPlan && genResult.questionPlan.progress;
+                        if (prog && prog.answered >= prog.total && prog.total > 0) {
+                            this.$bvToast.toast('Todas as perguntas foram respondidas! Iniciando processo de Deduplicação e Auditoria automaticamente...', {
+                                variant: 'success',
+                                title: 'Framework Concluído',
+                                autoHideDelay: 5000
+                            });
+                            this.approveThreatModel();
+                        } else {
+                            this.step = 'interactive';
+                        }
+                        
                         this.accelerationResult = {
                             type: 'success',
                             title: `${result.importedCount} respostas importadas!`,
@@ -2552,7 +2704,7 @@ export default {
             try {
                 const response = await axios.post(`/api/ai/session/${this.sessionId}/apply-requirements`, {
                     requirements: this.parsedRequirements
-                });
+                }, { headers: this.getAuthHeaders() });
                 
                 const result = response.data.data;
                 
@@ -2706,13 +2858,15 @@ export default {
                     revisionModel: this.form.revisionModel,
                     revisionExtendedThinking: this.form.revisionExtendedThinking,
                     deduplicatorModel: this.form.deduplicatorModel,
-                    deduplicatorExtendedThinking: this.form.deduplicatorExtendedThinking
+                    deduplicatorExtendedThinking: this.form.deduplicatorExtendedThinking,
+                    password: this.form.password
                 };
 
                 const response = await axios.post('/api/ai/threatmodel', payload);
                 const jobData = response.data.data;
                 this.jobId = jobData.jobId;
                 this.sessionId = jobData.sessionId;
+                this.sessionPassword = this.form.password;
 
                 this.pollJobStatus(jobData.jobId, (result) => {
                     this.progressIndex = 5;
@@ -2790,7 +2944,7 @@ export default {
                     deduplicatorExtendedThinking: this.form.deduplicatorExtendedThinking
                 };
 
-                const response = await axios.post('/api/ai/threatmodel', payload);
+                const response = await axios.post('/api/ai/threatmodel', payload, { headers: this.getAuthHeaders() });
 
                 if (response.status === 200) {
                     const result = response.data.data;
@@ -2849,7 +3003,7 @@ export default {
             try {
                 const response = await axios.post(`/api/ai/session/${this.sessionId}/edit-answers`, {
                     answeredQuestions: this.answeredQuestions
-                });
+                }, { headers: this.getAuthHeaders() });
 
                 const jobData = response.data.data;
                 this.jobId = jobData.jobId;
@@ -2923,6 +3077,12 @@ export default {
                 this.previousScore = null;
             }
             this.evaluation = result.evaluation || null;
+
+            if (result.deduplicateProposals !== undefined) {
+                this.deduplicateProposals = result.deduplicateProposals;
+                this.selectedControlDups = result.deduplicateProposals ? (result.deduplicateProposals.controlDeduplications || []).map(p => p.id) : [];
+                this.selectedThreatDups = result.deduplicateProposals ? (result.deduplicateProposals.threatDeduplications || []).map(p => p.id) : [];
+            }
 
             // Question plan progress tracking
             if (result.questionPlan) {
@@ -3028,7 +3188,7 @@ export default {
             try {
                 const response = await axios.post('/api/ai/threatmodel/undo', {
                     sessionId: this.sessionId
-                });
+                }, { headers: this.getAuthHeaders() });
                 const result = response.data.data;
                 this.updateLocalState(result);
                 this.refinementHistory = result.refinementHistory || [];
@@ -3060,19 +3220,97 @@ export default {
                 if (this.savedSessionId === sessionId) {
                     localStorage.removeItem('active_ai_session_id');
                     this.savedSessionId = null;
+                    this.sessionId = null;
                 }
             } catch (e) {
                 console.error(e);
             }
         },
-        async resumeSession(sessionId) {
+        async deleteSessionFromServer(session) {
+            const sessionId = typeof session === 'string' ? session : session.sessionId;
+            
+            // If it's the current session, we use the active password
+            let password = '';
+            if (this.sessionId === sessionId && this.sessionPassword) {
+                password = this.sessionPassword;
+            }
+
+            const performDelete = async (passVal = '') => {
+                try {
+                    const headers = passVal ? { 'x-session-password': passVal } : {};
+                    await axios.delete(`/api/ai/session/${sessionId}`, { headers });
+                    this.$toast.success('Sessão deletada com sucesso do servidor.');
+                    
+                    // Remove from serverSessions list
+                    this.serverSessions = this.serverSessions.filter(s => s.sessionId !== sessionId);
+                    
+                    // Remove from local history
+                    this.deleteSessionFromHistory(sessionId);
+                    
+                    // Fetch updated list of sessions on server
+                    await this.fetchServerSessions();
+                } catch (err) {
+                    console.error('Failed to delete session:', err);
+                    if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+                        // Prompt for password
+                        this.pendingDeleteSession = session;
+                        this.deletePasswordPrompt = '';
+                        this.$bvModal.show('delete-password-prompt-modal');
+                        this.$toast.error('Senha incorreta ou necessária para exclusão.');
+                    } else if (err.response && err.response.status === 404) {
+                        this.$toast.warning('Sessão não encontrada no servidor, limpando do histórico local.');
+                        this.deleteSessionFromHistory(sessionId);
+                    } else {
+                        this.$toast.error('Erro ao deletar sessão do servidor.');
+                    }
+                }
+            };
+
+            const confirm = await this.$bvModal.msgBoxConfirm('Tem certeza que deseja deletar esta sessão e todos os seus arquivos do servidor?', {
+                title: 'Confirmar Exclusão',
+                okVariant: 'danger',
+                okTitle: 'Deletar',
+                cancelTitle: 'Cancelar'
+            });
+
+            if (confirm) {
+                await performDelete(password);
+            }
+        },
+        handleDeletePasswordPromptOk(evt) {
+            evt.preventDefault();
+            this.submitDeletePasswordPrompt();
+        },
+        submitDeletePasswordPrompt() {
+            if (!this.deletePasswordPrompt) {
+                this.$toast.warning('A senha é obrigatória.');
+                return;
+            }
+            this.$bvModal.hide('delete-password-prompt-modal');
+            const session = this.pendingDeleteSession;
+            const sessionId = typeof session === 'string' ? session : session.sessionId;
+            
+            axios.delete(`/api/ai/session/${sessionId}`, {
+                headers: { 'x-session-password': this.deletePasswordPrompt }
+            }).then(() => {
+                this.$toast.success('Sessão deletada com sucesso do servidor.');
+                this.serverSessions = this.serverSessions.filter(s => s.sessionId !== sessionId);
+                this.deleteSessionFromHistory(sessionId);
+                this.fetchServerSessions();
+            }).catch((err) => {
+                console.error(err);
+                this.$toast.error('Senha incorreta ou erro ao deletar a sessão do servidor.');
+            });
+        },
+        async resumeSession(sessionId, password = '') {
             try {
+                const headers = password ? { 'x-session-password': password } : {};
                 // Sync the local model (with any potential manual edits) to the server session first
                 if (this.existingModel && this.existingModel.summary) {
-                    await axios.put(`/api/ai/session/${sessionId}`, { currentModel: this.existingModel });
+                    await axios.put(`/api/ai/session/${sessionId}`, { currentModel: this.existingModel }, { headers });
                 }
 
-                const response = await axios.get(`/api/ai/session/${sessionId}`);
+                const response = await axios.get(`/api/ai/session/${sessionId}`, { headers });
                 const result = response.data.data;
                 
                 this.form.title = result.title || '';
@@ -3094,21 +3332,67 @@ export default {
                 this.form.deduplicatorExtendedThinking = result.deduplicatorExtendedThinking === true || result.deduplicatorExtendedThinking === 'true';
                 
                 this.updateLocalState(result);
+                this.sessionPassword = password; // Set password on success!
                 
                 const userMsgCount = this.refinementHistory.filter(m => m.role === 'user').length;
                 this.refinementRound = userMsgCount + 1;
 
-                if (this.dfdApproved) {
+                if (result.deduplicateProposals) {
+                    this.step = 'deduplicate-review';
+                } else if (this.dfdApproved) {
                     this.step = 'interactive';
                 } else {
                     this.step = 'validate-dfd';
                 }
             } catch (err) {
                 console.error('Failed to resume session:', err);
-                this.$toast.error('Failed to resume the session. It may have expired or been deleted.');
-                this.clearSavedSession();
-                this.step = 'input';
+                if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+                    this.pendingResumeSessionId = sessionId;
+                    this.promptPassword = '';
+                    this.$bvModal.show('password-prompt-modal');
+                    this.$toast.error('Senha incorreta ou necessária para esta sessão.');
+                } else {
+                    this.$toast.error('Failed to resume the session. It may have expired or been deleted.');
+                    this.clearSavedSession();
+                    this.step = 'input';
+                }
             }
+        },
+        async fetchServerSessions() {
+            try {
+                const response = await axios.get('/api/ai/sessions');
+                this.serverSessions = response.data.data || [];
+            } catch (err) {
+                console.error('Failed to fetch server sessions:', err);
+            }
+        },
+        onPromptOrResume(session) {
+            if (session.hasPassword) {
+                this.pendingResumeSessionId = session.sessionId;
+                this.promptPassword = '';
+                this.$bvModal.show('password-prompt-modal');
+            } else {
+                this.resumeSession(session.sessionId);
+            }
+        },
+        handlePasswordPromptOk(evt) {
+            evt.preventDefault();
+            this.submitPasswordPrompt();
+        },
+        submitPasswordPrompt() {
+            if (!this.promptPassword) {
+                this.$toast.warning('A senha é obrigatória.');
+                return;
+            }
+            this.$bvModal.hide('password-prompt-modal');
+            this.resumeSession(this.pendingResumeSessionId, this.promptPassword);
+        },
+        getAuthHeaders() {
+            const headers = {};
+            if (this.sessionPassword) {
+                headers['x-session-password'] = this.sessionPassword;
+            }
+            return headers;
         },
         async approveDfd() {
             this.dfdApproved = true;
@@ -3136,7 +3420,7 @@ export default {
                     revisionExtendedThinking: this.form.revisionExtendedThinking,
                     deduplicatorModel: this.form.deduplicatorModel,
                     deduplicatorExtendedThinking: this.form.deduplicatorExtendedThinking
-                });
+                }, { headers: this.getAuthHeaders() });
                 
                 const jobData = response.data.data;
                 this.jobId = jobData.jobId;
@@ -3201,7 +3485,7 @@ export default {
                 const response = await axios.post(`/api/ai/session/${this.sessionId}/apply-deduplication`, {
                     approvedControlDeduplicationIds: approvedControlIds,
                     approvedThreatDeduplicationIds: approvedThreatIds
-                });
+                }, { headers: this.getAuthHeaders() });
                 
                 const data = response.data.data;
                 this.generatedModel = data.threatModel;

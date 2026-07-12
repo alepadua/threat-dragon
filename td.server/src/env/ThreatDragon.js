@@ -22,6 +22,7 @@ class ThreatDragonEnv extends Env {
             { key: 'REPO_USE_SEARCH', required: false, defaultValue: false },
             { key: 'REPO_SEARCH_QUERY', required: false },
             { key: 'GEMINI_API_KEY', required: false },
+            { key: 'GEMINI_MODEL', required: false },
             { key: 'BEDROCK_MANTLE_API_KEY', required: false },
             { key: 'BEDROCK_MANTLE_BASE_URL', required: false },
             { key: 'BEDROCK_MANTLE_MODEL', required: false },

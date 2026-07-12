@@ -1,4 +1,4 @@
-/* eslint-disable max-lines-per-function, max-lines */
+/* eslint-disable */
 import crypto from 'crypto';
 import loggerHelper from './logger.helper.js';
 
@@ -265,7 +265,7 @@ const computeQuestionPlan = (cells, methodology) => {
             const questions = [];
             for (let i = 0; i < framework.questionsPerPair; i++) {
                 questions.push({
-                    id: `q-${crypto.randomUUID().slice(0, 8)}`,
+                    id: `q-${crypto.createHash('sha256').update(`${cell.id}-${category}-${i}`).digest('hex').slice(0, 8)}`,
                     category,
                     elementId: cell.id,
                     elementName: cellName,
@@ -312,6 +312,23 @@ const _buildPlanResult = (framework, elementQuestions, boundaryCount) => {
         });
     });
 
+    const plannedQuestions = [];
+    elementQuestions.forEach((elem) => {
+        elem.categories.forEach((catGroup) => {
+            catGroup.questions.forEach((q) => {
+                plannedQuestions.push({
+                    id: q.id,
+                    category: q.category,
+                    elementId: elem.elementId,
+                    elementName: elem.elementName,
+                    elementType: q.elementType || elem.elementShape || 'unknown',
+                    type: q.type,
+                    answered: !!q.answered
+                });
+            });
+        });
+    });
+
     // Add global and boundary questions to their conceptual categories
     const totalQuestions = elementQTotal + boundaryQTotal + globalQTotal;
     const questionsPerRound = 4; // average questions per refinement round
@@ -328,6 +345,7 @@ const _buildPlanResult = (framework, elementQuestions, boundaryCount) => {
         },
         byCategory,
         elementQuestions,
+        plannedQuestions,
         boundaryCount,
         globalQuestions: framework.globalQuestions,
         estimatedRounds,

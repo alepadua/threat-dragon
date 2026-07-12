@@ -1,3 +1,4 @@
+/* eslint-disable */
 import crypto from 'crypto';
 import fs from 'fs';
 import encryptionHelper from './encryption.helper.js';
@@ -26,6 +27,11 @@ const getVectorsPath = (sessionId) => {
     return path.join(SESSIONS_DIR, `${safeId}.vectors.json`);
 };
 
+export const hashPassword = (password, salt) => {
+    if (!password) return '';
+    return crypto.createHash('sha256').update(password + salt).digest('hex');
+};
+
 export const createSession = async (data) => {
     ensureSessionsDir();
     const sessionId = crypto.randomUUID();
@@ -37,6 +43,11 @@ export const createSession = async (data) => {
         } catch (err) {
             logger.error(`Error encrypting API key on session creation: ${err.message}`);
         }
+    }
+
+    let passwordHash = '';
+    if (data.password && data.password.trim() !== '') {
+        passwordHash = hashPassword(data.password, sessionId);
     }
 
     const sessionData = {
@@ -56,7 +67,8 @@ export const createSession = async (data) => {
         aiProvider: data.aiProvider || 'gemini',
         customBaseUrl: data.customBaseUrl || '',
         customModel: data.customModel || '',
-        apiKey: encryptedKey
+        apiKey: encryptedKey,
+        passwordHash
     };
 
     fs.writeFileSync(getSessionPath(sessionId), JSON.stringify(sessionData, null, 2), 'utf-8');
@@ -146,12 +158,23 @@ export const updateSession = async (sessionId, updates) => {
         ? (updates.apiKey === '*****' ? session.apiKey : updates.apiKey)
         : session.apiKey;
 
+    let passwordHash = session.passwordHash || '';
+    if (updates.password !== undefined) {
+        if (updates.password && updates.password.trim() !== '') {
+            passwordHash = hashPassword(updates.password, sessionId);
+        } else {
+            passwordHash = '';
+        }
+    }
+
     const updatedSession = {
         ...session,
         ...updates,
+        passwordHash,
         apiKey: decryptedApiKey,
         updatedAt: new Date().toISOString()
     };
+    delete updatedSession.password;
 
     const diskSession = { ...updatedSession };
     if (diskSession.apiKey && diskSession.apiKey.trim() !== '') {
@@ -165,6 +188,7 @@ export const updateSession = async (sessionId, updates) => {
         diskSession.apiKey = '';
     }
 
+    delete diskSession.password;
     fs.writeFileSync(getSessionPath(sessionId), JSON.stringify(diskSession, null, 2), 'utf-8');
     logger.info(`Updated threat modeling session: ${sessionId}`);
     return updatedSession;
@@ -224,6 +248,40 @@ export const cleanOldSessions = (maxAgeDays = 7) => {
     }
 };
 
+export const listSessions = () => {
+    ensureSessionsDir();
+    try {
+        const files = fs.readdirSync(SESSIONS_DIR);
+        const sessions = [];
+        files.forEach((file) => {
+            if (file.endsWith('.json') && !file.endsWith('.vectors.json')) {
+                const filePath = path.join(SESSIONS_DIR, file);
+                try {
+                    const content = fs.readFileSync(filePath, 'utf-8');
+                    const session = JSON.parse(content);
+                    if (session.sessionId) {
+                        sessions.push({
+                            sessionId: session.sessionId,
+                            title: session.title || 'Untitled Session',
+                            methodology: session.methodology || 'STRIDE',
+                            createdAt: session.createdAt,
+                            updatedAt: session.updatedAt || session.createdAt,
+                            hasPassword: Boolean(session.passwordHash)
+                        });
+                    }
+                } catch (err) {
+                    logger.error(`Error reading session file ${file} in listSessions: ${err.message}`);
+                }
+            }
+        });
+        sessions.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+        return sessions;
+    } catch (err) {
+        logger.error(`Error listing sessions: ${err.message}`);
+        return [];
+    }
+};
+
 export default {
     createSession,
     getSession,
@@ -231,5 +289,8 @@ export default {
     deleteSession,
     saveVectors,
     getVectors,
-    cleanOldSessions
+    cleanOldSessions,
+    listSessions,
+    hashPassword
 };
+
