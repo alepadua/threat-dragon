@@ -1647,6 +1647,59 @@ const deleteSessionRoute = (req, res) => {
     }
 };
 
+const exportSession = (req, res) => {
+    const { sessionId } = req.params;
+    try {
+        const session = aiContextStore.getSession(sessionId);
+        if (!session) {
+            return res.status(404).json({
+                status: 404,
+                message: 'Session not found'
+            });
+        }
+        
+        const exportedSession = { ...session };
+        if (exportedSession.apiKey) {
+            exportedSession.apiKey = '*****';
+        }
+        
+        return res.status(200).json({
+            status: 200,
+            message: 'Session exported successfully',
+            data: exportedSession
+        });
+    } catch (err) {
+        logger.error(`Error exporting session ${sessionId}: ${err.message}`);
+        return serverError(err.message, res, logger);
+    }
+};
+
+const importSessionRoute = async (req, res) => {
+    try {
+        const sessionData = req.body;
+        if (!sessionData || !sessionData.title) {
+            return res.status(400).json({
+                status: 400,
+                message: 'Invalid session data'
+            });
+        }
+        
+        const imported = await aiContextStore.importSession(sessionData);
+        return res.status(200).json({
+            status: 200,
+            message: 'Session imported successfully',
+            data: {
+                sessionId: imported.sessionId,
+                title: imported.title,
+                methodology: imported.methodology
+            }
+        });
+    } catch (err) {
+        logger.error(`Error importing session: ${err.message}`);
+        return serverError(err.message, res, logger);
+    }
+};
+
 export default {
     generate,
     getSessionState,
@@ -1664,6 +1717,8 @@ export default {
     applyRequirements,
     deleteSessionRoute,
     listActiveSessions,
+    exportSession,
+    importSessionRoute,
     _areTitlesSimilar: areTitlesSimilar,
     _mergeDiagramCells: mergeDiagramCells,
     _mergeControlsAssessment: mergeControlsAssessment,

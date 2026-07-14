@@ -78,6 +78,7 @@ const messages = {
         statsFlows: 'Fluxos de Dados Mapeados',
         openEditor: 'Abrir no Editor do Threat Dragon',
         downloadJson: 'Baixar JSON do Modelo',
+        downloadSummaryPdf: 'Baixar Relatório PDF Resumido',
         errorTitle: 'Falha na Geração',
         tryAgain: 'Tentar Novamente',
         questionCount: 'Perguntas Necessárias',

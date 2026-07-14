@@ -282,6 +282,38 @@ export const listSessions = () => {
     }
 };
 
+export const importSession = async (sessionData) => {
+    ensureSessionsDir();
+    let targetSessionId = sessionData.sessionId;
+    
+    // If no sessionId or if it already exists, generate a new one
+    if (!targetSessionId || fs.existsSync(getSessionPath(targetSessionId))) {
+        targetSessionId = crypto.randomUUID();
+        // If we generated a new UUID, the old passwordHash (which was salted with the old sessionId)
+        // will no longer match. So we must clear the passwordHash to prevent the session from being permanently locked.
+        if (sessionData.passwordHash) {
+            delete sessionData.passwordHash;
+        }
+    }
+    
+    const imported = {
+        ...sessionData,
+        sessionId: targetSessionId,
+        createdAt: sessionData.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+    };
+    
+    // Ensure apiKey is handled correctly (if it was exported as obfuscated '*****', we clear it)
+    if (imported.apiKey === '*****') {
+        imported.apiKey = '';
+    }
+    
+    fs.writeFileSync(getSessionPath(targetSessionId), JSON.stringify(imported, null, 2), 'utf-8');
+    logger.info(`Imported threat modeling session: ${targetSessionId}`);
+    
+    return imported;
+};
+
 export default {
     createSession,
     getSession,
@@ -291,6 +323,7 @@ export default {
     getVectors,
     cleanOldSessions,
     listSessions,
-    hashPassword
+    hashPassword,
+    importSession
 };
 

@@ -78,6 +78,7 @@ const messages = {
         statsFlows: 'Data Flows Mapped',
         openEditor: 'Open in Threat Dragon Editor',
         downloadJson: 'Download Model JSON',
+        downloadSummaryPdf: 'Download Summary PDF Report',
         errorTitle: 'Generation Failed',
         tryAgain: 'Try Again',
         questionCount: 'Questions Required',

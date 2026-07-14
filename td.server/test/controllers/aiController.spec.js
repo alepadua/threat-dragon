@@ -1137,5 +1137,93 @@ describe('controllers/aiController.js - Semantic Similarity & Merging', () => {
             expect(bedrockModel).to.equal('meta.llama3-70b-instruct-v1:0');
         });
     });
+
+    describe('exportSession', () => {
+        let getSessionStub;
+
+        beforeEach(() => {
+            getSessionStub = sinon.stub(aiContextStore, 'getSession');
+        });
+
+        afterEach(() => {
+            getSessionStub.restore();
+        });
+
+        it('should return 404 if session is not found', async () => {
+            getSessionStub.returns(null);
+            const req = { params: { sessionId: 'nonexistent' } };
+            const res = {
+                status: sinon.stub().returnsThis(),
+                json: sinon.stub()
+            };
+
+            await aiController.exportSession(req, res);
+            expect(res.status).to.have.been.calledWith(404);
+        });
+
+        it('should return 200 and return the exported session, obfuscating the apiKey', async () => {
+            const mockSession = {
+                sessionId: 'session-123',
+                title: 'My Session',
+                apiKey: 'my-secret-key',
+                questions: []
+            };
+            getSessionStub.returns(mockSession);
+            const req = { params: { sessionId: 'session-123' } };
+            const res = {
+                status: sinon.stub().returnsThis(),
+                json: sinon.stub()
+            };
+
+            await aiController.exportSession(req, res);
+            expect(res.status).to.have.been.calledWith(200);
+            const data = res.json.firstCall.args[0].data;
+            expect(data.title).to.equal('My Session');
+            expect(data.apiKey).to.equal('*****');
+        });
+    });
+
+    describe('importSessionRoute', () => {
+        let importSessionStub;
+
+        beforeEach(() => {
+            importSessionStub = sinon.stub(aiContextStore, 'importSession');
+        });
+
+        afterEach(() => {
+            importSessionStub.restore();
+        });
+
+        it('should return 400 if session data or title is missing', async () => {
+            const req = { body: {} };
+            const res = {
+                status: sinon.stub().returnsThis(),
+                json: sinon.stub()
+            };
+
+            await aiController.importSessionRoute(req, res);
+            expect(res.status).to.have.been.calledWith(400);
+        });
+
+        it('should return 200 and import data successfully', async () => {
+            const mockImported = {
+                sessionId: 'imported-uuid-123',
+                title: 'Imported Title',
+                methodology: 'STRIDE'
+            };
+            importSessionStub.resolves(mockImported);
+            const req = { body: { title: 'Imported Title', methodology: 'STRIDE' } };
+            const res = {
+                status: sinon.stub().returnsThis(),
+                json: sinon.stub()
+            };
+
+            await aiController.importSessionRoute(req, res);
+            expect(res.status).to.have.been.calledWith(200);
+            const data = res.json.firstCall.args[0].data;
+            expect(data.sessionId).to.equal('imported-uuid-123');
+            expect(data.title).to.equal('Imported Title');
+        });
+    });
 });
 

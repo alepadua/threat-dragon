@@ -68,6 +68,8 @@ const unauthRoutes = (router) => {
 
     // Apply rate limit specifically to AI endpoints
     router.use('/api/ai', aiLimiter);
+    router.post('/api/ai/session/import', aiController.importSessionRoute);
+
     router.use('/api/ai', sessionPasswordMiddleware);
 
     router.get('/api/ai/sessions', aiController.listActiveSessions);
@@ -84,6 +86,7 @@ const unauthRoutes = (router) => {
     router.get('/api/ai/frameworks', aiController.getAvailableFrameworks);
     router.get('/api/ai/job/:jobId/status', aiController.getJobStatus);
     router.get('/api/ai/session/:sessionId/export-questions', aiController.exportQuestions);
+    router.get('/api/ai/session/:sessionId/export', aiController.exportSession);
     router.post('/api/ai/session/:sessionId/import-answers', aiController.importAnswers);
     router.post('/api/ai/session/:sessionId/apply-requirements', aiController.applyRequirements);
 

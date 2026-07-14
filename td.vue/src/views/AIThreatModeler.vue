@@ -446,9 +446,21 @@
                             <font-awesome-icon icon="server" class="mr-2 text-warning" />
                             <h5 class="mb-0 font-weight-bold">Active Sessions on Server</h5>
                         </div>
-                        <b-button size="sm" variant="outline-light" class="py-1 font-weight-bold" @click="fetchServerSessions">
-                            <font-awesome-icon icon="sync" class="mr-1" /> Refresh
-                        </b-button>
+                        <div>
+                            <b-button size="sm" variant="outline-info" class="py-1 font-weight-bold mr-2 text-white" @click="triggerSessionImport">
+                                <font-awesome-icon icon="upload" class="mr-1" /> Importar Sessão
+                            </b-button>
+                            <b-button size="sm" variant="outline-light" class="py-1 font-weight-bold" @click="fetchServerSessions">
+                                <font-awesome-icon icon="sync" class="mr-1" /> Refresh
+                            </b-button>
+                            <input
+                                type="file"
+                                ref="sessionFileInput"
+                                accept=".json"
+                                class="d-none"
+                                @change="onSessionFileSelected"
+                            />
+                        </div>
                     </div>
                 </template>
                 
@@ -608,6 +620,10 @@
                             <b-button variant="warning" class="w-100 font-weight-bold text-dark mb-2 py-2" @click="openInEditor">
                                 <font-awesome-icon icon="edit" class="mr-2" />
                                 Open in Threat Dragon
+                            </b-button>
+                            <b-button variant="outline-primary" class="w-100 mb-2 py-2 font-weight-bold" @click="exportAiSession">
+                                <font-awesome-icon icon="download" class="mr-2" />
+                                Exportar Sessão Completa
                             </b-button>
                             <b-button v-if="refinementRound > 1" variant="outline-secondary" class="w-100 mb-2 py-2 font-weight-medium" @click="undoLastRefinement">
                                 <font-awesome-icon icon="undo" class="mr-2" />
@@ -847,33 +863,63 @@
 
                         <!-- Action buttons directly below stats -->
                         <div class="mt-3 pt-2 border-top">
-                            <b-button variant="warning" class="w-100 font-weight-bold text-dark mb-2 py-2" @click="openInEditor">
+                            <b-button variant="warning" class="w-100 font-weight-bold text-dark mb-3 py-2 shadow-sm" @click="openInEditor">
                                 <font-awesome-icon icon="edit" class="mr-2" />
                                 Open in Threat Dragon
                             </b-button>
-                            <b-button variant="primary" class="w-100 mb-2 py-2 font-weight-bold text-white" @click="downloadPdfReport">
-                                <font-awesome-icon icon="file-pdf" class="mr-2" />
-                                Download PDF Report
-                            </b-button>
-                            <b-button variant="info" class="w-100 mb-2 py-2 font-weight-bold" @click="downloadAssessmentReport">
-                                <font-awesome-icon icon="file-alt" class="mr-2" />
-                                Download Markdown Report
-                            </b-button>
-                            <b-button variant="secondary" class="w-100 mb-2 py-2" @click="downloadJson">
-                                <font-awesome-icon icon="cloud-download-alt" class="mr-2" />
-                                Download Model JSON
-                            </b-button>
-                            <b-button v-if="activeMitigationStatus && activeMitigationStatus.length > 0" variant="outline-success" class="w-100 mb-2 py-2 font-weight-bold" @click="viewMitigationStatus">
-                                <font-awesome-icon icon="shield-alt" class="mr-2" />
-                                Ver Status de Mitigação de Ameaças
-                            </b-button>
-                            <b-button v-if="sessionId && answeredQuestions && answeredQuestions.length > 0" variant="outline-info" class="w-100 mb-2 py-2 font-weight-bold" @click="viewQaReview">
-                                <font-awesome-icon icon="history" class="mr-2" />
-                                Revisão de Perguntas e Respostas
-                            </b-button>
-                            <b-button variant="outline-danger" class="w-100" size="sm" @click="resetForm">
-                                Start Over
-                            </b-button>
+
+                            <!-- Navigation tabs side-by-side -->
+                            <div class="row no-gutters mb-2">
+                                <div class="col-6 pr-1" v-if="activeMitigationStatus && activeMitigationStatus.length > 0">
+                                    <b-button variant="outline-success" class="w-100 py-2 font-weight-bold font-size-sm text-truncate" @click="viewMitigationStatus" style="font-size: 0.85rem;">
+                                        <font-awesome-icon icon="shield-alt" class="mr-1" />
+                                        Mitigação
+                                    </b-button>
+                                </div>
+                                <div class="col-6 pl-1" v-if="sessionId && answeredQuestions && answeredQuestions.length > 0">
+                                    <b-button variant="outline-info" class="w-100 py-2 font-weight-bold font-size-sm text-truncate" @click="viewQaReview" style="font-size: 0.85rem;">
+                                        <font-awesome-icon icon="history" class="mr-1" />
+                                        Revisão Q&A
+                                    </b-button>
+                                </div>
+                            </div>
+
+                            <!-- Export options dropdown -->
+                            <b-dropdown id="export-dropdown" variant="outline-primary" class="w-100 mb-2" menu-class="w-100 shadow" toggle-class="font-weight-bold py-2">
+                                <template #button-content>
+                                    <font-awesome-icon icon="download" class="mr-2" />
+                                    Exportar / Baixar
+                                </template>
+                                <b-dropdown-item @click="downloadPdfReport(false)">
+                                    <font-awesome-icon icon="file-pdf" class="mr-2 text-danger" />
+                                    Relatório PDF Completo
+                                </b-dropdown-item>
+                                <b-dropdown-item @click="downloadPdfReport(true)">
+                                    <font-awesome-icon icon="file-pdf" class="mr-2 text-warning" />
+                                    Relatório PDF Resumido
+                                </b-dropdown-item>
+                                <b-dropdown-item @click="downloadAssessmentReport">
+                                    <font-awesome-icon icon="file-alt" class="mr-2 text-info" />
+                                    Relatório Markdown (MD)
+                                </b-dropdown-item>
+                                <b-dropdown-divider></b-dropdown-divider>
+                                <b-dropdown-item @click="exportAiSession">
+                                    <font-awesome-icon icon="file-archive" class="mr-2 text-success" />
+                                    Sessão Completa da IA
+                                </b-dropdown-item>
+                                <b-dropdown-item @click="downloadJson">
+                                    <font-awesome-icon icon="code" class="mr-2 text-secondary" />
+                                    Modelo JSON do Threat Dragon
+                                </b-dropdown-item>
+                            </b-dropdown>
+
+                            <!-- Subtle Start Over Link -->
+                            <div class="text-center mt-3">
+                                <b-button variant="link" class="text-muted font-size-sm p-0" @click="resetForm">
+                                    <font-awesome-icon icon="redo" class="mr-1" />
+                                    Recomeçar Sessão
+                                </b-button>
+                            </div>
                         </div>
                     </b-card>
 
@@ -1210,7 +1256,7 @@
                     </div>
                 </template>
 
-                <b-tabs content-class="mt-4" nav-wrapper-class="mb-3" pill card>
+                <b-tabs v-model="reviewTabIndex" content-class="mt-4" nav-wrapper-class="mb-3" pill card>
                     <!-- Tab 1: Deduplication -->
                     <b-tab title="Deduplicação de Ameaças & Controles" active>
                         <b-row class="text-left">
@@ -1496,7 +1542,7 @@
                                 <!-- Accordion List -->
                                 <div class="accordion" role="tablist">
                                     <b-card
-                                        v-for="(threat, index) in activeMitigationStatus.filter(t => mitigationFilter === 'All' || t.status === mitigationFilter)"
+                                        v-for="threat in activeMitigationStatus.filter(t => mitigationFilter === 'All' || t.status === mitigationFilter)"
                                         :key="threat.threatId"
                                         no-body
                                         class="mb-2 shadow-sm border-0"
@@ -1691,7 +1737,7 @@
             <!-- Off-screen Premium PDF print template -->
             <div id="pdf-report-template" style="position: absolute; left: 0; top: 0; width: 680px; height: 1px; overflow: hidden; opacity: 0.01; pointer-events: none; z-index: -9999; font-family: 'Outfit', 'Inter', 'Helvetica Neue', Arial, sans-serif; color: #1e293b; background-color: #ffffff; line-height: 1.6;">
                 <!-- Capa / Cover Page -->
-                <div class="pdf-cover-page" style="width: 100%; height: 880px; display: flex; flex-direction: column; justify-content: space-between; padding: 0 30px 30px 30px; box-sizing: border-box;">
+                <div id="pdf-page-cover" class="pdf-cover-page" style="width: 100%; height: 880px; display: flex; flex-direction: column; justify-content: space-between; padding: 0 30px 30px 30px; box-sizing: border-box;">
                     <div>
                         <!-- Logo / Header -->
                         <div style="display: flex; align-items: center; margin-bottom: 60px;">
@@ -1743,9 +1789,9 @@
                 </div>
 
                 <!-- Executive Summary Page -->
-                <div class="pdf-page" style="width: 100%; page-break-before: always; padding: 40px 30px 0 30px; box-sizing: border-box;">
+                <div id="pdf-page-exec-summary" class="pdf-page" style="width: 100%; page-break-before: always; padding: 40px 30px 0 30px; box-sizing: border-box;">
                     <h2 style="font-size: 24px; font-weight: 800; color: #0f172a; margin-bottom: 25px; border-bottom: 2px solid #0ea5e9; padding-bottom: 10px;">
-                        1. Executive Summary
+                        Executive Summary
                     </h2>
                     
                     <div style="background-color: #f0f9ff; border-left: 5px solid #0ea5e9; border-radius: 6px; padding: 20px; margin-bottom: 30px;">
@@ -1773,9 +1819,9 @@
                 </div>
 
                 <!-- Framework Coverage Page -->
-                <div class="pdf-page" style="width: 100%; page-break-before: always; padding: 40px 30px 0 30px; box-sizing: border-box;" v-if="questionPlan">
+                <div id="pdf-page-framework" class="pdf-page" style="width: 100%; page-break-before: always; padding: 40px 30px 0 30px; box-sizing: border-box;" v-if="questionPlan">
                     <h2 style="font-size: 24px; font-weight: 800; color: #0f172a; margin-bottom: 25px; border-bottom: 2px solid #0ea5e9; padding-bottom: 10px;">
-                        2. Framework Coverage Analysis
+                        Framework Coverage Analysis
                     </h2>
                     <p style="font-size: 14px; color: #64748b; margin-bottom: 30px;">
                         Below is the completion status of threat modeling categories mapped from the DFD components and boundaries for the <strong>{{ form.methodology }}</strong> framework:
@@ -1796,9 +1842,9 @@
                 </div>
 
                 <!-- Visual DFD Diagram Page -->
-                <div class="pdf-page pdf-landscape-page" style="width: 1000px; height: 670px; page-break-before: always; padding: 40px 30px 30px 30px; box-sizing: border-box; background-color: #ffffff;" v-if="generatedModel && generatedModel.detail && generatedModel.detail.diagrams && generatedModel.detail.diagrams[0]">
+                <div id="pdf-page-dfd" class="pdf-page pdf-landscape-page" style="width: 1000px; height: 670px; page-break-before: always; padding: 40px 30px 30px 30px; box-sizing: border-box; background-color: #ffffff;" v-if="generatedModel && generatedModel.detail && generatedModel.detail.diagrams && generatedModel.detail.diagrams[0]">
                     <h2 style="font-size: 24px; font-weight: 800; color: #0f172a; margin-bottom: 25px; border-bottom: 2px solid #0ea5e9; padding-bottom: 10px;">
-                        3. Visual Data Flow Diagram (DFD)
+                        Visual Data Flow Diagram (DFD)
                     </h2>
                     <p style="font-size: 14px; color: #64748b; margin-bottom: 20px;">
                         The graphical system topology representing components, data flows, and trust boundaries:
@@ -1813,9 +1859,9 @@
                 </div>
 
                 <!-- Security Control Efficacy Report Page -->
-                <div class="pdf-page" style="width: 100%; page-break-before: always; padding: 40px 30px 0 30px; box-sizing: border-box;" v-if="evaluation && evaluation.controlsAssessment && evaluation.controlsAssessment.length > 0">
+                <div id="pdf-page-controls" class="pdf-page" style="width: 100%; page-break-before: always; padding: 40px 30px 0 30px; box-sizing: border-box;" v-if="evaluation && evaluation.controlsAssessment && evaluation.controlsAssessment.length > 0">
                     <h2 style="font-size: 24px; font-weight: 800; color: #0f172a; margin-bottom: 25px; border-bottom: 2px solid #0ea5e9; padding-bottom: 10px;">
-                        4. Security Control Efficacy Assessment
+                        Security Control Efficacy Assessment
                     </h2>
                     <p style="font-size: 14px; color: #64748b; margin-bottom: 20px;">
                         Audited mitigations and security controls evaluated during the interactive sessions:
@@ -1848,9 +1894,9 @@
                 </div>
 
                 <!-- DFD Components and Threats Inventory Page -->
-                <div class="pdf-page" style="width: 100%; page-break-before: always; padding: 40px 30px 0 30px; box-sizing: border-box;" v-if="generatedModel">
+                <div id="pdf-page-inventory" class="pdf-page" style="width: 100%; page-break-before: always; padding: 40px 30px 0 30px; box-sizing: border-box;" v-if="generatedModel">
                     <h2 style="font-size: 24px; font-weight: 800; color: #0f172a; margin-bottom: 25px; border-bottom: 2px solid #0ea5e9; padding-bottom: 10px;">
-                        5. Component Security Inventory
+                        Component Security Inventory
                     </h2>
                     <p style="font-size: 14px; color: #64748b; margin-bottom: 20px;">
                         Catalog of elements identified in the DFD topology and their associated security threats:
@@ -1884,9 +1930,9 @@
                 </div>
 
                 <!-- Refinement History Page -->
-                <div class="pdf-page" style="width: 100%; page-break-before: always; padding: 40px 30px 0 30px; box-sizing: border-box;" v-if="refinementHistory && refinementHistory.length > 0">
+                <div id="pdf-page-history" class="pdf-page" style="width: 100%; page-break-before: always; padding: 40px 30px 0 30px; box-sizing: border-box;" v-if="refinementHistory && refinementHistory.length > 0">
                     <h2 style="font-size: 24px; font-weight: 800; color: #0f172a; margin-bottom: 25px; border-bottom: 2px solid #0ea5e9; padding-bottom: 10px;">
-                        6. Audit Trail & Refinement History
+                        Audit Trail & Refinement History
                     </h2>
                     <p style="font-size: 14px; color: #64748b; margin-bottom: 20px;">
                         Complete Q&A audit log history representing design refinement sessions:
@@ -1912,9 +1958,9 @@
                 </div>
 
                 <!-- Anti-Hallucination Page -->
-                <div class="pdf-page" style="width: 100%; page-break-before: always; padding: 40px 30px 0 30px; box-sizing: border-box;" v-if="evaluation && evaluation.hallucinationAlerts && evaluation.hallucinationAlerts.length > 0">
+                <div id="pdf-page-hallucination" class="pdf-page" style="width: 100%; page-break-before: always; padding: 40px 30px 0 30px; box-sizing: border-box;" v-if="evaluation && evaluation.hallucinationAlerts && evaluation.hallucinationAlerts.length > 0">
                     <h2 style="font-size: 24px; font-weight: 800; color: #0f172a; margin-bottom: 25px; border-bottom: 2px solid #0ea5e9; padding-bottom: 10px;">
-                        7. Architectural Consistency Audit (Anti-Hallucination)
+                        Architectural Consistency Audit (Anti-Hallucination)
                     </h2>
                     <p style="font-size: 14px; color: #64748b; margin-bottom: 20px;">
                         Potential inconsistencies identified between the system diagram/answers and the threat model definitions:
@@ -1940,47 +1986,75 @@
                 </div>
 
                 <!-- Threat Mitigation Status Page -->
-                <div class="pdf-page" style="width: 100%; page-break-before: always; padding: 40px 30px 0 30px; box-sizing: border-box;" v-if="evaluation && evaluation.mitigationStatus && evaluation.mitigationStatus.length > 0">
+                <div id="pdf-page-mitigation" class="pdf-page" style="width: 100%; page-break-before: always; padding: 40px 30px 0 30px; box-sizing: border-box;" v-if="activeMitigationStatus && activeMitigationStatus.length > 0">
                     <h2 style="font-size: 24px; font-weight: 800; color: #0f172a; margin-bottom: 25px; border-bottom: 2px solid #0ea5e9; padding-bottom: 10px;">
-                        8. Threat Mitigation Status Assessment
+                        Threat Mitigation Status Assessment
                     </h2>
-                    <p style="font-size: 14px; color: #64748b; margin-bottom: 20px;">
-                        Assessment of whether the generated threats have been mitigated based on your feedback:
-                    </p>
+                    
+                    <!-- Stats Cards Grid -->
+                    <div style="display: flex; gap: 12px; margin-bottom: 25px;">
+                        <div style="flex: 1; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px 10px; text-align: center;">
+                            <h3 style="margin: 0 0 2px 0; font-size: 22px; font-weight: 800; color: #1e293b; line-height: 1.1;">{{ activeMitigationStatus.length }}</h3>
+                            <small style="font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px;">Total Avaliadas</small>
+                        </div>
+                        <div style="flex: 1; background-color: #10b981; border-radius: 6px; padding: 12px 10px; text-align: center;">
+                            <h3 style="margin: 0 0 2px 0; font-size: 22px; font-weight: 800; color: #ffffff; line-height: 1.1;">{{ activeMitigationStatus.filter(t => t.status === 'Mitigada').length }}</h3>
+                            <small style="font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.9); text-transform: uppercase; letter-spacing: 0.5px;">Mitigadas</small>
+                        </div>
+                        <div style="flex: 1; background-color: #f59e0b; border-radius: 6px; padding: 12px 10px; text-align: center;">
+                            <h3 style="margin: 0 0 2px 0; font-size: 22px; font-weight: 800; color: #ffffff; line-height: 1.1;">{{ activeMitigationStatus.filter(t => t.status === 'Parcialmente Mitigada').length }}</h3>
+                            <small style="font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.9); text-transform: uppercase; letter-spacing: 0.5px;">Parciais</small>
+                        </div>
+                        <div style="flex: 1; background-color: #ef4444; border-radius: 6px; padding: 12px 10px; text-align: center;">
+                            <h3 style="margin: 0 0 2px 0; font-size: 22px; font-weight: 800; color: #ffffff; line-height: 1.1;">{{ activeMitigationStatus.filter(t => t.status === 'Não Mitigada').length }}</h3>
+                            <small style="font-size: 10px; font-weight: 700; color: rgba(255,255,255,0.9); text-transform: uppercase; letter-spacing: 0.5px;">Não Mitigadas</small>
+                        </div>
+                    </div>
 
-                    <table style="width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; margin-bottom: 30px;">
-                        <thead>
-                            <tr style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0;">
-                                <th style="padding: 10px; font-weight: 700; color: #475569; width: 25%;">Threat / Element</th>
-                                <th style="padding: 10px; font-weight: 700; color: #475569; width: 15%; text-align: center;">Status</th>
-                                <th style="padding: 10px; font-weight: 700; color: #475569; width: 35%;">Reason</th>
-                                <th style="padding: 10px; font-weight: 700; color: #475569; width: 25%;">Recommendations</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr v-for="threat in evaluation.mitigationStatus" :key="threat.threatId" style="border-bottom: 1px solid #f1f5f9; page-break-inside: avoid;">
-                                <td style="padding: 10px;">
-                                    <div style="font-weight: 700; color: #334155;">{{ threat.threatTitle }}</div>
-                                    <small style="color: #64748b;">Element: {{ threat.elementName }}</small>
-                                </td>
-                                <td style="padding: 10px; text-align: center; vertical-align: middle;">
-                                    <span :style="{
-                                        backgroundColor: threat.status === 'Mitigada' ? '#dcfce7' : threat.status === 'Parcialmente Mitigada' ? '#fef3c7' : '#fee2e2',
-                                        color: threat.status === 'Mitigada' ? '#166534' : threat.status === 'Parcialmente Mitigada' ? '#92400e' : '#991b1b',
-                                        padding: '4px 8px',
-                                        borderRadius: '4px',
-                                        fontWeight: '700',
-                                        fontSize: '10px',
-                                        display: 'inline-block'
-                                    }">
-                                        {{ threat.status }}
-                                    </span>
-                                </td>
-                                <td style="padding: 10px; color: #475569;">{{ threat.reason }}</td>
-                                <td style="padding: 10px; color: #475569;">{{ threat.recommendations || 'N/A' }}</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <!-- Threat Cards List -->
+                    <div v-for="threat in activeMitigationStatus" :key="threat.threatId" style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 15px; margin-bottom: 12px; page-break-inside: avoid;">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                            <div>
+                                <h4 style="margin: 0 0 4px 0; font-size: 14px; font-weight: 700; color: #1e293b;">{{ threat.threatTitle }}</h4>
+                                <span style="font-size: 11px; color: #64748b; font-weight: 600;">
+                                    Component: {{ threat.elementName }}
+                                </span>
+                            </div>
+                            <div>
+                                <span :style="{
+                                    backgroundColor: threat.status === 'Mitigada' ? '#dcfce7' : threat.status === 'Parcialmente Mitigada' ? '#fef3c7' : '#fee2e2',
+                                    color: threat.status === 'Mitigada' ? '#166534' : threat.status === 'Parcialmente Mitigada' ? '#92400e' : '#991b1b',
+                                    padding: '6px 12px',
+                                    borderRadius: '4px',
+                                    fontWeight: '700',
+                                    fontSize: '11px',
+                                    display: 'inline-block',
+                                    textAlign: 'center',
+                                    minWidth: '110px'
+                                }">
+                                    {{ threat.status }}
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <!-- Threat Scenario Description -->
+                        <div style="margin-top: 10px; background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px; padding: 10px; font-size: 12px; line-height: 1.4; color: #334155;">
+                            <strong style="color: #475569; display: block; margin-bottom: 3px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;">Descrição da Ameaça / Cenário:</strong>
+                            {{ threat.originalDescription || 'N/A' }}
+                        </div>
+                        
+                        <!-- Details sub-box -->
+                        <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #f1f5f9; font-size: 12px; display: flex; gap: 20px;">
+                            <div style="flex: 1;">
+                                <strong style="color: #475569; display: block; margin-bottom: 4px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;">Justification / Reason</strong>
+                                <div style="color: #334155; line-height: 1.5;">{{ threat.reason }}</div>
+                            </div>
+                            <div style="flex: 1;" v-if="threat.recommendations && threat.recommendations !== 'N/A'">
+                                <strong style="color: #475569; display: block; margin-bottom: 4px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px;">Recommendations</strong>
+                                <div style="color: #334155; line-height: 1.5;">{{ threat.recommendations }}</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
             <!-- Password Prompt Modal -->
@@ -2055,6 +2129,7 @@ export default {
             pendingDeleteSession: null,
             deletePasswordPrompt: '',
             step: 'input', // 'input', 'generating', 'interactive', 'error'
+            reviewTabIndex: 0,
             form: {
                 title: '',
                 description: '',
@@ -3302,6 +3377,62 @@ export default {
                 this.$toast.error('Senha incorreta ou erro ao deletar a sessão do servidor.');
             });
         },
+        async exportAiSession() {
+            if (!this.sessionId) return;
+            try {
+                const response = await axios.get(`/api/ai/session/${this.sessionId}/export`, { headers: this.getAuthHeaders() });
+                const sessionData = response.data.data;
+                const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(sessionData, null, 2));
+                const downloadAnchor = document.createElement('a');
+                downloadAnchor.setAttribute('href', dataStr);
+                downloadAnchor.setAttribute('download', `${sessionData.title || 'session'}-ai-session.json`);
+                document.body.appendChild(downloadAnchor);
+                downloadAnchor.click();
+                downloadAnchor.remove();
+                this.$toast.success('Sessão exportada com sucesso!');
+            } catch (err) {
+                console.error('Failed to export session:', err);
+                this.$toast.error('Erro ao exportar a sessão do servidor.');
+            }
+        },
+        triggerSessionImport() {
+            this.$refs.sessionFileInput.click();
+        },
+        onSessionFileSelected(evt) {
+            const file = evt.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const sessionData = JSON.parse(e.target.result);
+                    if (!sessionData || !sessionData.title) {
+                        this.$toast.error('O arquivo JSON importado é inválido ou não possui título da sessão.');
+                        return;
+                    }
+                    
+                    const response = await axios.post('/api/ai/session/import', sessionData);
+                    const result = response.data.data;
+                    this.$toast.success('Sessão importada com sucesso!');
+                    
+                    evt.target.value = '';
+                    await this.fetchServerSessions();
+                    
+                    if (sessionData.passwordHash) {
+                        this.pendingResumeSessionId = result.sessionId;
+                        this.promptPassword = '';
+                        this.$bvModal.show('password-prompt-modal');
+                    } else {
+                        await this.resumeSession(result.sessionId);
+                    }
+                } catch (err) {
+                    console.error('Failed to import session:', err);
+                    this.$toast.error('Erro ao importar a sessão no servidor. Verifique o formato do arquivo.');
+                    evt.target.value = '';
+                }
+            };
+            reader.readAsText(file);
+        },
         async resumeSession(sessionId, password = '') {
             try {
                 const headers = password ? { 'x-session-password': password } : {};
@@ -3451,29 +3582,11 @@ export default {
         },
         viewMitigationStatus() {
             this.step = 'deduplicate-review';
-            // Navigate to Tab 3 (mitigationStatus) on next tick
-            this.$nextTick(() => {
-                const tabs = this.$el.querySelector('.deduplicate-review .nav-pills, .card .nav-pills');
-                if (tabs) {
-                    const tabLinks = tabs.querySelectorAll('.nav-link');
-                    if (tabLinks.length >= 3) {
-                        tabLinks[2].click();
-                    }
-                }
-            });
+            this.reviewTabIndex = 2; // Index of "Status de Mitigação de Ameaças"
         },
         viewQaReview() {
             this.step = 'deduplicate-review';
-            // Navigate to Tab 4 (Q&A Review) on next tick
-            this.$nextTick(() => {
-                const tabs = this.$el.querySelector('.deduplicate-review .nav-pills, .card .nav-pills');
-                if (tabs) {
-                    const tabLinks = tabs.querySelectorAll('.nav-link');
-                    if (tabLinks.length >= 4) {
-                        tabLinks[3].click();
-                    }
-                }
-            });
+            this.reviewTabIndex = 3; // Index of "Revisão de Perguntas e Respostas"
         },
         async confirmDeduplicationAndApprove(controlDups = null, threatDups = null) {
             this.step = 'generating-proposals';
@@ -3603,7 +3716,7 @@ export default {
             link.remove();
             URL.revokeObjectURL(url);
         },
-        async downloadPdfReport() {
+        async downloadPdfReport(isSummary = false) {
             if (!this.generatedModel || !this.evaluation) return;
             
             let clone = null;
@@ -3623,6 +3736,22 @@ export default {
                 clone.style.overflow = 'visible';
                 clone.style.opacity = '1';
                 clone.style.zIndex = '-9999';
+                
+                if (isSummary) {
+                    const pagesToRemove = [
+                        '#pdf-page-exec-summary',
+                        '#pdf-page-controls',
+                        '#pdf-page-inventory',
+                        '#pdf-page-history',
+                        '#pdf-page-hallucination'
+                    ];
+                    pagesToRemove.forEach(selector => {
+                        const el = clone.querySelector(selector);
+                        if (el) {
+                            el.parentNode.removeChild(el);
+                        }
+                    });
+                }
                 
                 document.body.appendChild(clone);
                 
@@ -3688,7 +3817,8 @@ export default {
                     }
                 }
                 
-                const filename = `${this.form.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-assessment-report.pdf`;
+                const suffix = isSummary ? '-summary' : '';
+                const filename = `${this.form.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-assessment-report${suffix}.pdf`;
                 doc.save(filename);
             } catch (err) {
                 console.error('Failed to generate PDF report:', err);
