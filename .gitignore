@@ -81,6 +81,8 @@
 !td.server/src/env/*.js
 !td.server/src/helpers/
 !td.server/src/helpers/*.js
+!td.server/src/helpers/ai/
+!td.server/src/helpers/ai/**/*.js
 !td.server/src/providers/
 !td.server/src/providers/*.js
 !td.server/src/repositories/
