@@ -24,12 +24,30 @@ const ensureSessionsDir = () => {
 const getSessionPath = (sessionId) => {
     // Sanitize sessionId to avoid path traversal
     const safeId = sessionId.replace(/[^a-zA-Z0-9-]/gu, '');
-    return path.join(SESSIONS_DIR, `${safeId}.json`);
+    const primaryPath = path.join(SESSIONS_DIR, `${safeId}.json`);
+    
+    // Check fallback folder if primary does not exist
+    if (!fs.existsSync(primaryPath)) {
+        const fallbackPath = path.join(process.cwd(), 'ai-sessions', `${safeId}.json`);
+        if (fs.existsSync(fallbackPath)) {
+            return fallbackPath;
+        }
+    }
+    return primaryPath;
 };
 
 const getVectorsPath = (sessionId) => {
     const safeId = sessionId.replace(/[^a-zA-Z0-9-]/gu, '');
-    return path.join(SESSIONS_DIR, `${safeId}.vectors.json`);
+    const primaryPath = path.join(SESSIONS_DIR, `${safeId}.vectors.json`);
+    
+    // Check fallback folder if primary does not exist
+    if (!fs.existsSync(primaryPath)) {
+        const fallbackPath = path.join(process.cwd(), 'ai-sessions', `${safeId}.vectors.json`);
+        if (fs.existsSync(fallbackPath)) {
+            return fallbackPath;
+        }
+    }
+    return primaryPath;
 };
 
 export const hashPassword = (password, salt) => {
@@ -221,26 +239,35 @@ export const deleteSession = (sessionId) => {
 export const cleanOldSessions = (maxAgeDays = 7) => {
     ensureSessionsDir();
     try {
-        const files = fs.readdirSync(SESSIONS_DIR);
+        const dirs = [SESSIONS_DIR];
+        const fallbackDir = path.join(process.cwd(), 'ai-sessions');
+        if (fallbackDir !== SESSIONS_DIR && fs.existsSync(fallbackDir)) {
+            dirs.push(fallbackDir);
+        }
+
         const now = Date.now();
         const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
         let deletedCount = 0;
 
-        files.forEach((file) => {
-            if (file.endsWith('.json') && !file.endsWith('.vectors.json')) {
-                const filePath = path.join(SESSIONS_DIR, file);
-                try {
-                    const stats = fs.statSync(filePath);
-                    const ageMs = now - stats.mtimeMs;
-                    if (ageMs > maxAgeMs) {
-                        const sessionId = path.basename(file, '.json');
-                        deleteSession(sessionId);
-                        deletedCount++;
+        dirs.forEach((dir) => {
+            if (!fs.existsSync(dir)) return;
+            const files = fs.readdirSync(dir);
+            files.forEach((file) => {
+                if (file.endsWith('.json') && !file.endsWith('.vectors.json')) {
+                    const filePath = path.join(dir, file);
+                    try {
+                        const stats = fs.statSync(filePath);
+                        const ageMs = now - stats.mtimeMs;
+                        if (ageMs > maxAgeMs) {
+                            const sessionId = path.basename(file, '.json');
+                            deleteSession(sessionId);
+                            deletedCount++;
+                        }
+                    } catch (statErr) {
+                        logger.error(`Error checking stats for session file ${file} in dir ${dir}: ${statErr.message}`);
                     }
-                } catch (statErr) {
-                    logger.error(`Error checking stats for session file ${file}: ${statErr.message}`);
                 }
-            }
+            });
         });
 
         if (deletedCount > 0) {
@@ -256,29 +283,51 @@ export const cleanOldSessions = (maxAgeDays = 7) => {
 export const listSessions = () => {
     ensureSessionsDir();
     try {
-        const files = fs.readdirSync(SESSIONS_DIR);
-        const sessions = [];
-        files.forEach((file) => {
-            if (file.endsWith('.json') && !file.endsWith('.vectors.json')) {
-                const filePath = path.join(SESSIONS_DIR, file);
-                try {
-                    const content = fs.readFileSync(filePath, 'utf-8');
-                    const session = JSON.parse(content);
-                    if (session.sessionId) {
-                        sessions.push({
-                            sessionId: session.sessionId,
-                            title: session.title || 'Untitled Session',
-                            methodology: session.methodology || 'STRIDE',
-                            createdAt: session.createdAt,
-                            updatedAt: session.updatedAt || session.createdAt,
-                            hasPassword: Boolean(session.passwordHash)
-                        });
-                    }
-                } catch (err) {
-                    logger.error(`Error reading session file ${file} in listSessions: ${err.message}`);
+        const sessionFiles = new Map(); // sessionId -> file path
+        
+        // Scan primary SESSIONS_DIR
+        if (fs.existsSync(SESSIONS_DIR)) {
+            fs.readdirSync(SESSIONS_DIR).forEach(file => {
+                if (file.endsWith('.json') && !file.endsWith('.vectors.json')) {
+                    const sessionId = path.basename(file, '.json');
+                    sessionFiles.set(sessionId, path.join(SESSIONS_DIR, file));
                 }
+            });
+        }
+        
+        // Scan fallback directory if different
+        const fallbackDir = path.join(process.cwd(), 'ai-sessions');
+        if (fallbackDir !== SESSIONS_DIR && fs.existsSync(fallbackDir)) {
+            fs.readdirSync(fallbackDir).forEach(file => {
+                if (file.endsWith('.json') && !file.endsWith('.vectors.json')) {
+                    const sessionId = path.basename(file, '.json');
+                    if (!sessionFiles.has(sessionId)) {
+                        sessionFiles.set(sessionId, path.join(fallbackDir, file));
+                    }
+                }
+            });
+        }
+
+        const sessions = [];
+        sessionFiles.forEach((filePath, sessionId) => {
+            try {
+                const content = fs.readFileSync(filePath, 'utf-8');
+                const session = JSON.parse(content);
+                if (session.sessionId) {
+                    sessions.push({
+                        sessionId: session.sessionId,
+                        title: session.title || 'Untitled Session',
+                        methodology: session.methodology || 'STRIDE',
+                        createdAt: session.createdAt,
+                        updatedAt: session.updatedAt || session.createdAt,
+                        hasPassword: Boolean(session.passwordHash)
+                    });
+                }
+            } catch (err) {
+                logger.error(`Error reading session file ${filePath} in listSessions: ${err.message}`);
             }
         });
+        
         sessions.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
         return sessions;
     } catch (err) {
