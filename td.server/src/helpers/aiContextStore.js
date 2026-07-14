@@ -7,8 +7,13 @@ import path from 'path';
 
 const logger = loggerHelper.get('helpers/aiContextStore.js');
 
-// Store sessions in td.server/ai-sessions directory
-const SESSIONS_DIR = path.join(process.cwd(), 'ai-sessions');
+// Store sessions in td.server/ai-sessions directory relative to this file
+let SESSIONS_DIR = path.join(__dirname, '..', '..', 'ai-sessions');
+
+// Fallback to process.cwd()/ai-sessions if the directory does not exist there but exists in process.cwd()
+if (!fs.existsSync(SESSIONS_DIR) && fs.existsSync(path.join(process.cwd(), 'ai-sessions'))) {
+    SESSIONS_DIR = path.join(process.cwd(), 'ai-sessions');
+}
 
 const ensureSessionsDir = () => {
     if (!fs.existsSync(SESSIONS_DIR)) {
