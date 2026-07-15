@@ -86,6 +86,16 @@ const resolveModel = (provider, customModel, session) => {
     return customModel || (session && session.customModel) || env.get().config.GEMINI_MODEL || 'gemini-3.1-flash-lite';
 };
 
+const resolveApiKeyForSession = (session) => {
+    if (session && session.isCustomApiKey && session.apiKey) {
+        return session.apiKey;
+    }
+    const provider = session?.aiProvider || 'gemini';
+    return provider === 'bedrock-mantle'
+        ? env.get().config.BEDROCK_MANTLE_API_KEY
+        : env.get().config.GEMINI_API_KEY;
+};
+
 // Rebuild history from answered questions helper
 const rebuildHistoryFromAnswered = (answeredQuestions) => {
     const history = [];
@@ -198,12 +208,34 @@ const generate = async (req, res) => {
     } else if (activeSession && activeSession.extendedThinking) {
         extendedThinkingVal = true;
     }
+    const defaultEnvKey = provider === 'bedrock-mantle' ? env.get().config.BEDROCK_MANTLE_API_KEY : env.get().config.GEMINI_API_KEY;
     let resolvedApiKey = clientApiKey;
-    if (resolvedApiKey === '*****') {
-        resolvedApiKey = (activeSession && activeSession.apiKey) || '';
+    let isCustom = false;
+
+    if (resolvedApiKey && resolvedApiKey !== '*****') {
+        if (resolvedApiKey !== defaultEnvKey) {
+            isCustom = true;
+        } else {
+            resolvedApiKey = '';
+        }
     }
+
+    if (resolvedApiKey === '*****') {
+        if (activeSession && activeSession.isCustomApiKey && activeSession.apiKey) {
+            resolvedApiKey = activeSession.apiKey;
+            isCustom = true;
+        } else {
+            resolvedApiKey = defaultEnvKey;
+        }
+    }
+
     if (!resolvedApiKey) {
-        resolvedApiKey = (activeSession && activeSession.apiKey) || (provider === 'bedrock-mantle' ? env.get().config.BEDROCK_MANTLE_API_KEY : env.get().config.GEMINI_API_KEY);
+        if (activeSession && activeSession.isCustomApiKey && activeSession.apiKey) {
+            resolvedApiKey = activeSession.apiKey;
+            isCustom = true;
+        } else {
+            resolvedApiKey = defaultEnvKey;
+        }
     }
     const aiConfig = {
         provider: provider,
@@ -381,7 +413,13 @@ substring(2, 7)}`;
                     deduplicatorExtendedThinking: deduplicatorExtendedThinking === true || deduplicatorExtendedThinking === 'true'
                 };
                 if (clientApiKey !== undefined) {
-                    sessionUpdates.apiKey = clientApiKey;
+                    if (isCustom) {
+                        sessionUpdates.apiKey = resolvedApiKey;
+                        sessionUpdates.isCustomApiKey = true;
+                    } else {
+                        sessionUpdates.apiKey = '';
+                        sessionUpdates.isCustomApiKey = false;
+                    }
                 }
                 activeSession = await aiContextStore.updateSession(sessionId, sessionUpdates);
             }
@@ -439,7 +477,8 @@ substring(2, 7)}`;
                 aiProvider: provider,
                 customBaseUrl: aiConfig.baseUrl || '',
                 customModel: aiConfig.model || '',
-                apiKey: aiConfig.apiKey || '',
+                apiKey: isCustom ? resolvedApiKey : '',
+                isCustomApiKey: isCustom,
                 extendedThinking: aiConfig.extendedThinking,
                 customizeStageModels: customizeStageModels === true || customizeStageModels === 'true',
                 generatorModel: generatorModel || '',
@@ -672,7 +711,7 @@ const editAnswers = async (req, res) => {
         // We retrieve the needed parameters for generation
         const aiConfig = {
             provider: activeSession.aiProvider || 'gemini',
-            apiKey: activeSession.apiKey || (activeSession.aiProvider === 'bedrock-mantle' ? env.get().config.BEDROCK_MANTLE_API_KEY : env.get().config.GEMINI_API_KEY),
+            apiKey: resolveApiKeyForSession(activeSession),
             baseUrl: activeSession.customBaseUrl || env.get().config.BEDROCK_MANTLE_BASE_URL,
             model: resolveModel(activeSession.aiProvider || 'gemini', activeSession.customModel, activeSession),
             embeddingModel: env.get().config.BEDROCK_MANTLE_EMBEDDING_MODEL || 'amazon.titan-embed-text-v1',
@@ -1001,7 +1040,7 @@ const exportQuestions = async (req, res) => {
         const provider = session.aiProvider || 'gemini';
         const aiConfig = {
             provider,
-            apiKey: session.apiKey || (provider === 'bedrock-mantle' ? env.get().config.BEDROCK_MANTLE_API_KEY : env.get().config.GEMINI_API_KEY),
+            apiKey: resolveApiKeyForSession(session),
             baseUrl: session.customBaseUrl || env.get().config.BEDROCK_MANTLE_BASE_URL,
             model: resolveModel(provider, session.customModel, session),
             extendedThinking: session.extendedThinking === true || session.extendedThinking === 'true'
@@ -1328,7 +1367,7 @@ const importAnswers = async (req, res) => {
         const provider = session.aiProvider || 'gemini';
         const aiConfig = {
             provider,
-            apiKey: session.apiKey || (provider === 'bedrock-mantle' ? env.get().config.BEDROCK_MANTLE_API_KEY : env.get().config.GEMINI_API_KEY),
+            apiKey: resolveApiKeyForSession(session),
             baseUrl: session.customBaseUrl || env.get().config.BEDROCK_MANTLE_BASE_URL,
             model: resolveModel(provider, session.customModel, session),
             embeddingModel: session.customEmbeddingModel || env.get().config.BEDROCK_MANTLE_EMBEDDING_MODEL || 'amazon.titan-embed-text-v1',
@@ -1402,7 +1441,7 @@ const applyRequirements = async (req, res) => {
         const provider = session.aiProvider || 'gemini';
         const aiConfig = {
             provider,
-            apiKey: session.apiKey || (provider === 'bedrock-mantle' ? env.get().config.BEDROCK_MANTLE_API_KEY : env.get().config.GEMINI_API_KEY),
+            apiKey: resolveApiKeyForSession(session),
             baseUrl: session.customBaseUrl || env.get().config.BEDROCK_MANTLE_BASE_URL,
             model: resolveModel(provider, session.customModel, session),
             extendedThinking: session.extendedThinking === true || session.extendedThinking === 'true'
