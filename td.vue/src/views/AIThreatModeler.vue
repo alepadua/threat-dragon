@@ -933,7 +933,7 @@
                         </template>
 
                         <div class="control-assessment-list overflow-auto" style="max-height: 250px;">
-                            <div v-for="(item, idx) in evaluation.controlsAssessment" :key="idx" class="p-2 border-bottom font-size-xs">
+                            <div v-for="(item, idx) in (evaluation.controlsAssessment || []).filter(i => i && i.securityControl)" :key="idx" class="p-2 border-bottom font-size-xs">
                                 <div class="d-flex justify-content-between align-items-center mb-1">
                                     <span class="font-weight-bold text-dark">{{ item.securityControl }}</span>
                                     <b-badge :variant="item.assessment === 'Eficaz' ? 'success' : 'warning'" class="text-dark font-weight-bold">
@@ -1877,7 +1877,7 @@
                             </tr>
                         </thead>
                         <tbody>
-                            <tr v-for="(item, idx) in evaluation.controlsAssessment" :key="idx" style="border-bottom: 1px solid #f1f5f9;">
+                            <tr v-for="(item, idx) in (evaluation.controlsAssessment || []).filter(i => i && i.securityControl)" :key="idx" style="border-bottom: 1px solid #f1f5f9;">
                                 <td style="padding: 12px 10px; font-weight: 600; color: #334155;">{{ item.securityControl }}</td>
                                 <td style="padding: 12px 10px;">
                                     <span v-if="item.assessment === 'Eficaz'" style="background-color: #dcfce7; color: #15803d; padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 11px; display: inline-block;">
@@ -3631,7 +3631,7 @@ export default {
             if (this.evaluation.controlsAssessment && this.evaluation.controlsAssessment.length > 0) {
                 markdown += `| Answer Provided | Security Control | Efficacy | Critique / Recommendations |\n`;
                 markdown += `| --- | --- | --- | --- |\n`;
-                this.evaluation.controlsAssessment.forEach((item) => {
+                this.evaluation.controlsAssessment.filter(item => item && item.securityControl).forEach((item) => {
                     const badge = item.assessment === 'Eficaz' ? '✅ Eficaz' : '⚠️ Carece Melhoria';
                     markdown += `| ${item.userAnswer.replace(/\n/g, ' ')} | ${item.securityControl} | ${badge} | ${item.details.replace(/\n/g, ' ')} |\n`;
                 });

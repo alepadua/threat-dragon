@@ -284,7 +284,7 @@ export const healDiagramCells = (cells) => {
 
 export const applyDeduplicationChanges = (model, controlsAssessment, proposals, approvedControlIds = [], approvedThreatIds = []) => {
     const newModel = JSON.parse(JSON.stringify(model));
-    let newControls = [...(controlsAssessment || [])];
+    let newControls = (controlsAssessment || []).filter(item => item && item.securityControl);
     
     if (!proposals) { return { model: newModel, controlsAssessment: newControls }; }
     

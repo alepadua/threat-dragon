@@ -457,7 +457,7 @@ Return ONLY a JSON object containing the keys "${dfdApprovedBool ? 'threatDeltas
                 evaluation.controlsAssessment = [];
             } else {
                 evaluation.controlsAssessment = evaluation.controlsAssessment.filter((assessment) => {
-                    if (!assessment.userAnswer) { return false; }
+                    if (!assessment || !assessment.userAnswer) { return false; }
                     const cleanUserAnswer = assessment.userAnswer.toLowerCase().trim();
                     return realAnswers.some((q) => {
                         const cleanActual = q.answer.toLowerCase().trim();
