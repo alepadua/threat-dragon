@@ -59,13 +59,26 @@
                                 label-for="apiKey"
                                 label-class="font-weight-bold"
                             >
-                                <b-form-input
-                                    id="apiKey"
-                                    v-model="form.apiKey"
-                                    type="password"
-                                    :placeholder="form.aiProvider === 'bedrock-mantle' ? $t('aiThreatModeler.apiKeyPlaceholderBedrock') : $t('aiThreatModeler.apiKeyPlaceholderGemini')"
-                                    class="custom-input"
-                                ></b-form-input>
+                                <b-input-group>
+                                    <b-form-input
+                                        id="apiKey"
+                                        v-model="form.apiKey"
+                                        type="password"
+                                        :placeholder="form.aiProvider === 'bedrock-mantle' ? $t('aiThreatModeler.apiKeyPlaceholderBedrock') : $t('aiThreatModeler.apiKeyPlaceholderGemini')"
+                                        class="custom-input"
+                                    ></b-form-input>
+                                    <b-input-group-append>
+                                        <b-button variant="outline-warning" @click="resetToEnvKey" title="Usar chave padrão do servidor (.env)" class="font-weight-bold">
+                                            <font-awesome-icon icon="sync" class="mr-1" /> Usar .env
+                                        </b-button>
+                                    </b-input-group-append>
+                                </b-input-group>
+                                <small v-if="!form.apiKey" class="text-success font-weight-bold font-size-xs mt-1 d-block">
+                                    <font-awesome-icon icon="check-circle" /> Usando chave padrão do servidor (.env)
+                                </small>
+                                <small v-else class="text-warning font-weight-bold font-size-xs mt-1 d-block">
+                                    <font-awesome-icon icon="lock" /> Usando chave salva/customizada
+                                </small>
                             </b-form-group>
                         </b-col>
                     </b-form-row>
@@ -651,6 +664,27 @@
                                             class="custom-input font-size-sm"
                                         ></b-form-input>
                                     </b-form-group>
+                                    <b-form-group label="API Key Override" label-class="font-weight-bold font-size-xs" class="mb-2">
+                                        <b-input-group size="sm">
+                                            <b-form-input
+                                                v-model="form.apiKey"
+                                                type="password"
+                                                placeholder="Deixe vazio para usar a chave padrão (.env)..."
+                                                class="custom-input font-size-sm"
+                                            ></b-form-input>
+                                            <b-input-group-append>
+                                                <b-button variant="outline-warning" @click="resetToEnvKey" class="font-size-xs font-weight-bold">
+                                                    <font-awesome-icon icon="sync" /> Usar .env
+                                                </b-button>
+                                            </b-input-group-append>
+                                        </b-input-group>
+                                        <small v-if="!form.apiKey" class="text-success font-weight-bold font-size-xs mt-1 d-block">
+                                            <font-awesome-icon icon="check-circle" /> Usando chave padrão (.env)
+                                        </small>
+                                        <small v-else class="text-warning font-weight-bold font-size-xs mt-1 d-block">
+                                            <font-awesome-icon icon="lock" /> Usando chave salva/customizada
+                                        </small>
+                                    </b-form-group>
                                     <b-form-checkbox
                                         v-if="form.aiProvider === 'bedrock-mantle'"
                                         v-model="form.extendedThinking"
@@ -1205,6 +1239,27 @@
                                                 placeholder="meta.llama3-70b-instruct-v1:0"
                                                 class="custom-input font-size-sm"
                                             ></b-form-input>
+                                        </b-form-group>
+                                        <b-form-group label="API Key Override" label-class="font-weight-bold font-size-xs" class="mb-2">
+                                            <b-input-group size="sm">
+                                                <b-form-input
+                                                    v-model="form.apiKey"
+                                                    type="password"
+                                                    placeholder="Deixe vazio para usar a chave padrão (.env)..."
+                                                    class="custom-input font-size-sm"
+                                                ></b-form-input>
+                                                <b-input-group-append>
+                                                    <b-button variant="outline-warning" @click="resetToEnvKey" class="font-size-xs font-weight-bold">
+                                                        <font-awesome-icon icon="sync" /> Usar .env
+                                                    </b-button>
+                                                </b-input-group-append>
+                                            </b-input-group>
+                                            <small v-if="!form.apiKey" class="text-success font-weight-bold font-size-xs mt-1 d-block">
+                                                <font-awesome-icon icon="check-circle" /> Usando chave padrão (.env)
+                                            </small>
+                                            <small v-else class="text-warning font-weight-bold font-size-xs mt-1 d-block">
+                                                <font-awesome-icon icon="lock" /> Usando chave salva/customizada
+                                            </small>
                                         </b-form-group>
                                         <b-form-checkbox
                                             v-if="form.aiProvider === 'bedrock-mantle'"
@@ -2356,6 +2411,10 @@ export default {
         this.fetchServerSessions();
     },
     methods: {
+        resetToEnvKey() {
+            this.form.apiKey = '';
+            this.$toast.info('A chave da sessão foi redefinida para usar a chave padrão do servidor (.env).');
+        },
         triggerFileInput(id) {
             document.getElementById(id).click();
         },
