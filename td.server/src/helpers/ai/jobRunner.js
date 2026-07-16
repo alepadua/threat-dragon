@@ -574,6 +574,20 @@ Return ONLY a JSON object containing the keys "${dfdApprovedBool ? 'threatDeltas
             }
         }
 
+        if (threatModelApprovedBool) {
+            if (!evaluation) {
+                evaluation = {
+                    status: 'Ready',
+                    completenessScore: 100,
+                    feedback: 'Threat model successfully approved and concluded.',
+                    controlsAssessment: []
+                };
+            } else {
+                evaluation.status = 'Ready';
+                evaluation.completenessScore = 100;
+            }
+        }
+
         const isTransition = dfdApprovedBool && (!activeSession || !activeSession.dfdApproved);
         const historyToUse = isTransition ? [] : (refinementHistory || []);
         const updatedHistory = ensureModelMessageInHistory(historyToUse, parsedOutput.questions, dfdApprovedBool);

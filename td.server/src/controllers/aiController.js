@@ -439,9 +439,21 @@ substring(2, 7)}`;
                 });
             }
 
-            await aiContextStore.updateSession(activeSession.sessionId, {
+            const updatedEvaluation = activeSession.evaluation ? {
+                ...activeSession.evaluation,
+                status: 'Ready',
+                completenessScore: 100
+            } : {
+                status: 'Ready',
+                completenessScore: 100,
+                feedback: 'Threat model successfully approved and concluded.',
+                controlsAssessment: []
+            };
+
+            activeSession = await aiContextStore.updateSession(activeSession.sessionId, {
                 history: previousHistory,
-                threatModelApproved: true
+                threatModelApproved: true,
+                evaluation: updatedEvaluation
             });
 
             logger.info(`Threat model session approved by human. Session ID: ${activeSession.sessionId}`);
@@ -816,8 +828,17 @@ const applyDeduplication = async (req, res) => {
             ...session.evaluation,
             controlsAssessment: updatedControls,
             hallucinationAlerts: session.hallucinationAlerts || [],
+            mitigationStatus: session.mitigationStatus || [],
+            status: 'Ready',
+            completenessScore: 100
+        } : {
+            status: 'Ready',
+            completenessScore: 100,
+            feedback: 'Threat model successfully approved and concluded.',
+            controlsAssessment: updatedControls,
+            hallucinationAlerts: session.hallucinationAlerts || [],
             mitigationStatus: session.mitigationStatus || []
-        } : null;
+        };
 
         // Push to history for potential rollback
         const previousHistory = session.history || [];

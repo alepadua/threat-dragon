@@ -3212,6 +3212,22 @@ export default {
             }
             this.evaluation = result.evaluation || null;
 
+            if (this.threatModelApproved) {
+                if (!this.evaluation) {
+                    this.evaluation = {
+                        status: 'Ready',
+                        completenessScore: 100,
+                        feedback: 'Threat model successfully approved and concluded.',
+                        controlsAssessment: [],
+                        hallucinationAlerts: [],
+                        mitigationStatus: []
+                    };
+                } else {
+                    this.evaluation.status = 'Ready';
+                    this.evaluation.completenessScore = 100;
+                }
+            }
+
             if (result.deduplicateProposals !== undefined) {
                 this.deduplicateProposals = result.deduplicateProposals;
                 this.selectedControlDups = result.deduplicateProposals ? (result.deduplicateProposals.controlDeduplications || []).map(p => p.id) : [];
@@ -3663,6 +3679,10 @@ export default {
                 this.generatedModel = data.threatModel;
                 this.evaluation = data.evaluation;
                 this.threatModelApproved = true;
+                if (this.evaluation) {
+                    this.evaluation.status = 'Ready';
+                    this.evaluation.completenessScore = 100;
+                }
                 this.step = 'interactive';
             } catch (err) {
                 this.errorMessage = err.message || 'Error occurred while applying deduplication';
